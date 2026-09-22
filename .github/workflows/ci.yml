@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-e-testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restaurar
+        run: dotnet restore Jornada.slnx
+
+      # TreatWarningsAsErrors esta ligado em Directory.Build.props: um warning
+      # aqui ja quebra o build. E deliberado - num dominio cheio de invariante,
+      # aviso de referencia nula e bug esperando acontecer.
+      - name: Compilar
+        run: dotnet build Jornada.slnx --no-restore -c Release
+
+      # As guardas do ADR-0001 rodam ANTES dos testes de dominio. Se a regra de
+      # dependencia foi violada, o resto nao importa: o hexagono ja deixou de
+      # existir e os testes verdes dariam falsa seguranca.
+      - name: Guardas de arquitetura (ADR-0001)
+        run: dotnet run --project tests/Jornada.Arquitetura.Testes -c Release --no-build
+
+      - name: Testes de dominio
+        run: dotnet run --project tests/Jornada.Dominio.Testes -c Release --no-build
+
+  # Exercita o isolamento entre empresas contra um Postgres DE VERDADE
+  # (ADR-0003). Sem isto, a aposta de seguranca do produto fica so no papel.
+  isolamento-entre-empresas:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: catalogo
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar papeis e RLS
+        env:
+          PGPASSWORD: ci
+        run: |
+          psql -h localhost -U postgres -d catalogo -v ON_ERROR_STOP=1 -f local/postgres/01-papeis.sql
+          psql -h localhost -U postgres -d catalogo -v ON_ERROR_STOP=1 -f local/postgres/02-sandbox-rls.sql
+
+      - name: Nenhuma tabela com tenant_id sem RLS
+        env:
+          PGPASSWORD: ci
+        run: psql -h localhost -U postgres -d catalogo -v ON_ERROR_STOP=1 -c "SELECT plataforma.exigir_rls()"
+
+      - name: Empresa A nao enxerga dado da Empresa B
+        env:
+          PGPASSWORD: dev_app
+        run: |
+          set -e
+          A=11111111-1111-1111-1111-111111111111
+          B=22222222-2222-2222-2222-222222222222
+          val() { grep -Ev '^(BEGIN|COMMIT|SET|INSERT|UPDATE)' | grep -v '^$' | tail -1; }
+          q() { psql -h localhost -U catalogo_app -d catalogo -tA -c "$1" 2>&1 | val; }
+
+          [ "$(q 'SELECT count(*) FROM sandbox.ativo_exemplo')" = "0" ] \
+            || { echo 'FALHA: sem contexto de tenant deveria ver 0 linhas'; exit 1; }
+
+          [ "$(q "SELECT set_config('app.tenant_id','$A',true); SELECT count(*) FROM sandbox.ativo_exemplo")" = "2" ] \
+            || { echo 'FALHA: empresa A deveria ver 2'; exit 1; }
+
+          [ "$(q "SELECT set_config('app.tenant_id','$B',true); SELECT count(*) FROM sandbox.ativo_exemplo")" = "1" ] \
+            || { echo 'FALHA: empresa B deveria ver 1'; exit 1; }
+
+          # O contexto e LOCAL: morre no COMMIT. E isso que impede o vazamento
+          # quando o PgBouncer devolve a conexao a outra requisicao.
+          [ "$(q "BEGIN; SELECT set_config('app.tenant_id','$A',true); COMMIT; SELECT count(*) FROM sandbox.ativo_exemplo")" = "0" ] \
+            || { echo 'FALHA: contexto vazou depois do COMMIT'; exit 1; }
+
+          psql -h localhost -U catalogo_app -d catalogo -tAc \
+            "SELECT set_config('app.tenant_id','$A',true); INSERT INTO sandbox.ativo_exemplo (tenant_id,codigo,nome) VALUES ('$B','X-1','invasor')" 2>&1 \
+            | grep -qi 'row-level security' \
+            || { echo 'FALHA: INSERT com tenant alheio nao foi recusado'; exit 1; }
+
+          echo 'Isolamento entre empresas integro.'

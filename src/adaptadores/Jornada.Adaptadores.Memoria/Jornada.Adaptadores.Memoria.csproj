@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Adaptador em memória: implementa as MESMAS portas que o Postgres.
+       Serve para (a) os testes de domínio e de caso de uso, e (b) rodar a API
+       sem infraestrutura (provedor "memoria").
+
+       Ele existe porque o hexágono torna isso barato: a regra de negócio não
+       sabe qual adaptador está atrás da porta (ADR-0001). -->
+
+  <PropertyGroup>
+    <RootNamespace>Jornada.Adaptadores.Memoria</RootNamespace>
+    <AssemblyName>Jornada.Adaptadores.Memoria</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
+  </ItemGroup>
+
+</Project>

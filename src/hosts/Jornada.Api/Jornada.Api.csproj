@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Adaptador de ENTRADA. Traduz HTTP para caso de uso e nada mais:
+       nenhuma regra de negócio mora aqui (ADR-0001).
+
+       Usa só o framework compartilhado ASP.NET Core — sem PackageReference —
+       o que mantém a API compilável em ambiente sem acesso ao NuGet.
+       Microsoft.AspNetCore.OpenApi (geração do contrato, ADR-0009) entra
+       quando o NuGet estiver acessível. -->
+
+  <PropertyGroup>
+    <RootNamespace>Jornada.Api</RootNamespace>
+    <AssemblyName>Jornada.Api</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
+    <ProjectReference Include="..\..\adaptadores\Jornada.Adaptadores.Memoria\Jornada.Adaptadores.Memoria.csproj" />
+  </ItemGroup>
+
+</Project>

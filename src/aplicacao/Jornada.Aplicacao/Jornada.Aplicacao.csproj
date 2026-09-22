@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Casos de uso + DEFINIÇÃO das portas.
+       As interfaces moram AQUI, não nos adaptadores — é isso que inverte a
+       dependência e faz o hexágono funcionar (ADR-0001).
+       Também sem <PackageReference>: só o domínio. -->
+
+  <PropertyGroup>
+    <RootNamespace>Jornada.Aplicacao</RootNamespace>
+    <AssemblyName>Jornada.Aplicacao</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\dominio\Jornada.Dominio\Jornada.Dominio.csproj" />
+  </ItemGroup>
+
+</Project>

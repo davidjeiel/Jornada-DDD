@@ -1,0 +1,12 @@
+; Usuários do PgBouncer — APENAS AMBIENTE LOCAL.
+;
+; Senhas em texto puro: o PgBouncer aceita isso mesmo com auth_type
+; scram-sha-256 (ele calcula o verificador na hora). Em produção isto não
+; existe — a aplicação usa Managed Identity contra o Flexible Server e não há
+; senha em lugar nenhum (ADR-0011).
+;
+; As senhas aqui batem com local/postgres/01-papeis.sql.
+
+"catalogo_app"      "dev_app"
+"catalogo_migrador" "dev_migrador"
+"catalogo_leitor"   "dev_leitor"

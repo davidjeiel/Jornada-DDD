@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       ESTE É O ÚNICO PROJETO QUE NÃO FOI COMPILADO na geração desta primeira
+       versão: o ambiente não tinha acesso ao nuget.org, e ele precisa de
+       EF Core + Npgsql.
+
+       Na sua máquina, com NuGet acessível, `dotnet restore` resolve e ele
+       compila junto com o resto. Até lá, use o filtro de solution:
+
+           dotnet build Jornada-sem-nuget.slnf
+
+       Ver README.md > "Limitações desta primeira versão".
+       ════════════════════════════════════════════════════════════════════════ -->
+
+  <PropertyGroup>
+    <RootNamespace>Jornada.Persistencia.Postgres</RootNamespace>
+    <AssemblyName>Jornada.Persistencia.Postgres</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Dapper" />
+  </ItemGroup>
+
+</Project>

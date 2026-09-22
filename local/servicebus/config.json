@@ -1,0 +1,77 @@
+{
+  "//": [
+    "Emulador de Azure Service Bus — topologia local (ADR-0008).",
+    "Um tópico por tipo de evento; uma assinatura por consumidor.",
+    "Limites do emulador: 1 namespace, 50 entidades, 256 KB por mensagem,",
+    "e as entidades NÃO sobrevivem ao reinício do container — este arquivo",
+    "é que as recria. Ajustar aqui, não pelo SDK, para o ambiente ser",
+    "reproduzível entre máquinas.",
+    "Consumidores espelham a tabela do ADR-0008 §5."
+  ],
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "sbemulatorns",
+        "Queues": [
+          {
+            "Name": "outbox-despacho",
+            "Properties": {
+              "DeadLetteringOnMessageExpiration": true,
+              "DefaultMessageTimeToLive": "PT1H",
+              "LockDuration": "PT1M",
+              "MaxDeliveryCount": 5
+            }
+          },
+          {
+            "Name": "webhook-entrega",
+            "Properties": {
+              "DeadLetteringOnMessageExpiration": true,
+              "DefaultMessageTimeToLive": "PT6H",
+              "LockDuration": "PT2M",
+              "MaxDeliveryCount": 8
+            }
+          }
+        ],
+        "Topics": [
+          {
+            "Name": "catalogo.ativo",
+            "Properties": { "DefaultMessageTimeToLive": "PT1H" },
+            "Subscriptions": [
+              { "Name": "qualidade",   "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } },
+              { "Name": "indice-busca","Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } },
+              { "Name": "indicadores", "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } },
+              { "Name": "medicao",     "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } }
+            ]
+          },
+          {
+            "Name": "governanca.validacao",
+            "Properties": { "DefaultMessageTimeToLive": "PT1H" },
+            "Subscriptions": [
+              { "Name": "notificacoes", "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } },
+              { "Name": "indicadores",  "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } }
+            ]
+          },
+          {
+            "Name": "governanca.revisao",
+            "Properties": { "DefaultMessageTimeToLive": "PT1H" },
+            "Subscriptions": [
+              { "Name": "indice-busca", "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } },
+              { "Name": "notificacoes", "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } },
+              { "Name": "webhook",      "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } },
+              { "Name": "medicao",      "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } }
+            ]
+          },
+          {
+            "Name": "descoberta.importacao",
+            "Properties": { "DefaultMessageTimeToLive": "PT1H" },
+            "Subscriptions": [
+              { "Name": "qualidade", "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } },
+              { "Name": "medicao",   "Properties": { "MaxDeliveryCount": 5, "LockDuration": "PT1M" } }
+            ]
+          }
+        ]
+      }
+    ],
+    "Logging": { "Type": "File" }
+  }
+}

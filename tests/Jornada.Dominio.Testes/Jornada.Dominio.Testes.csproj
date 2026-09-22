@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       POR QUE ESTE PROJETO NÃO USA xUnit (ainda)
+
+       O ambiente em que esta primeira versão foi gerada não tinha acesso ao
+       nuget.org, então xUnit, FluentAssertions e NetArchTest não puderam ser
+       restaurados. Em vez de entregar testes que ninguém conseguiu executar,
+       eles rodam sobre um harness próprio de ~120 linhas, sem dependência
+       nenhuma — e RODAM, com saída verde, hoje.
+
+       O ativo aqui são os CASOS, não o executor (ADR-0012). A migração é
+       mecânica e está descrita em README.md > "Migrar os testes para xUnit":
+       cada [Teste] vira [Fact], cada Verificar.* vira Assert.*.
+       ════════════════════════════════════════════════════════════════════════ -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Jornada.Dominio.Testes</RootNamespace>
+    <AssemblyName>Jornada.Dominio.Testes</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\dominio\Jornada.Dominio\Jornada.Dominio.csproj" />
+    <ProjectReference Include="..\..\src\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
+    <ProjectReference Include="..\..\src\adaptadores\Jornada.Adaptadores.Memoria\Jornada.Adaptadores.Memoria.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,23 @@
+<Solution>
+  <!--
+    Solution para ambientes SEM acesso ao nuget.org.
+
+    Exclui apenas Jornada.Persistencia.Postgres, que precisa de EF Core e
+    Npgsql. Todo o resto — domínio, aplicação, adaptador em memória, API e as
+    duas suítes de teste — compila e roda só com o SDK do .NET:
+
+        dotnet build Jornada-sem-nuget.slnx
+
+    Com NuGet acessível, use Jornada.slnx. Ver README > "Limitações".
+  -->
+  <Folder Name="/src/">
+    <Project Path="src/dominio/Jornada.Dominio/Jornada.Dominio.csproj" />
+    <Project Path="src/aplicacao/Jornada.Aplicacao/Jornada.Aplicacao.csproj" />
+    <Project Path="src/adaptadores/Jornada.Adaptadores.Memoria/Jornada.Adaptadores.Memoria.csproj" />
+    <Project Path="src/hosts/Jornada.Api/Jornada.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Jornada.Dominio.Testes/Jornada.Dominio.Testes.csproj" />
+    <Project Path="tests/Jornada.Arquitetura.Testes/Jornada.Arquitetura.Testes.csproj" />
+  </Folder>
+</Solution>

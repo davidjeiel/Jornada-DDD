@@ -1,0 +1,40 @@
+# Copie para o SEU diretório de usuário como `.testcontainers.properties`:
+#   Windows:  %USERPROFILE%\.testcontainers.properties
+#   Linux:    ~/.testcontainers.properties
+#
+# É configuração de máquina, não de repositório — por isso não fica versionada
+# no lugar final. Este arquivo é só o modelo (ADR-0013 §7).
+
+# ── Onde está o daemon compatível com Docker ─────────────────────────────────
+# Windows, com "Docker Compatibility" ligado no Podman Desktop:
+docker.host=npipe:////./pipe/docker_engine
+
+# Linux / dentro do WSL, socket rootless do usuário:
+#   systemctl --user enable --now podman.socket
+# docker.host=unix:///run/user/1000/podman/podman.sock
+
+# ── Ryuk ─────────────────────────────────────────────────────────────────────
+# Ryuk é o container que recolhe containers órfãos ao fim dos testes. Ele
+# precisa montar o socket do Docker com privilégio, o que não funciona de forma
+# confiável em Podman rootless.
+#
+# O preço de desligá-lo é real: se o processo de teste morrer (Ctrl+C, crash,
+# parar o depurador), os containers ficam. Rode `.\local\dev.ps1 limpar`
+# de vez em quando — é higiene de rotina, não conserto de problema.
+#
+# No CI (Docker) NÃO desligue: lá o Ryuk funciona e limpa sozinho.
+ryuk.disabled=true
+
+# Alternativa, se o vazamento incomodar mais que perder o rootless:
+#   podman machine set --rootful
+#   ryuk.container.privileged=true
+#   ryuk.disabled=false
+
+# ── Desempenho ───────────────────────────────────────────────────────────────
+# Reusar o container entre execuções corta ~10 s por suíte. Exige
+# `withReuse(true)` no código do teste.
+testcontainers.reuse.enable=true
+
+# Imagens sempre com registro explícito: Podman não assume docker.io.
+# Sintoma de esquecer: "short-name resolution enforced but cannot prompt".
+# No código dos testes use docker.io/library/postgres:17-alpine, nunca postgres:17.

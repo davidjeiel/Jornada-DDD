@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A guarda do ADR-0001. Inspeciona os ASSEMBLIES COMPILADOS e falha o build
+       se alguém contaminar o domínio ou furar uma fronteira de módulo.
+
+       Sem NetArchTest: System.Reflection resolve isso em ~120 linhas e sem
+       dependência externa. Quando o NuGet estiver acessível, NetArchTest deixa
+       as regras mais expressivas — mas o efeito é o mesmo, e ele é o que
+       importa: sem este teste, o hexágono dura três sprints. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Jornada.Arquitetura.Testes</RootNamespace>
+    <AssemblyName>Jornada.Arquitetura.Testes</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\dominio\Jornada.Dominio\Jornada.Dominio.csproj" />
+    <ProjectReference Include="..\..\src\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
+    <ProjectReference Include="..\..\src\adaptadores\Jornada.Adaptadores.Memoria\Jornada.Adaptadores.Memoria.csproj" />
+  </ItemGroup>
+
+</Project>

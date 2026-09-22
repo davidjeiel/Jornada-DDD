@@ -1,0 +1,197 @@
+# Ambiente local do Catálogo Corporativo DDD — Podman (ADR-0013)
+#
+#   podman compose up -d          sobe tudo
+#   podman compose --profile busca up -d   inclui o OpenSearch opcional
+#   podman compose down -v        derruba e apaga volumes
+#
+# Este arquivo também roda em Docker sem alteração (o CI usa Docker).
+# Regra: imagens SEMPRE com registro explícito — Podman não assume docker.io.
+
+name: catalogo-local
+
+x-saude: &saude
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 20s
+
+services:
+
+  # ─────────────────────────────────────────────────── PostgreSQL (ADR-0004)
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    container_name: catalogo-postgres
+    environment:
+      POSTGRES_DB: catalogo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_local_nao_use_em_producao}
+      # pt-BR para ordenação e busca textual, igual ao Flexible Server
+      LANG: pt_BR.utf8
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    command:
+      - postgres
+      - -c
+      - max_connections=100
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - log_statement=none
+      - -c
+      - log_min_duration_statement=500   # loga consulta lenta: pega degradação por RLS
+    ports:
+      - "5432:5432"                      # acesso direto: migrações, psql, DBeaver
+    volumes:
+      - pgdados:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d:ro,Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d catalogo"]
+      <<: *saude
+
+  # ───────────────────────────── PgBouncer — transaction pooling (ADR-0003)
+  # NÃO É OPCIONAL. É aqui que se prova que `set_config('app.tenant_id', ..., true)`
+  # não vaza contexto entre requisições que reusam a mesma conexão.
+  pgbouncer:
+    image: docker.io/edoburu/pgbouncer:v1.23.1-p3
+    container_name: catalogo-pgbouncer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro,Z
+      - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro,Z
+    ports:
+      - "6432:6432"                      # ← a APLICAÇÃO conecta AQUI, não na 5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U catalogo_app"]
+      <<: *saude
+
+  # ─────────────────────────────────────────────── Cache / rate limit (ADR-0004)
+  valkey:
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: catalogo-valkey
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      <<: *saude
+
+  # ──────────────────────────────────────────── Blob Storage (evidências, exports)
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: catalogo-azurite
+    command: ["azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--location", "/dados"]
+    ports:
+      - "10000:10000"   # blob
+      - "10001:10001"   # queue
+      - "10002:10002"   # table
+    volumes:
+      - azuritedados:/dados
+
+  # ───────────────────────────────────────── Service Bus — outbox real (ADR-0008)
+  # ATENÇÃO: o instalador oficial da Microsoft ainda referencia azure-sql-edge,
+  # que foi APOSENTADO em 30/09/2025. Usamos mssql/server:2022.
+  servicebus:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    container_name: catalogo-servicebus
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      SQL_SERVER: mssql
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Dev_Local_Senha_Forte_1}
+      ACCEPT_EULA: "Y"
+    volumes:
+      - ./servicebus/config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro,Z
+    ports:
+      - "5672:5672"     # AMQP
+      - "5300:5300"     # gestão + /health
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: catalogo-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Dev_Local_Senha_Forte_1}
+      MSSQL_PID: Developer
+    healthcheck:
+      # sqlcmd mudou de caminho no 2022; tentamos os dois
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+
+  # ───────────────────────────── Identidade — OIDC local no lugar do Entra (ADR-0007)
+  # NÃO é Entra External ID. É OIDC padrão, que é o que a porta IProvedorDeIdentidade
+  # consome. Federação com IdP de cliente só se testa em homologação.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: catalogo-keycloak
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro,Z
+    ports:
+      - "8080:8080"
+
+  # ───────────────────── Observabilidade — OTLP local no lugar do Azure Monitor
+  # Mesmo protocolo (OpenTelemetry) que produção; muda só o destino.
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: catalogo-otel
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "18888:18888"   # painel web
+      - "18889:18889"   # OTLP/gRPC — é para cá que a aplicação exporta
+
+  # ─────────────────────── Busca — OPCIONAL, só quando mexer no adaptador de busca
+  # Na Fase 1, IIndiceDeBusca é implementada sobre tsvector do próprio Postgres
+  # (ADR-0004) e este serviço nem sobe.
+  opensearch:
+    profiles: ["busca"]
+    image: docker.io/opensearchproject/opensearch:2
+    container_name: catalogo-opensearch
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+
+  # ─────────────────────────────── Perfil "full" — a APLICAÇÃO em container
+  # Ainda não existe: depende do Dockerfile, que nasce na Fase 1 (ADR-0012).
+  # Quando existir, descomente. Serve para dois casos e só para eles: validar a
+  # imagem antes de publicar no ACR, e reproduzir bug que só aparece
+  # containerizado. NÃO é o modo de trabalho diário — em container você perde
+  # hot reload e depurador (ADR-0013 §2).
+  #
+  # api:
+  #   profiles: ["full"]
+  #   build:
+  #     context: ..
+  #     dockerfile: src/hosts/Catalogo.Api/Dockerfile
+  #   depends_on:
+  #     pgbouncer: { condition: service_healthy }
+  #   environment:
+  #     ConnectionStrings__Catalogo: "Host=pgbouncer;Port=6432;Database=catalogo;Username=catalogo_app;Password=dev_app"
+  #     ConnectionStrings__Redis: "valkey:6379"
+  #     OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+  #   ports:
+  #     - "8081:8080"
+  #
+  # workers:
+  #   profiles: ["full"]
+  #   build:
+  #     context: ..
+  #     dockerfile: src/hosts/Catalogo.Workers/Dockerfile
+  #   depends_on:
+  #     pgbouncer: { condition: service_healthy }
+
+volumes:
+  pgdados:
+  azuritedados:

@@ -1,0 +1,26 @@
+<Project>
+
+  <!-- Vale para TODO projeto da solution. Ver docs/adr/0001-arquitetura-hexagonal-ddd.md -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- O domínio é cheio de invariante. Referência nula silenciosa não entra. -->
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors></WarningsNotAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <NeutralLanguage>pt-BR</NeutralLanguage>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>Jornada DDD</Product>
+    <Company>Jornada DDD</Company>
+    <Authors>davidjeiel</Authors>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+       ║  O DOMÍNIO NÃO CONHECE O MUNDO.  (ADR-0001)                          ║
+       ║                                                                      ║
+       ║  Este arquivo não tem — e não pode ganhar — nenhum <PackageReference> ║
+       ║  nem <ProjectReference>. Sem EF Core, sem Npgsql, sem Azure, sem      ║
+       ║  ASP.NET, sem contêiner de injeção de dependência.                    ║
+       ║                                                                      ║
+       ║  Se você precisa de algo de fora, declare uma PORTA em               ║
+       ║  Jornada.Aplicacao/Portas e deixe um adaptador implementá-la.         ║
+       ║                                                                      ║
+       ║  Isto não depende de disciplina: tests/Jornada.Arquitetura.Testes     ║
+       ║  inspeciona o assembly compilado e quebra o build se alguém tentar.   ║
+       ╚══════════════════════════════════════════════════════════════════════╝ -->
+
+  <PropertyGroup>
+    <RootNamespace>Jornada.Dominio</RootNamespace>
+    <AssemblyName>Jornada.Dominio</AssemblyName>
+  </PropertyGroup>
+
+</Project>

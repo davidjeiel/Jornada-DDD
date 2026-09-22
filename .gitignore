@@ -1,0 +1,24 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+artifacts/
+TestResults/
+
+# Ambiente local (ADR-0013)
+local/.env
+local/dados/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.exemplo
+
+# Ferramentas
+.idea/
+.vscode/*
+!.vscode/extensions.json
