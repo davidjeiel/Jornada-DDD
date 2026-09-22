@@ -18,6 +18,7 @@ public sealed class ArmazemEmMemoria
 
     /// <summary>Relações: (origem, destino, tipo). Simplificação deliberada.</summary>
     internal List<(IdDeAtivo Origem, IdDeAtivo Destino, string Tipo)> Relacoes { get; } = [];
+    internal ConcurrentDictionary<Guid, ValidacaoEmProcesso> Validacoes { get; } = new();
 
     public void Limpar()
     {
@@ -25,6 +26,7 @@ public sealed class ArmazemEmMemoria
         Sequenciais.Clear();
         Eventos.Clear();
         Relacoes.Clear();
+        Validacoes.Clear();
     }
 }
 
@@ -52,12 +54,13 @@ public sealed class ArmazemEmMemoria
 /// </summary>
 public sealed class RepositorioDeAtivosEmMemoria(
     ArmazemEmMemoria armazem, IContextoDeTenantAtual tenant)
-    : IRepositorioDeAtivos, IRepositorioDeRelacoes, IUnidadeDeTrabalho
+    : IRepositorioDeAtivos, IRepositorioDeRelacoes, IUnidadeDeTrabalho, IRepositorioDeValidacoes
 {
     private ConcurrentDictionary<IdDeAtivo, Ativo> _ativos => armazem.Ativos;
     private ConcurrentDictionary<string, int> _sequenciais => armazem.Sequenciais;
     private List<EventoDeDominio> _eventosPublicados => armazem.Eventos;
     private List<(IdDeAtivo Origem, IdDeAtivo Destino, string Tipo)> _relacoes => armazem.Relacoes;
+    private ConcurrentDictionary<Guid, ValidacaoEmProcesso> _validacoes => armazem.Validacoes;
 
     public IReadOnlyList<EventoDeDominio> EventosPublicados => _eventosPublicados;
 
@@ -182,5 +185,25 @@ public sealed class RepositorioDeAtivosEmMemoria(
             drenados += eventos.Count;
         }
         return Task.FromResult(drenados);
+    }
+
+    public Task AdicionarAsync(ValidacaoEmProcesso validacao, CancellationToken ct = default)
+    {
+        if (validacao.Empresa != Empresa)
+            throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de gravar validação de outra empresa.");
+        _validacoes[validacao.Id] = validacao;
+        return Task.CompletedTask;
+    }
+
+    public Task<ValidacaoEmProcesso?> ObterAsync(Guid id, CancellationToken ct = default) =>
+        Task.FromResult(_validacoes.TryGetValue(id, out var validacao)
+            && validacao.Empresa == Empresa ? validacao : null);
+
+    public Task<IReadOnlyList<ValidacaoEmProcesso>> ListarAsync(IdDeAtivo? ativo = null, CancellationToken ct = default)
+    {
+        IEnumerable<ValidacaoEmProcesso> validacoes = _validacoes.Values.Where(v => v.Empresa == Empresa);
+        if (ativo is { } id) validacoes = validacoes.Where(v => v.Ativo == id);
+        return Task.FromResult<IReadOnlyList<ValidacaoEmProcesso>>(
+            validacoes.OrderBy(v => v.Status).ThenBy(v => v.Etapa).ToArray());
     }
 }

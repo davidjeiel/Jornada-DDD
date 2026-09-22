@@ -22,3 +22,7 @@ local/dados/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

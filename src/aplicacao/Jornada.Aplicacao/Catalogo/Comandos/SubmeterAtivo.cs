@@ -24,6 +24,7 @@ public sealed class SubmeterAtivo(
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    IRepositorioDeValidacoes validacoes,
     IRelogio relogio)
 {
     public sealed record Saida(int Revisao, IReadOnlyList<EtapaValidacao> EtapasAbertas, int Score);
@@ -61,6 +62,12 @@ public sealed class SubmeterAtivo(
         }
 
         ativo.Submeter(cmd.Motivo, ator.IdPessoa, relogio);
+        foreach (var etapa in checagem.Politica.Etapas)
+        {
+            await validacoes.AdicionarAsync(new ValidacaoEmProcesso(
+                Guid.CreateVersion7(), ativo.Id, contexto.Empresa, ativo.RevisaoAtual,
+                etapa, ator.IdPessoa), ct);
+        }
         await uow.ConfirmarAsync(ct);
 
         return Resultado<Saida>.Ok(new Saida(ativo.RevisaoAtual, checagem.Politica.Etapas, score.Total));

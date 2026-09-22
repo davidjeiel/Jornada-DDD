@@ -39,6 +39,7 @@ builder.Services.AddScoped<RepositorioDeAtivosEmMemoria>();
 builder.Services.AddScoped<IRepositorioDeAtivos>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
 builder.Services.AddScoped<IRepositorioDeRelacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
 builder.Services.AddScoped<IUnidadeDeTrabalho>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+builder.Services.AddScoped<IRepositorioDeValidacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
 
 builder.Services.AddSingleton<IMetamodelo, MetamodeloPadrao>();
 builder.Services.AddSingleton<IPoliticasDeGovernanca, PoliticasPadrao>();
@@ -47,6 +48,7 @@ builder.Services.AddSingleton<IPublicadorDeEventos, PublicadorEmMemoria>();
 builder.Services.AddScoped<CadastrarAtivo>();
 builder.Services.AddScoped<AtribuirResponsavel>();
 builder.Services.AddScoped<SubmeterAtivo>();
+builder.Services.AddScoped<DecidirValidacao>();
 builder.Services.AddScoped<AvaliarPreCheck>();
 builder.Services.AddScoped<ObterVisaoDoAtivo>();
 
@@ -210,6 +212,35 @@ v1.MapPost("/ativos/{id:guid}/submissoes",
         : Problema(r.Codigo!, r.Mensagem!);
 });
 
+v1.MapGet("/validacoes", async (IRepositorioDeValidacoes repo, string? ativo, CancellationToken ct) =>
+{
+    IdDeAtivo? idAtivo = Guid.TryParse(ativo, out var id) ? new IdDeAtivo(id) : null;
+    var validacoes = await repo.ListarAsync(idAtivo, ct);
+    return Results.Ok(new
+    {
+        total = validacoes.Count,
+        validacoes = validacoes.Select(v => new
+        {
+            id = v.Id,
+            ativo = v.Ativo.Valor,
+            revisao = v.Revisao,
+            etapa = v.Etapa.ToString().ToLowerInvariant(),
+            status = v.Status.ToString().ToLowerInvariant(),
+            submetidaPor = v.IdSubmissor,
+            decididaPor = v.IdDecisor,
+            motivo = v.Motivo,
+        }),
+    });
+});
+
+v1.MapPost("/validacoes/{id:guid}/decisoes",
+    async (Guid id, CorpoDecisaoValidacao corpo, DecidirValidacao caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(
+        new ComandoDecidirValidacao(id, corpo.Aprovada, corpo.Motivo), ct);
+    return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
+});
+
 app.Run();
 return;
 
@@ -239,3 +270,5 @@ internal sealed record CorpoCadastrarAtivo(
 internal sealed record CorpoSubmeter(string? Motivo);
 
 internal sealed record CorpoResponsavel(Guid IdPessoa, string Papel);
+
+internal sealed record CorpoDecisaoValidacao(bool Aprovada, string? Motivo = null);

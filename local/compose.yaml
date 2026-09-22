@@ -164,25 +164,29 @@ services:
       - "9200:9200"
 
   # ─────────────────────────────── Perfil "full" — a APLICAÇÃO em container
-  # Ainda não existe: depende do Dockerfile, que nasce na Fase 1 (ADR-0012).
-  # Quando existir, descomente. Serve para dois casos e só para eles: validar a
-  # imagem antes de publicar no ACR, e reproduzir bug que só aparece
-  # containerizado. NÃO é o modo de trabalho diário — em container você perde
-  # hot reload e depurador (ADR-0013 §2).
-  #
-  # api:
-  #   profiles: ["full"]
-  #   build:
-  #     context: ..
-  #     dockerfile: src/hosts/Catalogo.Api/Dockerfile
-  #   depends_on:
-  #     pgbouncer: { condition: service_healthy }
-  #   environment:
-  #     ConnectionStrings__Catalogo: "Host=pgbouncer;Port=6432;Database=catalogo;Username=catalogo_app;Password=dev_app"
-  #     ConnectionStrings__Redis: "valkey:6379"
-  #     OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
-  #   ports:
-  #     - "8081:8080"
+  # A API usa o adaptador em memória nesta primeira versão e, por isso, não
+  # precisa iniciar a infraestrutura local para executar o código.
+  # Não é o modo de trabalho diário: em container você perde hot reload e
+  # depurador (ADR-0013 §2).
+  api:
+    profiles: ["full"]
+    build:
+      context: ..
+      dockerfile: src/hosts/Jornada.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "5080:8080"
+
+  frontend:
+    profiles: ["full"]
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
   #
   # workers:
   #   profiles: ["full"]

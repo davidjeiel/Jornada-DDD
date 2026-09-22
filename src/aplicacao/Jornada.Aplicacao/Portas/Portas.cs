@@ -77,6 +77,37 @@ public interface IUnidadeDeTrabalho
     public Task<int> ConfirmarAsync(CancellationToken ct = default);
 }
 
+public enum StatusDaValidacao { Aberta, Aprovada, Reprovada }
+
+public sealed class ValidacaoEmProcesso(
+    Guid id, IdDeAtivo ativo, IdDeEmpresa empresa, int revisao,
+    EtapaValidacao etapa, Guid idSubmissor)
+{
+    public Guid Id { get; } = id;
+    public IdDeAtivo Ativo { get; } = ativo;
+    public IdDeEmpresa Empresa { get; } = empresa;
+    public int Revisao { get; } = revisao;
+    public EtapaValidacao Etapa { get; } = etapa;
+    public Guid IdSubmissor { get; } = idSubmissor;
+    public StatusDaValidacao Status { get; private set; } = StatusDaValidacao.Aberta;
+    public Guid? IdDecisor { get; private set; }
+    public string? Motivo { get; private set; }
+
+    public void Decidir(bool aprovada, Guid idDecisor, string? motivo)
+    {
+        Status = aprovada ? StatusDaValidacao.Aprovada : StatusDaValidacao.Reprovada;
+        IdDecisor = idDecisor;
+        Motivo = motivo;
+    }
+}
+
+public interface IRepositorioDeValidacoes
+{
+    public Task AdicionarAsync(ValidacaoEmProcesso validacao, CancellationToken ct = default);
+    public Task<ValidacaoEmProcesso?> ObterAsync(Guid id, CancellationToken ct = default);
+    public Task<IReadOnlyList<ValidacaoEmProcesso>> ListarAsync(IdDeAtivo? ativo = null, CancellationToken ct = default);
+}
+
 /// <summary>Saída de eventos. Em dev é barramento em memória; em produção, Service Bus.</summary>
 public interface IPublicadorDeEventos
 {
