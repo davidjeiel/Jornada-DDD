@@ -5,6 +5,7 @@ COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/dominio/Jornada.Dominio/Jornada.Dominio.csproj src/dominio/Jornada.Dominio/
 COPY src/aplicacao/Jornada.Aplicacao/Jornada.Aplicacao.csproj src/aplicacao/Jornada.Aplicacao/
 COPY src/adaptadores/Jornada.Adaptadores.Memoria/Jornada.Adaptadores.Memoria.csproj src/adaptadores/Jornada.Adaptadores.Memoria/
+COPY src/adaptadores/Jornada.Persistencia.Postgres/Jornada.Persistencia.Postgres.csproj src/adaptadores/Jornada.Persistencia.Postgres/
 COPY src/hosts/Jornada.Api/Jornada.Api.csproj src/hosts/Jornada.Api/
 
 RUN dotnet restore src/hosts/Jornada.Api/Jornada.Api.csproj --ignore-failed-sources

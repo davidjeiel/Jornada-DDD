@@ -37,9 +37,11 @@ public sealed class MiddlewareDeTenant(RequestDelegate proximo)
 {
     public async Task InvokeAsync(HttpContext http, ContextoDaRequisicao contexto)
     {
-        // Rotas abertas não precisam de contexto.
+        // Rotas abertas não precisam de contexto. /saude* inclui a probe de
+        // prontidão: um orquestrador de containers chama isso sem X-Empresa.
         var caminho = http.Request.Path.Value ?? "";
-        if (caminho is "/" or "/saude" || caminho.StartsWith("/demo", StringComparison.Ordinal))
+        if (caminho is "/" || caminho.StartsWith("/saude", StringComparison.Ordinal)
+                          || caminho.StartsWith("/demo", StringComparison.Ordinal))
         {
             await proximo(http);
             return;

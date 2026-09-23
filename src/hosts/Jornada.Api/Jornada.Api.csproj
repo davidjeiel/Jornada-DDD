@@ -3,10 +3,11 @@
   <!-- Adaptador de ENTRADA. Traduz HTTP para caso de uso e nada mais:
        nenhuma regra de negócio mora aqui (ADR-0001).
 
-       Usa só o framework compartilhado ASP.NET Core — sem PackageReference —
-       o que mantém a API compilável em ambiente sem acesso ao NuGet.
-       Microsoft.AspNetCore.OpenApi (geração do contrato, ADR-0009) entra
-       quando o NuGet estiver acessível. -->
+       Este projeto não tem PackageReference próprio — os pacotes de EF
+       Core/Npgsql/Dapper chegam de forma TRANSITIVA via
+       Jornada.Persistencia.Postgres, só quando essa referência de projeto é
+       usada em runtime (Persistencia:Provedor=postgres). Microsoft.AspNetCore.OpenApi
+       (geração do contrato, ADR-0009) é o próximo candidato a PackageReference direto. -->
 
   <PropertyGroup>
     <RootNamespace>Jornada.Api</RootNamespace>
@@ -16,6 +17,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
     <ProjectReference Include="..\..\adaptadores\Jornada.Adaptadores.Memoria\Jornada.Adaptadores.Memoria.csproj" />
+    <!-- Só entra em jogo quando Persistencia:Provedor=postgres (ver Program.cs).
+         Referenciar sempre, e escolher em runtime por configuração, é o que
+         permite trocar de adaptador sem rebuild de imagem (ADR-0001). -->
+    <ProjectReference Include="..\..\adaptadores\Jornada.Persistencia.Postgres\Jornada.Persistencia.Postgres.csproj" />
   </ItemGroup>
 
 </Project>

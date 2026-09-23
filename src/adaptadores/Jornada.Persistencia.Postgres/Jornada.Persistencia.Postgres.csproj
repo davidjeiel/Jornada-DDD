@@ -24,8 +24,34 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Dapper" />
+  </ItemGroup>
+
+  <!-- System.Security.Cryptography.Xml chega TRANSITIVO por
+       Microsoft.EntityFrameworkCore.Design (PrivateAssets="all" acima: é
+       ferramenta de design-time para `dotnet ef migrations add`, nunca entra
+       no publish nem roda em produção). O índice de auditoria do NuGet marca
+       toda versão do pacote como vulnerável (GHSA-23rf-6693-g89p e outros) —
+       não há versão "corrigida" para pinar. Suprimir aqui é escopado a ESTAS
+       advisories específicas, não a NU1903 em geral. -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-23rf-6693-g89p" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-37gx-xxp4-5rgx" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-6588-8gv4-xfgh" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-8q5v-6pqq-x66h" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-cvvh-rhrc-wg4q" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-g8r8-53c2-pm3f" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-mmjf-rqrv-855v" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-w3x6-4m5h-cxqf" />
+  </ItemGroup>
+
+  <!-- Copiado para o output/publish: é assim que o host aplica RLS depois das
+       migrations sem precisar referenciar um caminho de arquivo do repositório
+       (ver README > "Ligar o Postgres" e Program.cs). -->
+  <ItemGroup>
+    <None Include="Esquema.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

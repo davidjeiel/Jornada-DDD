@@ -164,8 +164,10 @@ services:
       - "9200:9200"
 
   # ─────────────────────────────── Perfil "full" — a APLICAÇÃO em container
-  # A API usa o adaptador em memória nesta primeira versão e, por isso, não
-  # precisa iniciar a infraestrutura local para executar o código.
+  # Grupo 1 (containers/pods): a API já liga Postgres de verdade aqui — não é
+  # mais o adaptador em memória. Por isso agora ela DEPENDE de pgbouncer/postgres
+  # saudáveis, e migrations + Esquema.sql (RLS) rodam na própria inicialização
+  # do container, antes de `/saude/pronto` responder saudável.
   # Não é o modo de trabalho diário: em container você perde hot reload e
   # depurador (ADR-0013 §2).
   api:
@@ -175,8 +177,25 @@ services:
       dockerfile: src/hosts/Jornada.Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      Persistencia__Provedor: postgres
+      # A APLICAÇÃO conecta no PgBouncer (6432), nunca direto no Postgres —
+      # é lá que o transaction pooling do ADR-0003 é exercitado de verdade.
+      ConnectionStrings__Catalogo: Host=pgbouncer;Port=6432;Database=catalogo;Username=catalogo_app;Password=${POSTGRES_APP_PASSWORD:-dev_app}
+      # Migrations e Esquema.sql (DDL) rodam como DONO do schema, direto no
+      # Postgres (5432) — catalogo_app nem tem privilégio de DDL, de propósito.
+      ConnectionStrings__Migracoes: Host=postgres;Port=5432;Database=catalogo;Username=catalogo_migrador;Password=${POSTGRES_MIGRADOR_PASSWORD:-dev_migrador}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
     ports:
       - "5080:8080"
+    healthcheck:
+      # A mesma pergunta que um orquestrador de pods faz antes de rotear
+      # tráfego: liveness (`/saude`) não basta, porque não toca a dependência.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/saude/pronto"]
+      <<: *saude
 
   frontend:
     profiles: ["full"]
@@ -184,9 +203,13 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "5173:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      <<: *saude
   #
   # workers:
   #   profiles: ["full"]

@@ -103,6 +103,13 @@ public sealed class AtivoConfiguracao : IEntityTypeConfiguration<Ativo>
 
         e.Ignore(a => a.EventosPendentes);
 
+        // Sem isto o EF tenta descobrir ESTAS propriedades computadas como
+        // navegação por convenção (são IReadOnlyList<TEntidade>) e entra em
+        // conflito com o OwnsMany acima, que já mapeia os CAMPOS de apoio
+        // (_responsaveis, _evidencias) diretamente.
+        e.Ignore(a => a.Responsaveis);
+        e.Ignore(a => a.Evidencias);
+
         // ── Índices: tenant_id SEMPRE à esquerda (ADR-0003) ──────────────────
         e.HasIndex(a => new { a.Empresa, a.Codigo }).IsUnique().HasDatabaseName("ux_item_codigo");
         e.HasIndex(a => new { a.Empresa, a.TipoItem }).HasDatabaseName("ix_item_tenant_tipo");

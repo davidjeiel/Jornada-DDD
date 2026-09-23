@@ -74,8 +74,31 @@ public sealed class Ativo : RaizDeAgregado
     }
 
     /// <summary>
-    /// Único caminho para criar um ativo. Construtor privado + fábrica nomeada:
-    /// não existe instância inválida (ADR-0001).
+    /// Construtor vazio, só para o EF Core materializar a entidade a partir de
+    /// uma linha do banco (ADR-0004). NUNCA use em regra de negócio — os únicos
+    /// caminhos válidos continuam sendo <see cref="Rascunhar"/> e
+    /// <see cref="Reidratar"/>. Os valores abaixo são placeholders que o EF
+    /// sobrescreve por reflexão logo em seguida; sem eles o compilador recusa
+    /// (propriedades somente-leitura precisam ser atribuídas no construtor).
+    /// </summary>
+    private Ativo()
+    {
+        Id = default;
+        Empresa = default;
+        TipoItem = string.Empty;
+        Codigo = default;
+        Nome = string.Empty;
+        Descricao = string.Empty;
+        Origem = default;
+        CriadoEm = default;
+        _atributos = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _responsaveis = [];
+        _evidencias = [];
+    }
+
+    /// <summary>
+    /// Único caminho para criar um ativo NOVO. Construtor privado + fábrica
+    /// nomeada: não existe instância inválida (ADR-0001).
     /// </summary>
     public static Ativo Rascunhar(
         IdDeEmpresa empresa, TipoDeAtivo tipo, CodigoDeAtivo codigo, string nome,

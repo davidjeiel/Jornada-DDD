@@ -1,0 +1,6 @@
+# Código gerado pelo `dotnet ef migrations add` — nunca editado à mão.
+# O scaffolding do EF Core sempre emite namespace de bloco; a regra de estilo
+# do repositório (namespace file-scoped) é para código escrito por gente.
+[*.cs]
+generated_code = true
+csharp_style_namespace_declarations = block_scoped:none

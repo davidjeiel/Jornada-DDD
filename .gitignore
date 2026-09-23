@@ -10,6 +10,7 @@ TestResults/
 # Ambiente local (ADR-0013)
 local/.env
 local/dados/
+.nugetcache-container/
 
 # Terraform
 .terraform/

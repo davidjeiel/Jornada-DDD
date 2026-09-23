@@ -35,6 +35,12 @@ ALTER ROLE catalogo_leitor SET statement_timeout = '60s';
 -- ───────────────────────────────────────────────────────────────── schemas
 \connect catalogo
 
+-- CREATE SCHEMA (mesmo com IF NOT EXISTS) exige privilégio CREATE no BANCO,
+-- não só ser dono do schema — o Postgres checa isso antes de olhar se o
+-- schema já existe. Sem este GRANT, Esquema.sql falha com "permission denied
+-- for database" ao tentar (re)criar o schema `plataforma` de forma idempotente.
+GRANT CREATE ON DATABASE catalogo TO catalogo_migrador;
+
 CREATE SCHEMA IF NOT EXISTS catalogo    AUTHORIZATION catalogo_migrador;  -- data plane
 CREATE SCHEMA IF NOT EXISTS governanca  AUTHORIZATION catalogo_migrador;
 CREATE SCHEMA IF NOT EXISTS notificacao AUTHORIZATION catalogo_migrador;
@@ -75,6 +81,12 @@ END $$;
 --  Fica em schema próprio, e não em `public`: o REVOKE acima tira USAGE de
 --  public, então uma função criada lá seria invisível para catalogo_app.
 -- ═══════════════════════════════════════════════════════════════════════════
+-- Criado COMO catalogo_migrador (não como o superusuário `postgres` que roda
+-- este script), senão os objetos ficam com dono errado: Esquema.sql roda como
+-- catalogo_migrador e faz CREATE OR REPLACE nestas MESMAS funções — "must be
+-- owner of function" se o dono for outro. Mesmo padrão de 02-sandbox-rls.sql.
+SET ROLE catalogo_migrador;
+
 CREATE SCHEMA IF NOT EXISTS plataforma AUTHORIZATION catalogo_migrador;
 GRANT USAGE ON SCHEMA plataforma TO catalogo_app, catalogo_leitor;
 
@@ -136,3 +148,5 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION plataforma.tenant_atual() TO catalogo_app, catalogo_leitor;
+
+RESET ROLE;

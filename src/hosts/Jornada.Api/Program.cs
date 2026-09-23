@@ -7,6 +7,12 @@ using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Governanca;
+using Jornada.Dominio.Tenancy;
+using Jornada.Persistencia.Postgres;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,18 +34,50 @@ builder.Services.AddScoped<ContextoDaRequisicao>();
 builder.Services.AddScoped<IContextoDeTenantAtual>(sp => sp.GetRequiredService<ContextoDaRequisicao>());
 builder.Services.AddScoped<IAtorAtual>(sp => sp.GetRequiredService<ContextoDaRequisicao>());
 
-// Adaptador de persistência. Trocar por Postgres é trocar ESTAS LINHAS —
-// nenhum caso de uso muda (ADR-0001). Ver README > "Ligar o Postgres".
-//
-// O ARMAZÉM é singleton (são os dados, como o banco); o REPOSITÓRIO é scoped
-// (carrega o contexto de tenant da requisição). Inverter isso é o bug de
-// dependência cativa descrito em RepositorioDeAtivosEmMemoria.
-builder.Services.AddSingleton<ArmazemEmMemoria>();
-builder.Services.AddScoped<RepositorioDeAtivosEmMemoria>();
-builder.Services.AddScoped<IRepositorioDeAtivos>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
-builder.Services.AddScoped<IRepositorioDeRelacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
-builder.Services.AddScoped<IUnidadeDeTrabalho>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
-builder.Services.AddScoped<IRepositorioDeValidacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+// Adaptador de persistência escolhido em RUNTIME, por configuração — nunca por
+// rebuild de imagem (Grupo 1 do plano de containers: um container só é
+// reconfigurável de verdade se isso for verdade). Zero-config continua sendo
+// "memoria" (appsettings.json); container/pod liga Postgres via variável de
+// ambiente Persistencia__Provedor (ver local/compose.yaml).
+var provedorDePersistencia = builder.Configuration.GetValue("Persistencia:Provedor", "memoria")!;
+var usaPostgres = string.Equals(provedorDePersistencia, "postgres", StringComparison.OrdinalIgnoreCase);
+
+if (usaPostgres)
+{
+    var stringDeConexao = builder.Configuration.GetConnectionString("Catalogo")
+        ?? throw new InvalidOperationException(
+            "ConnectionStrings:Catalogo é obrigatória quando Persistencia:Provedor=postgres.");
+
+    // EnableDynamicJson: sem isto, o Npgsql 8+ recusa serializar
+    // Dictionary<string,string> (o campo `atributos`) para jsonb — é opt-in de
+    // propósito, para não pagar reflexão em cenários AOT que não precisam.
+    builder.Services.AddSingleton(_ =>
+        new NpgsqlDataSourceBuilder(stringDeConexao).EnableDynamicJson().Build());
+
+    // O DbContext é scoped (padrão do AddDbContext): carrega o contexto de
+    // tenant da requisição, do mesmo jeito que o repositório em memória já
+    // fazia — inverter isso reabriria a dependência cativa do ADR-0003.
+    builder.Services.AddDbContext<ContextoDeDados>((sp, o) =>
+        o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>()));
+
+    builder.Services.AddScoped<RepositorioDeAtivosPostgres>();
+    builder.Services.AddScoped<IRepositorioDeAtivos>(sp => sp.GetRequiredService<RepositorioDeAtivosPostgres>());
+    builder.Services.AddScoped<IRepositorioDeRelacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosPostgres>());
+    builder.Services.AddScoped<IRepositorioDeValidacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosPostgres>());
+    builder.Services.AddScoped<IUnidadeDeTrabalho, TransacaoComTenant>();
+}
+else
+{
+    // O ARMAZÉM é singleton (são os dados, como o banco); o REPOSITÓRIO é scoped
+    // (carrega o contexto de tenant da requisição). Inverter isso é o bug de
+    // dependência cativa descrito em RepositorioDeAtivosEmMemoria.
+    builder.Services.AddSingleton<ArmazemEmMemoria>();
+    builder.Services.AddScoped<RepositorioDeAtivosEmMemoria>();
+    builder.Services.AddScoped<IRepositorioDeAtivos>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+    builder.Services.AddScoped<IRepositorioDeRelacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+    builder.Services.AddScoped<IUnidadeDeTrabalho>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+    builder.Services.AddScoped<IRepositorioDeValidacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+}
 
 builder.Services.AddSingleton<IMetamodelo, MetamodeloPadrao>();
 builder.Services.AddSingleton<IPoliticasDeGovernanca, PoliticasPadrao>();
@@ -52,7 +90,28 @@ builder.Services.AddScoped<DecidirValidacao>();
 builder.Services.AddScoped<AvaliarPreCheck>();
 builder.Services.AddScoped<ObterVisaoDoAtivo>();
 
+// Probe de prontidão real: só existe verificação quando há algo externo para
+// verificar. Com "memoria" não há tag "pronto" nenhuma, e o middleware de
+// health checks responde saudável por padrão quando não há checagem alguma —
+// o que é o comportamento certo nesse caso (não há dependência a aguardar).
+var checagensDeSaude = builder.Services.AddHealthChecks();
+if (usaPostgres)
+{
+    checagensDeSaude.AddCheck<VerificacaoDePostgres>("postgres", tags: ["pronto"]);
+}
+
 var app = builder.Build();
+
+// Migração + Esquema.sql (RLS) ANTES de aceitar tráfego. Roda com a conexão do
+// DONO do schema (catalogo_migrador via ConnectionStrings:Migracoes) — nunca
+// com a conexão de requisição (catalogo_app), que nem tem privilégio de DDL
+// (ADR-0003). Guardado por flag porque, com mais de uma réplica do pod, só UMA
+// deveria aplicar schema; hoje o produto ainda não tem esse segundo processo
+// (ver README > Limitações), então o próprio host faz o papel de migrador.
+if (usaPostgres && builder.Configuration.GetValue("Persistencia:AplicarEsquemaNaInicializacao", true))
+{
+    await AplicarEsquemaDoBancoAsync(app.Configuration, app.Logger);
+}
 
 app.UseMiddleware<MiddlewareDeTenant>();
 
@@ -79,12 +138,22 @@ app.MapGet("/", () => Results.Ok(new
     produto = "Jornada DDD",
     versao = "0.1.0",
     situacao = "primeira versão — estrutura hexagonal + domínio portado",
-    provedor = "memoria",
+    provedor = provedorDePersistencia,
     documentacao = "docs/ARQUITETURA.md",
     dica = "toda rota /v1 exige o cabeçalho X-Empresa. Veja /demo para um exemplo pronto.",
 }));
 
+// Liveness: "o processo responde?". Nunca toca banco — um Postgres lento não
+// deve fazer o orquestrador matar um pod que está saudável.
 app.MapGet("/saude", () => Results.Ok(new { situacao = "ok" }));
+
+// Readiness: "este pod pode receber tráfego agora?". Só aqui é honesto tocar
+// a dependência externa — é exatamente a pergunta que a probe de prontidão de
+// um orquestrador de containers faz antes de rotear uma requisição (Grupo 1).
+app.MapHealthChecks("/saude/pronto", new HealthCheckOptions
+{
+    Predicate = c => c.Tags.Contains("pronto"),
+});
 
 app.MapGet("/demo", () => Results.Ok(new
 {
@@ -256,6 +325,68 @@ static IResult Problema(string codigo, string mensagem, int status = 422)
         detail: mensagem,
         statusCode: status,
         extensions: new Dictionary<string, object?> { ["codigo"] = codigo });
+}
+
+/// <summary>
+/// Aplica migrations do EF Core e depois <c>Esquema.sql</c> (RLS, outbox),
+/// nessa ordem — a mesma que o comentário do arquivo exige: toda tabela com
+/// <c>tenant_id</c> precisa existir ANTES do bloco que liga RLS.
+///
+/// Usa <c>ConnectionStrings:Migracoes</c> (papel <c>catalogo_migrador</c>, dono
+/// do schema), nunca a conexão de requisição — essa nem tem privilégio de DDL,
+/// de propósito (ADR-0003).
+/// </summary>
+static async Task AplicarEsquemaDoBancoAsync(IConfiguration configuracao, ILogger logger)
+{
+    var stringDeMigracao = configuracao.GetConnectionString("Migracoes")
+        ?? throw new InvalidOperationException(
+            "ConnectionStrings:Migracoes é obrigatória para aplicar migrations/RLS na inicialização.");
+
+    // catalogo_migrador não tem USAGE em `public` (REVOKE ALL ... FROM PUBLIC em
+    // 01-papeis.sql, de propósito — ADR-0006 §2) e não tem search_path próprio.
+    // Sem apontar o schema explicitamente, o Postgres recusa criar
+    // __EFMigrationsHistory com "no schema has been selected to create in".
+    var opcoes = new DbContextOptionsBuilder<ContextoDeDados>()
+        .UseNpgsql(stringDeMigracao, o => o.MigrationsHistoryTable("__ef_migrations_historico", "catalogo"))
+        .Options;
+
+    // Tenant fixo: migração é DDL puro, nunca consulta filtrada por empresa —
+    // o valor não importa, só precisa satisfazer o construtor do DbContext.
+    await using var db = new ContextoDeDados(opcoes, ContextoDeTenantFixo.Para(IdDeEmpresa.Novo()));
+
+    logger.LogInformation("Aplicando migrations do EF Core (catalogo_migrador)...");
+    await db.Database.MigrateAsync();
+
+    var caminhoDoEsquema = Path.Combine(AppContext.BaseDirectory, "Esquema.sql");
+    logger.LogInformation("Aplicando {Arquivo} (RLS + outbox)...", caminhoDoEsquema);
+    var esquemaSql = await File.ReadAllTextAsync(caminhoDoEsquema);
+    await db.Database.ExecuteSqlRawAsync(esquemaSql);
+
+    logger.LogInformation("Schema do Postgres pronto — RLS ligada em toda tabela com tenant_id.");
+}
+
+/// <summary>
+/// Readiness real (Grupo 1): pergunta ao Postgres, pela MESMA conexão de
+/// requisição que a API usa (catalogo_app, via PgBouncer). Um orquestrador de
+/// containers só deveria rotear tráfego para este pod depois disto responder
+/// saudável.
+/// </summary>
+internal sealed class VerificacaoDePostgres(ContextoDeDados db) : IHealthCheck
+{
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext contexto, CancellationToken ct = default)
+    {
+        try
+        {
+            return await db.Database.CanConnectAsync(ct)
+                ? HealthCheckResult.Healthy("Postgres alcançável.")
+                : HealthCheckResult.Unhealthy("Postgres não respondeu.");
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy("Falha ao conectar no Postgres.", ex);
+        }
+    }
 }
 
 // Contratos de entrada. Ficam aqui, no adaptador: o domínio não conhece JSON.
