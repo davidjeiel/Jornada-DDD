@@ -73,10 +73,19 @@ public sealed class MiddlewareDeTenant(RequestDelegate proximo)
             ? gp
             : Guid.Parse("33333333-3333-3333-3333-333333333333");
 
-        var ator = new Ator(idPessoa, empresa,
-            [AtribuicaoDePapel.NaEmpresa(papel, DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-1)))]);
+        // Unidade é ESCOPO de autorização, não fronteira de isolamento
+        // (ADR-0003 §8) — por isso é opcional e só chega por cabeçalho
+        // separado, nunca embutida no id de empresa.
+        IdDeUnidade? unidade = http.Request.Headers.TryGetValue("X-Unidade", out var unidadeBruta)
+                               && Guid.TryParse(unidadeBruta.ToString(), out var gu)
+            ? new IdDeUnidade(gu)
+            : null;
 
-        contexto.Definir(new ContextoDeTenant(empresa), ator);
+        var ator = new Ator(idPessoa, empresa,
+            [AtribuicaoDePapel.NaEmpresa(papel, DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-1)))],
+            Unidade: unidade);
+
+        contexto.Definir(new ContextoDeTenant(empresa, unidade), ator);
         await proximo(http);
     }
 

@@ -173,6 +173,25 @@ public sealed class RepositorioDeAtivosPostgres(ContextoDeDados db, IContextoDeT
             return (IReadOnlyList<string>)nomes.ToArray();
         }, ct);
 
+    public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo, CancellationToken ct = default) =>
+        db.ComContextoDeTenantAsync(tenant, async () =>
+        {
+            db.Relacoes.Add(RelacaoAtivo.Nova(
+                tenant.Atual.Empresa, origem, destino, tipo, DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync(ct);
+            return true;
+        }, ct);
+
+    public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default) =>
+        db.ComContextoDeTenantAsync(tenant, async () =>
+        {
+            var lista = await db.Relacoes
+                .Where(r => r.OrigemId == id.Valor || r.DestinoId == id.Valor)
+                .Select(r => new RelacaoResumo(new IdDeAtivo(r.OrigemId), new IdDeAtivo(r.DestinoId), r.Tipo))
+                .ToListAsync(ct);
+            return (IReadOnlyList<RelacaoResumo>)lista;
+        }, ct);
+
     public Task<int> ContarImplementacoesAsync(IdDeAtivo idCapacidade, CancellationToken ct = default) =>
         db.ComContextoDeTenantAsync(tenant, async () =>
         {

@@ -45,7 +45,10 @@ public interface IRepositorioDeAtivos
     public Task<int> ProximoSequencialAsync(string tipoItem, CancellationToken ct = default);
 }
 
-/// <summary>Consultas sobre o grafo de relações (ADR-0004: CTE recursiva no Postgres).</summary>
+/// <summary>Uma aresta do grafo de relações, já resolvida para os dois lados.</summary>
+public sealed record RelacaoResumo(IdDeAtivo Origem, IdDeAtivo Destino, string Tipo);
+
+/// <summary>Consultas e escrita sobre o grafo de relações (ADR-0004: CTE recursiva no Postgres).</summary>
 public interface IRepositorioDeRelacoes
 {
     public Task<bool> TemDependenciaCircularAsync(IdDeAtivo id, CancellationToken ct = default);
@@ -54,6 +57,12 @@ public interface IRepositorioDeRelacoes
         IdDeAtivo id, CancellationToken ct = default);
 
     public Task<int> ContarImplementacoesAsync(IdDeAtivo idCapacidade, CancellationToken ct = default);
+
+    /// <summary>Grava uma aresta (origem → destino). Não valida regra de negócio — isso é do caso de uso.</summary>
+    public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo, CancellationToken ct = default);
+
+    /// <summary>Todas as arestas em que o ativo aparece, como origem OU destino.</summary>
+    public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default);
 }
 
 /// <summary>A taxonomia desta empresa, na versão vigente (ADR-0005).</summary>

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Jornada.Persistencia.Postgres;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Jornada.Persistencia.Postgres.Migracoes
 {
     [DbContext(typeof(ContextoDeDados))]
-    partial class ContextoDeDadosModelSnapshot : ModelSnapshot
+    [Migration("20260923110354_AjustarChaveDeEvidencia")]
+    partial class AjustarChaveDeEvidencia
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

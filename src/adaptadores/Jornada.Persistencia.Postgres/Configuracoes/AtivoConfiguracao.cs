@@ -96,6 +96,13 @@ public sealed class AtivoConfiguracao : IEntityTypeConfiguration<Ativo>
         {
             ev.ToTable("evidencia", "catalogo");
             ev.WithOwner().HasForeignKey("id_item");
+            // Sem ValueGeneratedNever, o EF assume que Guid = chave gerada pelo
+            // BANCO (convenção padrão para Guid), ignora o valor que
+            // Ativo.AnexarEvidencia já gerou (Guid.CreateVersion7()) e espera
+            // ler de volta um valor via RETURNING — que nunca vem, porque a
+            // coluna não tem generator nenhum. Resultado: INSERT "afeta 0
+            // linhas" (DbUpdateConcurrencyException), embora a linha exista.
+            ev.Property(x => x.Id).ValueGeneratedNever();
             ev.Property(x => x.Tipo).HasColumnName("tipo").HasMaxLength(30);
             ev.Property(x => x.Titulo).HasColumnName("titulo").HasMaxLength(200);
             ev.Property(x => x.Url).HasColumnName("url");

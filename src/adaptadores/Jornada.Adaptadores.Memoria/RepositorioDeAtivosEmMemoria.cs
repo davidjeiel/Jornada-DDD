@@ -130,8 +130,20 @@ public sealed class RepositorioDeAtivosEmMemoria(
 
     // ───────────────────────────────────────────────── IRepositorioDeRelacoes
 
-    public void Relacionar(IdDeAtivo origem, IdDeAtivo destino, string tipo = "depende_de") =>
+    public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo, CancellationToken ct = default)
+    {
         _relacoes.Add((origem, destino, tipo));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default)
+    {
+        var lista = _relacoes
+            .Where(r => r.Origem == id || r.Destino == id)
+            .Select(r => new RelacaoResumo(r.Origem, r.Destino, r.Tipo))
+            .ToArray();
+        return Task.FromResult<IReadOnlyList<RelacaoResumo>>(lista);
+    }
 
     public Task<bool> TemDependenciaCircularAsync(IdDeAtivo id, CancellationToken ct = default)
     {

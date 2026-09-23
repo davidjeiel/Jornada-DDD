@@ -84,7 +84,10 @@ builder.Services.AddSingleton<IPoliticasDeGovernanca, PoliticasPadrao>();
 builder.Services.AddSingleton<IPublicadorDeEventos, PublicadorEmMemoria>();
 
 builder.Services.AddScoped<CadastrarAtivo>();
+builder.Services.AddScoped<EditarAtivo>();
 builder.Services.AddScoped<AtribuirResponsavel>();
+builder.Services.AddScoped<AnexarEvidencia>();
+builder.Services.AddScoped<RelacionarAtivos>();
 builder.Services.AddScoped<SubmeterAtivo>();
 builder.Services.AddScoped<DecidirValidacao>();
 builder.Services.AddScoped<AvaliarPreCheck>();
@@ -210,6 +213,18 @@ v1.MapGet("/ativos/{id:guid}", async (Guid id, ObterVisaoDoAtivo caso, Cancellat
     return r.Sucesso ? Results.Ok(r.Valor) : Problema(r.Codigo!, r.Mensagem!, 404);
 });
 
+// Recurso inteiro, não PATCH parcial: o formulário de edição já manda o
+// estado completo dos campos editáveis — mais simples de raciocinar e de
+// testar do que merge de patch parcial (ADR-0009 mantém isso simples).
+v1.MapPut("/ativos/{id:guid}", async (Guid id, CorpoEditarAtivo corpo, EditarAtivo caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(new ComandoEditarAtivo(
+        new IdDeAtivo(id), corpo.Nome, corpo.Descricao ?? "",
+        CriticidadeExtensoes.De(corpo.Criticidade), corpo.Atributos), ct);
+
+    return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
+});
+
 v1.MapPost("/ativos/{id:guid}/responsaveis",
     async (Guid id, AtribuirResponsavel caso, CorpoResponsavel corpo, CancellationToken ct) =>
 {
@@ -220,6 +235,24 @@ v1.MapPost("/ativos/{id:guid}/responsaveis",
 
     var r = await caso.ExecutarAsync(
         new ComandoAtribuirResponsavel(new IdDeAtivo(id), corpo.IdPessoa, papel), ct);
+
+    return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
+});
+
+v1.MapPost("/ativos/{id:guid}/evidencias",
+    async (Guid id, CorpoEvidencia corpo, AnexarEvidencia caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(
+        new ComandoAnexarEvidencia(new IdDeAtivo(id), corpo.Tipo, corpo.Titulo, corpo.Url), ct);
+
+    return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
+});
+
+v1.MapPost("/ativos/{id:guid}/relacoes",
+    async (Guid id, CorpoRelacao corpo, RelacionarAtivos caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(
+        new ComandoRelacionarAtivos(new IdDeAtivo(id), new IdDeAtivo(corpo.IdDestino), corpo.Tipo), ct);
 
     return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
 });
@@ -398,8 +431,18 @@ internal sealed record CorpoCadastrarAtivo(
     Guid? IdPai = null,
     Dictionary<string, string>? Atributos = null);
 
+internal sealed record CorpoEditarAtivo(
+    string Nome,
+    string? Descricao = null,
+    string? Criticidade = null,
+    Dictionary<string, string>? Atributos = null);
+
 internal sealed record CorpoSubmeter(string? Motivo);
 
 internal sealed record CorpoResponsavel(Guid IdPessoa, string Papel);
+
+internal sealed record CorpoEvidencia(string Tipo, string Titulo, string? Url = null);
+
+internal sealed record CorpoRelacao(Guid IdDestino, string Tipo);
 
 internal sealed record CorpoDecisaoValidacao(bool Aprovada, string? Motivo = null);
