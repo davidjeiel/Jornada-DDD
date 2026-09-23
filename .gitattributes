@@ -1,0 +1,4 @@
+# Scripts .sh rodam dentro de containers Linux (ex.: frontend/docker-entrypoint-resolver.sh)
+# ou via WSL/bash. Sem isto, core.autocrlf=true (comum em máquina Windows) grava
+# CRLF no checkout, e "#!/bin/sh\r" quebra a execução com "bad interpreter".
+*.sh text eol=lf

@@ -194,14 +194,18 @@ services:
     healthcheck:
       # A mesma pergunta que um orquestrador de pods faz antes de rotear
       # tráfego: liveness (`/saude`) não basta, porque não toca a dependência.
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/saude/pronto"]
+      # curl, não wget: a imagem aspnet (Debian slim) não tem wget.
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/saude/pronto"]
       <<: *saude
 
   frontend:
     profiles: ["full"]
     build:
-      context: ../frontend
-      dockerfile: Dockerfile
+      # Contexto na raiz do repo (igual à API), não em ../frontend: a cartilha
+      # (docs/CARTILHA.md) é build-time asset do frontend agora — fonte única,
+      # sem cópia manual (ver frontend/Dockerfile e frontend/src/App.tsx).
+      context: ..
+      dockerfile: frontend/Dockerfile
     depends_on:
       api:
         condition: service_healthy
