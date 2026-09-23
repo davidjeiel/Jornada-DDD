@@ -70,13 +70,14 @@ tests/
 ├── Jornada.Dominio.Testes/           49 casos portados do pytest
 └── Jornada.Arquitetura.Testes/       a regra de dependência como build gate
 
-docs/     13 ADRs + ARQUITETURA.md + AMBIENTE-LOCAL.md
+docs/     13 ADRs + ARQUITETURA.md + AMBIENTE-LOCAL.md + CARTILHA.md
 local/    ambiente Podman (compose, RLS, Keycloak, Service Bus)
 infra/    esqueleto Terraform
 ```
 
 As decisões e o porquê de cada uma estão em [`docs/adr/`](docs/adr/README.md).
-Comece por [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md).
+Comece por [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md). Guia de uso por papel (o que
+cada papel cadastra, decide e não pode fazer) está em [`docs/CARTILHA.md`](docs/CARTILHA.md).
 
 > **Nota de nomenclatura:** os ADRs escrevem `Catalogo.*` (Catalogo.Dominio,
 > Catalogo.Api…). O código usa `Jornada.*`, para bater com o nome do
