@@ -70,6 +70,9 @@ public sealed class AtivoConfiguracao : IEntityTypeConfiguration<Ativo>
             .HasMaxLength(12);
 
         e.Property(a => a.RevisaoAtual).HasColumnName("revisao_atual");
+        e.Property(a => a.UltimaRevisaoPublicada).HasColumnName("ultima_revisao_publicada");
+        e.Ignore(a => a.Editavel);
+        e.Ignore(a => a.MotivoDeNaoEditavel);
         e.Property(a => a.FimVigencia).HasColumnName("fim_vigencia");
         e.Property(a => a.CriadoEm).HasColumnName("criado_em");
         e.Property(a => a.AtualizadoEm).HasColumnName("atualizado_em");

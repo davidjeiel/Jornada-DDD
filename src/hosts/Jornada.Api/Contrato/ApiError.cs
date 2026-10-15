@@ -58,6 +58,8 @@ public static class CodigosDeErro
 
         ["TRANSICAO_INVALIDA"] = StatusCodes.Status409Conflict,
         ["VALIDACAO_JA_DECIDIDA"] = StatusCodes.Status409Conflict,
+        ["VALIDACAO_OBSOLETA"] = StatusCodes.Status409Conflict,
+        ["ATIVO_NAO_EDITAVEL"] = StatusCodes.Status409Conflict,
 
         [ErroInterno] = StatusCodes.Status500InternalServerError,
     };

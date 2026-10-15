@@ -89,6 +89,7 @@ builder.Services.AddScoped<AtribuirResponsavel>();
 builder.Services.AddScoped<AnexarEvidencia>();
 builder.Services.AddScoped<RelacionarAtivos>();
 builder.Services.AddScoped<SubmeterAtivo>();
+builder.Services.AddScoped<AbrirRevisao>();
 builder.Services.AddScoped<DecidirValidacao>();
 builder.Services.AddScoped<AvaliarPreCheck>();
 builder.Services.AddScoped<ObterVisaoDoAtivo>();
@@ -296,8 +297,9 @@ catalogo.MapPut("/ativos/{id:guid}", async Task<Results<NoContent, JsonHttpResul
 })
     .WithName("editarAtivo")
     .WithSummary("Altera os campos editáveis de um ativo")
-    .WithDescription("Substitui nome, descrição e criticidade; grava os atributos informados.")
-    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity);
+    .WithDescription("Substitui nome, descrição e criticidade; grava os atributos informados. Só em rascunho ou com revisão aberta: publicado devolve 409 ATIVO_NAO_EDITAVEL.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound,
+              StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity);
 
 catalogo.MapPost("/ativos/{id:guid}/responsaveis", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
     HttpContext http, Guid id, AtribuirResponsavel caso, AtribuirResponsavelRequest corpo, CancellationToken ct) =>
@@ -311,8 +313,8 @@ catalogo.MapPost("/ativos/{id:guid}/responsaveis", async Task<Results<NoContent,
 })
     .WithName("atribuirResponsavel")
     .WithSummary("Define um responsável pelo ativo")
-    .WithDescription("Sem os owners que o tipo exige, o pré-check bloqueia a submissão.")
-    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound);
+    .WithDescription("Sem os owners que o tipo exige, o pré-check bloqueia a submissão. Só em rascunho ou com revisão aberta.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
 
 catalogo.MapPost("/ativos/{id:guid}/evidencias", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
     HttpContext http, Guid id, AnexarEvidenciaRequest corpo, AnexarEvidencia caso, CancellationToken ct) =>
@@ -322,8 +324,8 @@ catalogo.MapPost("/ativos/{id:guid}/evidencias", async Task<Results<NoContent, J
 })
     .WithName("anexarEvidencia")
     .WithSummary("Anexa uma evidência ao ativo")
-    .WithDescription("A política do tipo define quantas evidências são exigidas para publicar.")
-    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound);
+    .WithDescription("A política do tipo define quantas evidências são exigidas para publicar. Só em rascunho ou com revisão aberta.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
 
 catalogo.MapPost("/ativos/{id:guid}/relacoes", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
     HttpContext http, Guid id, RelacionarAtivosRequest corpo, RelacionarAtivos caso, CancellationToken ct) =>
@@ -352,6 +354,19 @@ governanca.MapGet("/ativos/{id:guid}/pre-check", async Task<Results<Ok<PreCheckR
     .WithSummary("Avalia se o ativo pode ser submetido")
     .WithDescription("Devolve score de qualidade, bloqueios com código estável, alertas, a política aplicável e o caminho até a publicação. Não altera nada.")
     .ComErros(StatusCodes.Status404NotFound);
+
+// Publicado é imutável: alterar exige abrir revisão. A revisão volta ao rito
+// pela submissão; rejeitada, volta para em_revisao (não para rascunho).
+governanca.MapPost("/ativos/{id:guid}/revisoes", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, AbrirRevisao caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(new ComandoAbrirRevisao(new IdDeAtivo(id)), ct);
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("abrirRevisao")
+    .WithSummary("Abre revisão de um ativo publicado")
+    .WithDescription("Único caminho para alterar um ativo publicado: o ativo vai para em_revisao, aceita edição e volta à validação pela submissão. Só ativo publicado; outro estado devolve 409 TRANSICAO_INVALIDA.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
 
 // Recurso, não procedimento: POST /submissoes em vez de POST /submeter (ADR-0009).
 governanca.MapPost("/ativos/{id:guid}/submissoes", async Task<Results<Created<SubmissaoResponse>, JsonHttpResult<ApiError>>> (
@@ -388,7 +403,7 @@ governanca.MapPost("/validacoes/{id:guid}/decisoes", async Task<Results<NoConten
 })
     .WithName("decidirValidacao")
     .WithSummary("Aprova ou reprova uma etapa de validação")
-    .WithDescription("Quem submeteu a revisão não decide sobre ela, nem sendo admin. Cada etapa exige o papel correspondente (negocial: negócio; técnica: tech lead; arquitetural: arquiteto) ou ser o owner do ativo.")
+    .WithDescription("Quem submeteu a revisão não decide sobre ela, nem sendo admin. Cada etapa exige o papel correspondente (negocial: negócio; técnica: tech lead; arquitetural: arquiteto) ou ser o owner do ativo. Reprovar uma etapa cancela as outras etapas abertas da mesma revisão e devolve o ativo para ajuste; aprovar a última etapa da revisão publica o ativo.")
     .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
 
 app.Run();

@@ -274,7 +274,7 @@ paths:
       tags:
         - Catálogo
       summary: Altera os campos editáveis de um ativo
-      description: 'Substitui nome, descrição e criticidade; grava os atributos informados.'
+      description: 'Substitui nome, descrição e criticidade; grava os atributos informados. Só em rascunho ou com revisão aberta: publicado devolve 409 ATIVO_NAO_EDITAVEL.'
       operationId: editarAtivo
       parameters:
         - name: id
@@ -319,6 +319,18 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '404':
           description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -387,7 +399,7 @@ paths:
       tags:
         - Catálogo
       summary: Define um responsável pelo ativo
-      description: 'Sem os owners que o tipo exige, o pré-check bloqueia a submissão.'
+      description: 'Sem os owners que o tipo exige, o pré-check bloqueia a submissão. Só em rascunho ou com revisão aberta.'
       operationId: atribuirResponsavel
       parameters:
         - name: id
@@ -432,6 +444,18 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '404':
           description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -488,7 +512,7 @@ paths:
       tags:
         - Catálogo
       summary: Anexa uma evidência ao ativo
-      description: A política do tipo define quantas evidências são exigidas para publicar.
+      description: A política do tipo define quantas evidências são exigidas para publicar. Só em rascunho ou com revisão aberta.
       operationId: anexarEvidencia
       parameters:
         - name: id
@@ -533,6 +557,18 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '404':
           description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -733,6 +769,113 @@ paths:
                 $ref: '#/components/schemas/PreCheckResponse'
         '404':
           description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/revisoes':
+    post:
+      tags:
+        - Governança
+      summary: Abre revisão de um ativo publicado
+      description: 'Único caminho para alterar um ativo publicado: o ativo vai para em_revisao, aceita edição e volta à validação pela submissão. Só ativo publicado; outro estado devolve 409 TRANSICAO_INVALIDA.'
+      operationId: abrirRevisao
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '204':
+          description: 'Operação concluída, sem conteúdo de resposta.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -991,7 +1134,7 @@ paths:
       tags:
         - Governança
       summary: Aprova ou reprova uma etapa de validação
-      description: 'Quem submeteu a revisão não decide sobre ela, nem sendo admin. Cada etapa exige o papel correspondente (negocial: negócio; técnica: tech lead; arquitetural: arquiteto) ou ser o owner do ativo.'
+      description: 'Quem submeteu a revisão não decide sobre ela, nem sendo admin. Cada etapa exige o papel correspondente (negocial: negócio; técnica: tech lead; arquitetural: arquiteto) ou ser o owner do ativo. Reprovar uma etapa cancela as outras etapas abertas da mesma revisão e devolve o ativo para ajuste; aprovar a última etapa da revisão publica o ativo.'
       operationId: decidirValidacao
       parameters:
         - name: id
@@ -1764,7 +1907,7 @@ components:
           description: 'negocial, tecnica ou arquitetural.'
         status:
           type: string
-          description: 'aberta, aprovada ou reprovada.'
+          description: 'aberta, aprovada, reprovada ou cancelada (outra etapa da mesma revisão foi reprovada).'
         submetidaPor:
           type: string
           description: Quem submeteu a revisão.

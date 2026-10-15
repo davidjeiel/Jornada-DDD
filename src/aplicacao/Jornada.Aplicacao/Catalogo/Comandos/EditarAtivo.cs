@@ -38,6 +38,10 @@ public sealed class EditarAtivo(
         if (!PoliticaDeAutorizacao.Pode(ator, Acao.Editar, alvo, relogio.Hoje))
             return Resultado<bool>.Recusado("SEM_PERMISSAO", "Sem permissão para editar este ativo.");
 
+        // Publicado é imutável: mudar exige abrir revisão (POST .../revisoes).
+        if (!ativo.Editavel)
+            return Resultado<bool>.Recusado("ATIVO_NAO_EDITAVEL", ativo.MotivoDeNaoEditavel);
+
         ativo.Renomear(cmd.Nome, relogio);
         ativo.Descrever(cmd.Descricao, relogio);
         ativo.ReclassificarCriticidade(cmd.Criticidade, relogio);

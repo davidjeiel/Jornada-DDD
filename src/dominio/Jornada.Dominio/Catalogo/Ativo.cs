@@ -45,6 +45,14 @@ public sealed class Ativo : RaizDeAgregado
     public StatusCicloVida Status { get; private set; }
     public OrigemDoAtivo Origem { get; }
     public int RevisaoAtual { get; private set; }
+
+    /// <summary>
+    /// Última revisão que chegou a ser publicada, ou nulo se o ativo nunca foi
+    /// publicado. É o que decide para onde volta uma revisão rejeitada: um
+    /// ativo que já foi oficial volta para <c>em_revisao</c>, não para rascunho.
+    /// </summary>
+    public int? UltimaRevisaoPublicada { get; private set; }
+
     public DateOnly? FimVigencia { get; private set; }
     public DateTimeOffset CriadoEm { get; }
     public DateTimeOffset AtualizadoEm { get; private set; }
@@ -135,6 +143,7 @@ public sealed class Ativo : RaizDeAgregado
 
     public void Renomear(string nome, IRelogio relogio)
     {
+        ExigirEditavel();
         if (string.IsNullOrWhiteSpace(nome))
             throw new ErroDeDominio("NOME_OBRIGATORIO", "Nome do ativo é obrigatório.");
         Nome = nome.Trim();
@@ -143,24 +152,28 @@ public sealed class Ativo : RaizDeAgregado
 
     public void Descrever(string descricao, IRelogio relogio)
     {
+        ExigirEditavel();
         Descricao = (descricao ?? "").Trim();
         Tocar(relogio);
     }
 
     public void DefinirAtributo(string nome, string valor, IRelogio relogio)
     {
+        ExigirEditavel();
         _atributos[nome] = valor;
         Tocar(relogio);
     }
 
     public void ReclassificarCriticidade(Criticidade nova, IRelogio relogio)
     {
+        ExigirEditavel();
         Criticidade = nova;
         Tocar(relogio);
     }
 
     public void VincularPai(IdDeAtivo? pai, IRelogio relogio)
     {
+        ExigirEditavel();
         if (pai == Id) throw new ErroDeDominio("CICLO", "Um ativo não pode ser pai de si mesmo.");
         IdPai = pai;
         Tocar(relogio);
@@ -168,6 +181,7 @@ public sealed class Ativo : RaizDeAgregado
 
     public void AtribuirResponsavel(Guid idPessoa, PapelDeOwnership papel, IRelogio relogio)
     {
+        ExigirEditavel();
         _responsaveis.RemoveAll(r => r.IdPessoa == idPessoa && r.Papel == papel);
         _responsaveis.Add(new Responsabilidade(idPessoa, papel, relogio.Hoje));
         Tocar(relogio);
@@ -175,6 +189,7 @@ public sealed class Ativo : RaizDeAgregado
 
     public void AnexarEvidencia(string tipo, string titulo, string? url, IRelogio relogio)
     {
+        ExigirEditavel();
         _evidencias.Add(new Evidencia(Guid.CreateVersion7(), tipo, titulo, url));
         Tocar(relogio);
     }
@@ -208,16 +223,42 @@ public sealed class Ativo : RaizDeAgregado
     {
         MaquinaDeCicloDeVida.Exigir(Status, StatusCicloVida.Publicado);
         Status = StatusCicloVida.Publicado;
+        UltimaRevisaoPublicada = RevisaoAtual;
         Tocar(relogio);
         Registrar(new RevisaoPublicada(Id, Empresa, RevisaoAtual));
     }
 
-    /// <summary>Rejeição na validação: volta para rascunho.</summary>
-    public void DevolverParaRascunho(IRelogio relogio)
+    /// <summary>
+    /// Rejeição na validação. Um ativo que nunca foi publicado volta para
+    /// rascunho; um que já foi oficial volta para <c>em_revisao</c> — a revisão
+    /// recusada não apaga o fato de ele já ter sido publicado.
+    /// </summary>
+    public void Rejeitar(IRelogio relogio)
     {
-        MaquinaDeCicloDeVida.Exigir(Status, StatusCicloVida.Rascunho);
-        Status = StatusCicloVida.Rascunho;
+        var destino = UltimaRevisaoPublicada is null ? StatusCicloVida.Rascunho : StatusCicloVida.EmRevisao;
+        MaquinaDeCicloDeVida.Exigir(Status, destino);
+        Status = destino;
         Tocar(relogio);
+    }
+
+    /// <summary>
+    /// O cadastro só muda em rascunho ou com uma revisão aberta. Publicado é
+    /// imutável ("histórico não é log", Proposta Consolidada §2): mudar exige
+    /// abrir revisão. Em validação, o conteúdo está congelado para quem decide.
+    /// </summary>
+    public bool Editavel => Status is StatusCicloVida.Rascunho or StatusCicloVida.EmRevisao;
+
+    /// <summary>Por que este ativo não aceita edição agora, em linguagem de quem usa.</summary>
+    public string MotivoDeNaoEditavel => Status switch
+    {
+        StatusCicloVida.Publicado => "Ativo publicado não pode ser alterado. Abra uma revisão para editar.",
+        StatusCicloVida.EmValidacao => "Ativo em validação está congelado até a decisão das etapas.",
+        _ => $"Ativo em '{MaquinaDeCicloDeVida.Rotulo(Status)}' não aceita alterações.",
+    };
+
+    private void ExigirEditavel()
+    {
+        if (!Editavel) throw new ErroDeDominio("ATIVO_NAO_EDITAVEL", MotivoDeNaoEditavel);
     }
 
     public void AbrirRevisao(IRelogio relogio)
@@ -252,6 +293,7 @@ public sealed class Ativo : RaizDeAgregado
         StatusCicloVida status, OrigemDoAtivo origem, int revisaoAtual,
         DateTimeOffset criadoEm, DateTimeOffset atualizadoEm,
         IdDeUnidade? unidade = null, DateOnly? fimVigencia = null,
+        int? ultimaRevisaoPublicada = null,
         IReadOnlyDictionary<string, string>? atributos = null,
         IEnumerable<Responsabilidade>? responsaveis = null,
         IEnumerable<Evidencia>? evidencias = null)
@@ -263,6 +305,7 @@ public sealed class Ativo : RaizDeAgregado
             Unidade = unidade,
             Status = status,
             RevisaoAtual = revisaoAtual,
+            UltimaRevisaoPublicada = ultimaRevisaoPublicada,
             FimVigencia = fimVigencia,
             AtualizadoEm = atualizadoEm,
         };

@@ -30,6 +30,12 @@ public sealed class DecidirValidacao(
         if (ativo is null)
             return Resultado<bool>.Recusado("ATIVO_NAO_ENCONTRADO", "Ativo não encontrado.");
 
+        // Uma etapa só vale para a revisão que está em validação agora. Etapa de
+        // revisão antiga que ficou aberta (dado anterior a esta regra) não decide nada.
+        if (validacao.Revisao != ativo.RevisaoAtual || ativo.Status != StatusCicloVida.EmValidacao)
+            return Resultado<bool>.Recusado("VALIDACAO_OBSOLETA",
+                $"Esta etapa é da revisão {validacao.Revisao}, que não está mais em validação.");
+
         var tipo = (await metamodelo.ObterAsync(ct)).Obter(ativo.TipoItem);
         var ator = await atorAtual.ObterAsync(ct);
         var contexto = tenant.Atual;
@@ -39,16 +45,27 @@ public sealed class DecidirValidacao(
         if (!autorizacao.Permitido)
             return Resultado<bool>.Recusado("SEM_PERMISSAO", autorizacao.Motivo);
 
+        // Só as etapas DESTA revisão contam. Antes, a busca trazia também as de
+        // revisões anteriores — e uma reprovação antiga impedia para sempre a
+        // publicação de qualquer revisão nova do mesmo ativo.
+        var daRevisao = (await validacoes.ListarAsync(ativo.Id, ct))
+            .Where(v => v.Revisao == validacao.Revisao)
+            .ToArray();
+
         validacao.Decidir(cmd.Aprovada, ator.IdPessoa, cmd.Motivo);
+
         if (!cmd.Aprovada)
         {
-            ativo.DevolverParaRascunho(relogio);
+            // Reprovada uma etapa, a revisão inteira volta para ajuste: as demais
+            // etapas abertas dela são canceladas, como no painel-ddd.
+            foreach (var irma in daRevisao.Where(v => v.Id != validacao.Id && v.Status == StatusDaValidacao.Aberta))
+                irma.Cancelar($"Revisão {validacao.Revisao} reprovada na etapa {validacao.Etapa.ToString().ToLowerInvariant()}.");
+
+            ativo.Rejeitar(relogio);
         }
-        else
+        else if (daRevisao.All(v => v.Id == validacao.Id || v.Status == StatusDaValidacao.Aprovada))
         {
-            var doAtivo = await validacoes.ListarAsync(ativo.Id, ct);
-            if (doAtivo.All(v => v.Status == StatusDaValidacao.Aprovada))
-                ativo.Publicar(relogio);
+            ativo.Publicar(relogio);
         }
 
         await uow.ConfirmarAsync(ct);

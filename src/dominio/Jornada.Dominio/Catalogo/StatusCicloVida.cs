@@ -14,7 +14,7 @@ public enum StatusCicloVida
 }
 
 /// <summary>
-/// Portado literalmente de <c>governanca.TRANSICOES</c>:
+/// Portado de <c>governanca.TRANSICOES</c>:
 ///
 /// <code>
 /// "rascunho":      {"em_validacao", "arquivado"},
@@ -25,6 +25,13 @@ public enum StatusCicloVida
 /// "arquivado":     set(),
 /// </code>
 ///
+/// com duas transições a mais, que completam o caminho da revisão:
+/// <c>em_revisao → em_validacao</c> (a revisão é submetida — o
+/// <c>servicos.submeter</c> do painel-ddd já aceitava partir de em_revisao,
+/// passando por fora desta tabela) e <c>em_validacao → em_revisao</c> (a
+/// revisão de um ativo já publicado é rejeitada e volta para ajuste, sem
+/// virar rascunho).
+///
 /// Vira uma máquina PURA: nenhum banco, nenhuma injeção. A suíte que cobre isto
 /// (<c>tests/test_governanca.py</c>) hoje precisa de <c>create_app</c>,
 /// <c>seed</c> e <c>tmp_path</c>; aqui roda em microssegundos (ADR-0001).
@@ -34,9 +41,9 @@ public static class MaquinaDeCicloDeVida
     private static readonly Dictionary<StatusCicloVida, StatusCicloVida[]> Transicoes = new()
     {
         [StatusCicloVida.Rascunho]      = [StatusCicloVida.EmValidacao, StatusCicloVida.Arquivado],
-        [StatusCicloVida.EmValidacao]   = [StatusCicloVida.Rascunho, StatusCicloVida.Publicado],
+        [StatusCicloVida.EmValidacao]   = [StatusCicloVida.Rascunho, StatusCicloVida.Publicado, StatusCicloVida.EmRevisao],
         [StatusCicloVida.Publicado]     = [StatusCicloVida.EmRevisao, StatusCicloVida.Descontinuado],
-        [StatusCicloVida.EmRevisao]     = [StatusCicloVida.Publicado, StatusCicloVida.Descontinuado],
+        [StatusCicloVida.EmRevisao]     = [StatusCicloVida.Publicado, StatusCicloVida.Descontinuado, StatusCicloVida.EmValidacao],
         [StatusCicloVida.Descontinuado] = [StatusCicloVida.Arquivado],
         [StatusCicloVida.Arquivado]     = [],
     };

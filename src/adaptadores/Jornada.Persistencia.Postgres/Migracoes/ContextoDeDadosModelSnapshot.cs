@@ -154,6 +154,10 @@ namespace Jornada.Persistencia.Postgres.Migracoes
                         .HasColumnType("character varying(60)")
                         .HasColumnName("tipo_item");
 
+                    b.Property<int?>("UltimaRevisaoPublicada")
+                        .HasColumnType("integer")
+                        .HasColumnName("ultima_revisao_publicada");
+
                     b.Property<Guid?>("Unidade")
                         .HasColumnType("uuid")
                         .HasColumnName("unidade_id");
