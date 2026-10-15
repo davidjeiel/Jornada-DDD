@@ -1,3 +1,4 @@
+using Jornada.Api.Contrato;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Tenancy;
@@ -39,9 +40,11 @@ public sealed class MiddlewareDeTenant(RequestDelegate proximo)
     {
         // Rotas abertas não precisam de contexto. /saude* inclui a probe de
         // prontidão: um orquestrador de containers chama isso sem X-Empresa.
+        // /swagger é o contrato: o API Management e o Spectral o leem sem empresa.
         var caminho = http.Request.Path.Value ?? "";
         if (caminho is "/" || caminho.StartsWith("/saude", StringComparison.Ordinal)
-                          || caminho.StartsWith("/demo", StringComparison.Ordinal))
+                          || caminho.StartsWith("/demo", StringComparison.Ordinal)
+                          || caminho.StartsWith("/swagger", StringComparison.Ordinal))
         {
             await proximo(http);
             return;
@@ -50,11 +53,9 @@ public sealed class MiddlewareDeTenant(RequestDelegate proximo)
         if (!http.Request.Headers.TryGetValue("X-Empresa", out var empresaBruta)
             || !Guid.TryParse(empresaBruta.ToString(), out var idEmpresa))
         {
-            await EscreverProblema(http, StatusCodes.Status401Unauthorized,
-                "EMPRESA_NAO_IDENTIFICADA",
-                "Requisição sem empresa identificada",
-                "Em produção a empresa vem do claim 'tid_empresa' do token. " +
-                "Neste ambiente de desenvolvimento, informe o cabeçalho X-Empresa.");
+            await RespostaDeErro.EscreverAsync(http, CodigosDeErro.EmpresaNaoIdentificada,
+                "Requisição sem empresa identificada. Em produção a empresa vem do claim " +
+                "'tid_empresa' do token; neste ambiente de desenvolvimento, informe o cabeçalho X-Empresa.");
             return;
         }
 
@@ -87,31 +88,5 @@ public sealed class MiddlewareDeTenant(RequestDelegate proximo)
 
         contexto.Definir(new ContextoDeTenant(empresa, unidade), ator);
         await proximo(http);
-    }
-
-    /// <summary>Problem Details (RFC 9457) — o formato do ADR-0009.</summary>
-    public static async Task EscreverProblema(
-        HttpContext http, int status, string codigo, string titulo, string detalhe,
-        object? extras = null)
-    {
-        http.Response.StatusCode = status;
-        http.Response.ContentType = "application/problem+json";
-
-        var corpo = new Dictionary<string, object?>
-        {
-            ["type"] = $"https://jornada-ddd.exemplo/erros/{codigo.ToLowerInvariant().Replace('_', '-')}",
-            ["title"] = titulo,
-            ["status"] = status,
-            ["detail"] = detalhe,
-            ["instance"] = http.Request.Path.Value,
-            ["codigo"] = codigo,
-            ["traceId"] = System.Diagnostics.Activity.Current?.Id ?? http.TraceIdentifier,
-        };
-
-        if (extras is not null)
-            foreach (var prop in extras.GetType().GetProperties())
-                corpo[prop.Name] = prop.GetValue(extras);
-
-        await http.Response.WriteAsJsonAsync(corpo);
     }
 }

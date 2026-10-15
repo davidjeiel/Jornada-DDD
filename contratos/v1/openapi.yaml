@@ -1,0 +1,1824 @@
+openapi: 3.0.4
+info:
+  title: API Catálogo Corporativo DDD
+  description: 'Catálogo governado de ativos de negócio (domínio, subdomínio, contexto, capacidade) e técnicos (sistema, aplicação, API, endpoint, dados), com ciclo de vida, pré-check, validação em etapas e score de qualidade cadastral.'
+  contact:
+    name: a definir com a governança
+  version: 0.1.0
+  x-equipe-responsavel: a definir com a governança
+  x-gestor-negocial: a definir com a governança
+  x-classificacao-informacao: a definir com a governança
+  x-identificacao-rtc: a definir com a governança
+  x-timeout-gateway: a definir com a governança
+  x-timeout-backend: a definir com a governança
+paths:
+  /v1/ativos:
+    get:
+      tags:
+        - Catálogo
+      summary: Lista os ativos da empresa
+      description: 'Até 200 ativos, ordenados por código. O parâmetro tipo filtra pela chave do metamodelo (ex.: sistema).'
+      operationId: listarAtivos
+      parameters:
+        - name: tipo
+          in: query
+          schema:
+            type: string
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaDeAtivosResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+    post:
+      tags:
+        - Catálogo
+      summary: Cadastra um ativo
+      description: 'O ativo nasce em rascunho, com código gerado pelo tipo (ex.: SIS-0001). O papel precisa escrever no bloco do tipo: negócio cadastra a estrutura DDD, tech lead os ativos técnicos.'
+      operationId: cadastrarAtivo
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CadastrarAtivoRequest'
+        required: true
+      responses:
+        '201':
+          description: Recurso criado.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AtivoCriadoResponse'
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}':
+    get:
+      tags:
+        - Catálogo
+      summary: Consulta a ficha completa de um ativo
+      description: 'Atributos, trilha hierárquica, responsáveis, evidências e relações nos dois sentidos.'
+      operationId: consultarAtivo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FichaDoAtivoResponse'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+    put:
+      tags:
+        - Catálogo
+      summary: Altera os campos editáveis de um ativo
+      description: 'Substitui nome, descrição e criticidade; grava os atributos informados.'
+      operationId: editarAtivo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditarAtivoRequest'
+        required: true
+      responses:
+        '204':
+          description: 'Operação concluída, sem conteúdo de resposta.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/responsaveis':
+    post:
+      tags:
+        - Catálogo
+      summary: Define um responsável pelo ativo
+      description: 'Sem os owners que o tipo exige, o pré-check bloqueia a submissão.'
+      operationId: atribuirResponsavel
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtribuirResponsavelRequest'
+        required: true
+      responses:
+        '204':
+          description: 'Operação concluída, sem conteúdo de resposta.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/evidencias':
+    post:
+      tags:
+        - Catálogo
+      summary: Anexa uma evidência ao ativo
+      description: A política do tipo define quantas evidências são exigidas para publicar.
+      operationId: anexarEvidencia
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnexarEvidenciaRequest'
+        required: true
+      responses:
+        '204':
+          description: 'Operação concluída, sem conteúdo de resposta.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/relacoes':
+    post:
+      tags:
+        - Catálogo
+      summary: Relaciona este ativo a outro
+      description: 'Cria uma aresta do grafo do catálogo, com este ativo como origem.'
+      operationId: relacionarAtivos
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelacionarAtivosRequest'
+        required: true
+      responses:
+        '204':
+          description: 'Operação concluída, sem conteúdo de resposta.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/pre-check':
+    get:
+      tags:
+        - Governança
+      summary: Avalia se o ativo pode ser submetido
+      description: 'Devolve score de qualidade, bloqueios com código estável, alertas, a política aplicável e o caminho até a publicação. Não altera nada.'
+      operationId: avaliarPreCheck
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreCheckResponse'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/submissoes':
+    post:
+      tags:
+        - Governança
+      summary: Submete o ativo para validação
+      description: 'Roda o pré-check; se aprovado, abre uma nova revisão e as etapas de validação exigidas pela política. Reprovado no pré-check: 422 PRECHECK_REPROVADO.'
+      operationId: submeterAtivo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmeterAtivoRequest'
+      responses:
+        '201':
+          description: Recurso criado.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissaoResponse'
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  /v1/validacoes:
+    get:
+      tags:
+        - Governança
+      summary: Lista as validações da empresa
+      description: Abertas primeiro. O parâmetro ativo restringe a um ativo.
+      operationId: listarValidacoes
+      parameters:
+        - name: ativo
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaDeValidacoesResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/validacoes/{id}/decisoes':
+    post:
+      tags:
+        - Governança
+      summary: Aprova ou reprova uma etapa de validação
+      description: 'Quem submeteu a revisão não decide sobre ela, nem sendo admin. Cada etapa exige o papel correspondente (negocial: negócio; técnica: tech lead; arquitetural: arquiteto) ou ser o owner do ativo.'
+      operationId: decidirValidacao
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecidirValidacaoRequest'
+        required: true
+      responses:
+        '204':
+          description: 'Operação concluída, sem conteúdo de resposta.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  /saude:
+    get:
+      tags:
+        - Operação
+      summary: Verifica se o processo responde
+      description: Liveness. Não consulta dependências.
+      operationId: verificarVida
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaudeResponse'
+  /saude/pronto:
+    get:
+      tags:
+        - Operação
+      summary: Verifica se a API pode receber tráfego
+      description: 'Readiness. Com persistência Postgres, testa a conexão com o banco. situacao: healthy, degraded ou unhealthy.'
+      operationId: verificarProntidao
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaudeResponse'
+        '503':
+          description: Dependência indisponível.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaudeResponse'
+components:
+  schemas:
+    AnexarEvidenciaRequest:
+      required:
+        - tipo
+        - titulo
+      type: object
+      properties:
+        tipo:
+          type: string
+          example: openapi
+        titulo:
+          type: string
+          example: Contrato OpenAPI v2
+        url:
+          type: string
+          nullable: true
+          example: https://repositorio.exemplo/core-bancario/openapi.yaml
+      additionalProperties: false
+      description: 'Evidência que sustenta o cadastro (ADR, contrato, documento, link).'
+    ApiError:
+      required:
+        - codigo
+        - correlationId
+        - dataHora
+        - mensagem
+      type: object
+      properties:
+        codigo:
+          type: string
+          description: 'Código estável, para o cliente tratar o erro sem interpretar texto.'
+          example: ATIVO_NAO_ENCONTRADO
+        mensagem:
+          type: string
+          description: Mensagem para pessoas. Nunca carrega stack trace nem dado interno.
+          example: Ativo não encontrado.
+        correlationId:
+          type: string
+          description: O mesmo valor devolvido no cabeçalho `x-correlation-id`.
+          example: 7df2662f-1b66-43f5-98d4-bfe3c3600011
+        dataHora:
+          type: string
+          description: 'Instante do erro, com fuso.'
+          format: date-time
+          example: '2026-10-09T10:37:00-03:00'
+      additionalProperties: false
+      description: Erro no padrão CAIXA. Toda resposta 4xx e 5xx desta API usa este formato.
+    AtivoCriadoResponse:
+      required:
+        - id
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador público do ativo.
+          format: uuid
+      additionalProperties: false
+      description: Ativo recém-cadastrado.
+      example:
+        id: 01a12128-8221-716c-89ac-50ca6aad15a3
+    AtivoResumoResponse:
+      required:
+        - id
+        - codigo
+        - nome
+        - tipo
+        - status
+        - criticidade
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        codigo:
+          type: string
+        nome:
+          type: string
+        tipo:
+          type: string
+        status:
+          type: string
+        criticidade:
+          type: string
+      additionalProperties: false
+      description: Linha da listagem do catálogo.
+      example:
+        id: 01a12128-8221-716c-89ac-50ca6aad15a3
+        codigo: SIS-0001
+        nome: Core Bancário
+        tipo: sistema
+        status: rascunho
+        criticidade: alta
+    AtribuirResponsavelRequest:
+      required:
+        - idPessoa
+        - papel
+      type: object
+      properties:
+        idPessoa:
+          type: string
+          format: uuid
+          example: 44444444-4444-4444-4444-444444444444
+        papel:
+          type: string
+          description: 'OwnerNegocial, OwnerTecnico, Arquiteto ou Mantenedor.'
+          example: OwnerTecnico
+      additionalProperties: false
+      description: Define quem responde pelo ativo.
+    BloqueioResponse:
+      required:
+        - codigo
+        - mensagem
+      type: object
+      properties:
+        codigo:
+          type: string
+          description: 'Chave estável (ex.: OWNER_NAO_DEFINIDO), para o cliente automatizar a correção.'
+        mensagem:
+          type: string
+          description: Texto para pessoas.
+      additionalProperties: false
+      description: Impedimento de publicação.
+    CadastrarAtivoRequest:
+      required:
+        - nome
+        - tipo
+      type: object
+      properties:
+        tipo:
+          type: string
+          description: 'Chave do tipo no metamodelo (dominio, subdominio, contexto, capacidade, sistema, aplicacao, repositorio, api, endpoint, base_dados, objeto_dado, evento).'
+          example: sistema
+        nome:
+          type: string
+          description: Nome do ativo. Único por tipo dentro da empresa.
+          example: Core Bancário
+        descricao:
+          type: string
+          description: 'Para que serve o ativo. Obrigatória para publicar, não para cadastrar.'
+          nullable: true
+          example: Sistema central de contas e lançamentos.
+        criticidade:
+          type: string
+          description: 'baixa, media, alta ou critica. Ausente vale media.'
+          nullable: true
+          example: alta
+        idPai:
+          type: string
+          description: 'Id do item pai, quando o tipo exige hierarquia (ex.: subdomínio exige domínio).'
+          format: uuid
+          nullable: true
+        atributos:
+          type: object
+          additionalProperties:
+            type: string
+          description: 'Campos específicos do tipo, declarados no metamodelo.'
+          nullable: true
+          example:
+            plataforma: mainframe
+      additionalProperties: false
+      description: Cadastro de um ativo novo. Ele nasce em rascunho.
+    DecidirValidacaoRequest:
+      required:
+        - aprovada
+      type: object
+      properties:
+        aprovada:
+          type: boolean
+          description: true aprova a etapa; false devolve o ativo ao rascunho.
+          example: true
+        motivo:
+          type: string
+          nullable: true
+          example: Owner e evidência conferidos.
+      additionalProperties: false
+      description: Decisão sobre uma etapa de validação.
+    DimensoesDoScoreResponse:
+      required:
+        - completude
+        - consistencia
+        - ownership
+        - evidencia
+        - temporalidade
+      type: object
+      properties:
+        completude:
+          type: integer
+          format: int32
+        consistencia:
+          type: integer
+          format: int32
+        ownership:
+          type: integer
+          format: int32
+        evidencia:
+          type: integer
+          format: int32
+        temporalidade:
+          type: integer
+          format: int32
+      additionalProperties: false
+      description: 'As cinco dimensões do score de qualidade, de 0 a 100.'
+    EditarAtivoRequest:
+      required:
+        - nome
+      type: object
+      properties:
+        nome:
+          type: string
+          example: Core Bancário
+        descricao:
+          type: string
+          nullable: true
+          example: Sistema central de contas e lançamentos.
+        criticidade:
+          type: string
+          nullable: true
+          example: alta
+        atributos:
+          type: object
+          additionalProperties:
+            type: string
+          description: Atributos informados são gravados; os ausentes ficam como estão.
+          nullable: true
+          example:
+            plataforma: mainframe
+      additionalProperties: false
+      description: 'Estado completo dos campos editáveis (PUT substitui, não mescla).'
+    EvidenciaResponse:
+      required:
+        - id
+        - tipo
+        - titulo
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+        titulo:
+          type: string
+        url:
+          type: string
+          nullable: true
+      additionalProperties: false
+    FichaDoAtivoResponse:
+      required:
+        - id
+        - codigo
+        - nome
+        - tipoItem
+        - status
+        - criticidade
+        - descricao
+        - revisaoAtual
+        - trilha
+        - atributos
+        - evidencias
+        - responsaveis
+        - relacoes
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        codigo:
+          type: string
+        nome:
+          type: string
+        tipoItem:
+          type: string
+        status:
+          type: string
+        criticidade:
+          type: string
+        descricao:
+          type: string
+        revisaoAtual:
+          type: integer
+          format: int32
+        trilha:
+          type: array
+          items:
+            type: string
+        atributos:
+          type: object
+          additionalProperties:
+            type: string
+        evidencias:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenciaResponse'
+        responsaveis:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResponsavelResponse'
+        relacoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelacaoResponse'
+      additionalProperties: false
+      description: Ficha completa do ativo (visão 360°).
+      example:
+        id: 01a12128-8221-716c-89ac-50ca6aad15a3
+        codigo: SIS-0001
+        nome: Core Bancário
+        tipoItem: sistema
+        status: publicado
+        criticidade: alta
+        descricao: Sistema central de contas e lançamentos.
+        revisaoAtual: 1
+        trilha:
+          - Core Bancário
+        atributos:
+          plataforma: mainframe
+        evidencias:
+          - id: 01a12128-8290-7d4e-a1f0-0b6a3c2d9e10
+            tipo: openapi
+            titulo: Contrato OpenAPI v2
+            url: https://repositorio.exemplo/core-bancario/openapi.yaml
+        responsaveis:
+          - idPessoa: 40000000-0000-0000-0000-000000000009
+            papel: OwnerTecnico
+            inicioVigencia: '2026-10-09'
+            fimVigencia: null
+            vigente: true
+        relacoes: [ ]
+    ListaDeAtivosResponse:
+      required:
+        - total
+        - ativos
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int32
+        ativos:
+          type: array
+          items:
+            $ref: '#/components/schemas/AtivoResumoResponse'
+      additionalProperties: false
+      description: Listagem do catálogo da empresa.
+    ListaDeValidacoesResponse:
+      required:
+        - total
+        - validacoes
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int32
+        validacoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidacaoResponse'
+      additionalProperties: false
+      description: Fila de validações da empresa.
+    PassoResponse:
+      required:
+        - passo
+        - rotulo
+        - concluido
+        - impedimentos
+      type: object
+      properties:
+        passo:
+          type: string
+        rotulo:
+          type: string
+        concluido:
+          type: boolean
+        impedimentos:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      description: Passo do caminho até a publicação.
+    PoliticaResponse:
+      required:
+        - scoreMinimo
+        - evidenciaMinima
+        - slaHoras
+        - etapas
+      type: object
+      properties:
+        scoreMinimo:
+          type: integer
+          format: int32
+        evidenciaMinima:
+          type: integer
+          format: int32
+        slaHoras:
+          type: integer
+          format: int32
+        etapas:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      description: Política de governança que vale para este ativo (tipo × criticidade).
+    PreCheckResponse:
+      required:
+        - aprovado
+        - score
+        - dimensoes
+        - bloqueios
+        - alertas
+        - politica
+        - caminho
+      type: object
+      properties:
+        aprovado:
+          type: boolean
+        score:
+          type: integer
+          format: int32
+        dimensoes:
+          $ref: '#/components/schemas/DimensoesDoScoreResponse'
+        bloqueios:
+          type: array
+          items:
+            $ref: '#/components/schemas/BloqueioResponse'
+        alertas:
+          type: array
+          items:
+            type: string
+        politica:
+          $ref: '#/components/schemas/PoliticaResponse'
+        caminho:
+          type: array
+          items:
+            $ref: '#/components/schemas/PassoResponse'
+      additionalProperties: false
+      description: 'Resultado do pré-check: o que falta para o ativo poder ser submetido.'
+      example:
+        aprovado: false
+        score: 76
+        dimensoes:
+          completude: 100
+          consistencia: 100
+          ownership: 0
+          evidencia: 80
+          temporalidade: 100
+        bloqueios:
+          - codigo: OWNER_NAO_DEFINIDO
+            mensagem: Owner técnico não definido
+        alertas:
+          - Definir owner tecnico
+        politica:
+          scoreMinimo: 60
+          evidenciaMinima: 0
+          slaHoras: 72
+          etapas:
+            - tecnica
+        caminho:
+          - passo: responsaveis
+            rotulo: Definir responsáveis
+            concluido: false
+            impedimentos:
+              - OWNER_NAO_DEFINIDO
+    RelacaoResponse:
+      required:
+        - direcao
+        - ativoId
+        - codigo
+        - nome
+        - tipo
+      type: object
+      properties:
+        direcao:
+          type: string
+          description: saida (este ativo é a origem) ou entrada (é o destino).
+        ativoId:
+          type: string
+          description: O ativo do outro lado.
+          format: uuid
+        codigo:
+          type: string
+          description: Código do ativo do outro lado.
+        nome:
+          type: string
+          description: Nome do ativo do outro lado.
+        tipo:
+          type: string
+          description: Tipo da relação.
+      additionalProperties: false
+      description: Relação vista a partir deste ativo.
+    RelacionarAtivosRequest:
+      required:
+        - idDestino
+        - tipo
+      type: object
+      properties:
+        idDestino:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          description: 'implementa, expoe, consome, produz, depende_de ou persiste_em.'
+          example: depende_de
+      additionalProperties: false
+      description: Relação deste ativo (origem) com outro (destino).
+    ResponsavelResponse:
+      required:
+        - idPessoa
+        - papel
+        - inicioVigencia
+        - vigente
+      type: object
+      properties:
+        idPessoa:
+          type: string
+          format: uuid
+        papel:
+          type: string
+        inicioVigencia:
+          type: string
+          format: date
+        fimVigencia:
+          type: string
+          format: date
+          nullable: true
+        vigente:
+          type: boolean
+      additionalProperties: false
+    SaudeResponse:
+      required:
+        - situacao
+      type: object
+      properties:
+        situacao:
+          type: string
+      additionalProperties: false
+      description: Resposta da verificação de vida do processo.
+      example:
+        situacao: ok
+    SubmeterAtivoRequest:
+      type: object
+      properties:
+        motivo:
+          type: string
+          nullable: true
+          example: Primeira versão
+      additionalProperties: false
+      description: Envio do ativo para validação.
+    SubmissaoResponse:
+      required:
+        - revisao
+        - score
+        - etapasAbertas
+      type: object
+      properties:
+        revisao:
+          type: integer
+          format: int32
+        score:
+          type: integer
+          format: int32
+        etapasAbertas:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      description: 'Submissão aceita: a revisão foi aberta e as etapas exigidas pela política aguardam decisão.'
+      example:
+        revisao: 1
+        score: 97
+        etapasAbertas:
+          - tecnica
+    ValidacaoResponse:
+      required:
+        - id
+        - ativo
+        - revisao
+        - etapa
+        - status
+        - submetidaPor
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador da validação.
+          format: uuid
+        ativo:
+          type: string
+          description: Ativo validado.
+          format: uuid
+        revisao:
+          type: integer
+          description: Número da revisão submetida.
+          format: int32
+        etapa:
+          type: string
+          description: 'negocial, tecnica ou arquitetural.'
+        status:
+          type: string
+          description: 'aberta, aprovada ou reprovada.'
+        submetidaPor:
+          type: string
+          description: Quem submeteu a revisão.
+          format: uuid
+        decididaPor:
+          type: string
+          description: 'Quem decidiu a etapa, se já decidida.'
+          format: uuid
+          nullable: true
+        motivo:
+          type: string
+          description: Justificativa da decisão.
+          nullable: true
+      additionalProperties: false
+      description: Etapa de validação de uma revisão.
+      example:
+        id: 01a12128-8277-7ab1-9c35-1b2e4f9d0c11
+        ativo: 01a12128-8221-716c-89ac-50ca6aad15a3
+        revisao: 1
+        etapa: tecnica
+        status: aberta
+        submetidaPor: 20000000-0000-0000-0000-000000000001
+        decididaPor: null
+        motivo: null
+  securitySchemes:
+    Bearer:
+      type: http
+      description: 'ALVO de produção: token JWT do provedor de identidade corporativo, com a empresa no claim tid_empresa. AINDA NÃO VALIDADO por esta versão da API — enquanto a identidade não for ligada, use os cabeçalhos de desenvolvimento.'
+      scheme: bearer
+      bearerFormat: JWT
+    X-Empresa:
+      type: apiKey
+      description: SOMENTE DESENVOLVIMENTO. Id da empresa (UUID). Em produção vem do token.
+      name: X-Empresa
+      in: header
+    X-Papel:
+      type: apiKey
+      description: 'SOMENTE DESENVOLVIMENTO. admin, curador, arquiteto, techlead, negocio ou consulta.'
+      name: X-Papel
+      in: header
+    X-Pessoa:
+      type: apiKey
+      description: SOMENTE DESENVOLVIMENTO. Id da pessoa que age (UUID).
+      name: X-Pessoa
+      in: header
+    X-Unidade:
+      type: apiKey
+      description: 'SOMENTE DESENVOLVIMENTO. Id da unidade da pessoa (UUID), escopo de autorização.'
+      name: X-Unidade
+      in: header
+tags:
+  - name: Catálogo
+    description: 'Cadastro e consulta de ativos, responsáveis, evidências e relações.'
+  - name: Governança
+    description: 'Pré-check, submissão e decisão das etapas de validação.'
+  - name: Operação
+    description: Verificações de saúde para o orquestrador.
