@@ -250,8 +250,10 @@ Você faz tudo o que os outros fazem. Nesta versão, sem console de administraç
 
 - Decidir sobre uma revisão que você mesmo submeteu — a segregação de função não tem
   exceção de papel
-- Editar um ativo publicado sem que ele volte a rascunho por decisão de Ajustes — não
-  existe ainda um fluxo de "abrir revisão" separado na interface
+- Editar um ativo publicado sem abrir revisão — publicado é imutável. O botão
+  **Abrir revisão**, no painel do ativo, leva o ativo para `em_revisao`; aí a edição
+  volta a valer, e a revisão passa de novo pelo rito. Se a revisão for reprovada, o
+  ativo volta para `em_revisao` (não para rascunho: ele já foi oficial)
 
 > Comandos de manutenção (varredura de SLA, notificação, recálculo de qualidade em lote)
 > existem no `painel-ddd` como comandos de linha de comando. Aqui ainda não há
@@ -297,7 +299,7 @@ falta o fio até a interface.
 | Editar ativo | sim | sim | sim | sim | sim | — | sim |
 | Registrar relação | — | sim | sim | sim | sim | — | sim |
 | Submeter para validação | sim | sim | sim | sim | sim | — | sim |
-| Abrir revisão | sim | sim | sim | sim | sim | — | não |
+| Abrir revisão | sim | sim | sim | sim | sim | — | sim |
 | Decidir validação | sim | sim | sim | — | sim | — | sim |
 | Importar descobertas | — | sim | — | sim | sim | — | não |
 | Triar bandeja | — | sim | — | sim | sim | — | não |

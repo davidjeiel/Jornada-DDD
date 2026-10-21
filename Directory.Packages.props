@@ -15,6 +15,16 @@
     <PackageVersion Include="Dapper" Version="2.1.66" />
   </ItemGroup>
 
+  <ItemGroup Label="Pinagem de transitivos com vulnerabilidade conhecida">
+    <!-- Chegam por Microsoft.EntityFrameworkCore.Design (ferramenta de
+         migrations, design-time) na versão 9.0.0, que o NuGet Audit marca como
+         vulnerável — e o build trata o aviso como erro. Fixar a série 10.0.x
+         (com a pinagem transitiva ligada acima) troca a versão sem precisar
+         suprimir o alerta. -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.13" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+  </ItemGroup>
+
   <ItemGroup Label="Contrato OpenAPI — só o host da API usa (ADR-0014)">
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.3.0" />
   </ItemGroup>

@@ -144,6 +144,11 @@ export function relacionarAtivos(id: string, idDestino: string, tipo: string): P
   });
 }
 
+// Publicado é imutável: alterar exige abrir revisão (o ativo vai para em_revisao).
+export function abrirRevisao(id: string): Promise<void> {
+  return requisicao(`/v1/ativos/${id}/revisoes`, { method: 'POST' });
+}
+
 export function submeterAtivo(id: string, motivo: string): Promise<{ revisao: number; score: number; etapasAbertas: string[] }> {
   return requisicao(`/v1/ativos/${id}/submissoes`, {
     method: 'POST',

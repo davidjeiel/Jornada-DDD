@@ -115,7 +115,7 @@ public sealed record SubmissaoResponse(int Revisao, int Score, IReadOnlyList<str
 /// <param name="Ativo">Ativo validado.</param>
 /// <param name="Revisao">Número da revisão submetida.</param>
 /// <param name="Etapa">negocial, tecnica ou arquitetural.</param>
-/// <param name="Status">aberta, aprovada ou reprovada.</param>
+/// <param name="Status">aberta, aprovada, reprovada ou cancelada (outra etapa da mesma revisão foi reprovada).</param>
 /// <param name="SubmetidaPor">Quem submeteu a revisão.</param>
 /// <param name="DecididaPor">Quem decidiu a etapa, se já decidida.</param>
 /// <param name="Motivo">Justificativa da decisão.</param>

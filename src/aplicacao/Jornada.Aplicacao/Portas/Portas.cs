@@ -86,7 +86,12 @@ public interface IUnidadeDeTrabalho
     public Task<int> ConfirmarAsync(CancellationToken ct = default);
 }
 
-public enum StatusDaValidacao { Aberta, Aprovada, Reprovada }
+/// <summary>
+/// Cancelada: a etapa não chegou a ser decidida porque outra etapa da MESMA
+/// revisão foi reprovada — a revisão inteira volta para ajuste, e não faz
+/// sentido deixar alguém decidindo sobre ela.
+/// </summary>
+public enum StatusDaValidacao { Aberta, Aprovada, Reprovada, Cancelada }
 
 public sealed class ValidacaoEmProcesso(
     Guid id, IdDeAtivo ativo, IdDeEmpresa empresa, int revisao,
@@ -106,6 +111,13 @@ public sealed class ValidacaoEmProcesso(
     {
         Status = aprovada ? StatusDaValidacao.Aprovada : StatusDaValidacao.Reprovada;
         IdDecisor = idDecisor;
+        Motivo = motivo;
+    }
+
+    /// <summary>Encerra a etapa sem decisão, porque a revisão já foi reprovada em outra etapa.</summary>
+    public void Cancelar(string motivo)
+    {
+        Status = StatusDaValidacao.Cancelada;
         Motivo = motivo;
     }
 }

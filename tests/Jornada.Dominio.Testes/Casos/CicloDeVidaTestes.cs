@@ -95,7 +95,7 @@ public sealed class CicloDeVidaTestes
         ativo.Submeter("v1", Guid.NewGuid(), Cenario.Relogio);
         var chave1 = ativo.EventosPendentes.OfType<AtivoSubmetido>().Single().ChaveDeIdempotencia;
 
-        ativo.DevolverParaRascunho(Cenario.Relogio);
+        ativo.Rejeitar(Cenario.Relogio);
         ativo.DrenarEventos();
         ativo.Submeter("v2", Guid.NewGuid(), Cenario.Relogio);
         var chave2 = ativo.EventosPendentes.OfType<AtivoSubmetido>().Single().ChaveDeIdempotencia;

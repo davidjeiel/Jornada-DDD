@@ -36,6 +36,10 @@ public sealed class AnexarEvidencia(
         if (!PoliticaDeAutorizacao.Pode(ator, Acao.Editar, alvo, relogio.Hoje))
             return Resultado<bool>.Recusado("SEM_PERMISSAO", "Sem permissão para editar este ativo.");
 
+        // Publicado é imutável: mudar exige abrir revisão (POST .../revisoes).
+        if (!ativo.Editavel)
+            return Resultado<bool>.Recusado("ATIVO_NAO_EDITAVEL", ativo.MotivoDeNaoEditavel);
+
         ativo.AnexarEvidencia(cmd.Tipo, cmd.Titulo, cmd.Url, relogio);
         await uow.ConfirmarAsync(ct);
         return Resultado<bool>.Ok(true);
