@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Testes de CONTRATO das portas de persistência. Uma suíte só, escrita
+       contra as portas (IRepositorioDeAtivos, IRepositorioDeRelacoes,
+       IRepositorioDeValidacoes, IUnidadeDeTrabalho), que todo adaptador
+       precisa passar: memória, Postgres e, quando chegar, Cosmos DB.
+
+       A suíte Postgres só roda com JORNADA_TESTES_POSTGRES definida (ver
+       Adaptadores/ContratoPostgres.cs); sem ela, os testes aparecem como PULO.
+
+       O harness é o mesmo da suíte de domínio, linkado, não copiado. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Jornada.Persistencia.Testes</RootNamespace>
+    <AssemblyName>Jornada.Persistencia.Testes</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Jornada.Dominio.Testes\Harness\Harness.cs" Link="Harness\Harness.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\dominio\Jornada.Dominio\Jornada.Dominio.csproj" />
+    <ProjectReference Include="..\..\src\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
+    <ProjectReference Include="..\..\src\adaptadores\Jornada.Adaptadores.Memoria\Jornada.Adaptadores.Memoria.csproj" />
+    <ProjectReference Include="..\..\src\adaptadores\Jornada.Persistencia.Postgres\Jornada.Persistencia.Postgres.csproj" />
+  </ItemGroup>
+
+</Project>

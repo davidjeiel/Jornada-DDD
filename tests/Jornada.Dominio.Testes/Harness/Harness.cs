@@ -19,6 +19,12 @@ public sealed class SuiteAttribute(string nome) : Attribute
 
 public sealed class FalhaDeVerificacao(string mensagem) : Exception(mensagem);
 
+/// <summary>
+/// Teste que não pode rodar neste ambiente (ex.: sem banco configurado).
+/// Aparece como PULO e não conta como falha. Mapeia para <c>Assert.Skip</c> do xUnit v3.
+/// </summary>
+public sealed class TestePulado(string motivo) : Exception(motivo);
+
 /// <summary>Asserções mínimas. Mapeiam 1:1 para <c>Assert.*</c> do xUnit.</summary>
 public static class Verificar
 {
@@ -86,7 +92,7 @@ public static class Executor
     public static int Executar(Assembly assembly, string? filtro = null)
     {
         var relogio = Stopwatch.StartNew();
-        int passou = 0, falhou = 0;
+        int passou = 0, falhou = 0, pulou = 0;
         var falhas = new List<string>();
 
         var suites = assembly.GetTypes()
@@ -119,6 +125,12 @@ public static class Executor
                 catch (Exception e)
                 {
                     var raiz = e is TargetInvocationException { InnerException: { } inner } ? inner : e;
+                    if (raiz is TestePulado)
+                    {
+                        Console.WriteLine($"    \u001b[33mPULO\u001b[0m  {descricao} — {raiz.Message}");
+                        pulou++;
+                        continue;
+                    }
                     Console.WriteLine($"    \u001b[31mFALHA\u001b[0m {descricao}");
                     Console.WriteLine($"          {raiz.Message}");
                     falhas.Add($"{nomeSuite} > {descricao}: {raiz.Message}");
@@ -132,7 +144,8 @@ public static class Executor
         Console.WriteLine(new string('─', 72));
         var cor = falhou == 0 ? "\u001b[32m" : "\u001b[31m";
         Console.WriteLine(
-            $"  {cor}{passou} passou, {falhou} falhou\u001b[0m  em {relogio.ElapsedMilliseconds} ms");
+            $"  {cor}{passou} passou, {falhou} falhou\u001b[0m" +
+            $"{(pulou > 0 ? $", \u001b[33m{pulou} pulou\u001b[0m" : "")}  em {relogio.ElapsedMilliseconds} ms");
 
         if (falhou > 0)
         {

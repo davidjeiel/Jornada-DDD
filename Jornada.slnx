@@ -16,5 +16,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/Jornada.Arquitetura.Testes/Jornada.Arquitetura.Testes.csproj" />
     <Project Path="tests/Jornada.Dominio.Testes/Jornada.Dominio.Testes.csproj" />
+    <Project Path="tests/Jornada.Persistencia.Testes/Jornada.Persistencia.Testes.csproj" />
   </Folder>
 </Solution>

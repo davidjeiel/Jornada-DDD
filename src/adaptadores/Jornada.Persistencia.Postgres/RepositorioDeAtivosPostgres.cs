@@ -84,10 +84,15 @@ public sealed class RepositorioDeAtivosPostgres(ContextoDeDados db, IContextoDeT
         string tipoItem, string nome, IdDeAtivo? exceto = null, CancellationToken ct = default) =>
         db.ComContextoDeTenantAsync(tenant, () =>
         {
-            var nomeNormalizado = nome.ToLower();
+            // lower() com a colação ICU, e não a do banco: com locale C (o do
+            // ambiente local) o lower() padrão não converte letra acentuada, e
+            // "Órgão" deixaria de colidir com "órgão". A regra é de negócio;
+            // não pode depender de como o banco foi criado.
+            var nomeNormalizado = nome.ToLowerInvariant();
+            var tipoNormalizado = tipoItem.ToLowerInvariant();
             return db.Ativos.AnyAsync(a =>
-                a.TipoItem == tipoItem.ToLower() &&
-                a.Nome.ToLower() == nomeNormalizado &&
+                a.TipoItem == tipoNormalizado &&
+                EF.Functions.Collate(a.Nome, "und-x-icu").ToLower() == nomeNormalizado &&
                 (exceto == null || a.Id != exceto), ct);
         }, ct);
 
@@ -120,10 +125,7 @@ public sealed class RepositorioDeAtivosPostgres(ContextoDeDados db, IContextoDeT
     // ────────────────────────────────────────────────── IRepositorioDeRelacoes
     //
     // Consultas sobre o grafo de relações (ADR-0004: CTE recursiva no Postgres).
-    // Não existe, ainda, caso de uso nem rota para GRAVAR uma relação — por
-    // isso estas consultas sempre respondem "nenhuma", honestamente, até que
-    // a funcionalidade de relacionar ativos exista. A tabela e o índice já
-    // estão prontos para quando ela chegar.
+    // A escrita vem do caso de uso RelacionarAtivos (POST /v1/ativos/{id}/relacoes).
 
     public Task<bool> TemDependenciaCircularAsync(IdDeAtivo id, CancellationToken ct = default) =>
         db.ComContextoDeTenantAsync(tenant, async () =>
