@@ -16,8 +16,12 @@ public sealed class ArmazemEmMemoria
     internal ConcurrentDictionary<string, int> Sequenciais { get; } = new();
     internal List<EventoDeDominio> Eventos { get; } = [];
 
-    /// <summary>Relações: (origem, destino, tipo). Simplificação deliberada.</summary>
-    internal List<(IdDeAtivo Origem, IdDeAtivo Destino, string Tipo)> Relacoes { get; } = [];
+    /// <summary>
+    /// Relações: (empresa, origem, destino, tipo). A empresa vai junto pelo
+    /// mesmo motivo do <c>tenant_id</c> em <c>relacao_ativo</c>: sem ela, uma
+    /// empresa enxergaria as arestas de outra.
+    /// </summary>
+    internal List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo)> Relacoes { get; } = [];
     internal ConcurrentDictionary<Guid, ValidacaoEmProcesso> Validacoes { get; } = new();
 
     public void Limpar()
@@ -59,7 +63,11 @@ public sealed class RepositorioDeAtivosEmMemoria(
     private ConcurrentDictionary<IdDeAtivo, Ativo> _ativos => armazem.Ativos;
     private ConcurrentDictionary<string, int> _sequenciais => armazem.Sequenciais;
     private List<EventoDeDominio> _eventosPublicados => armazem.Eventos;
-    private List<(IdDeAtivo Origem, IdDeAtivo Destino, string Tipo)> _relacoes => armazem.Relacoes;
+    private List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo)> _relacoes => armazem.Relacoes;
+
+    /// <summary>As relações desta empresa. Toda consulta ao grafo parte daqui.</summary>
+    private IEnumerable<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo)> MinhasRelacoes =>
+        _relacoes.Where(r => r.Empresa == Empresa);
     private ConcurrentDictionary<Guid, ValidacaoEmProcesso> _validacoes => armazem.Validacoes;
 
     public IReadOnlyList<EventoDeDominio> EventosPublicados => _eventosPublicados;
@@ -132,13 +140,13 @@ public sealed class RepositorioDeAtivosEmMemoria(
 
     public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo, CancellationToken ct = default)
     {
-        _relacoes.Add((origem, destino, tipo));
+        _relacoes.Add((Empresa, origem, destino, tipo));
         return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default)
     {
-        var lista = _relacoes
+        var lista = MinhasRelacoes
             .Where(r => r.Origem == id || r.Destino == id)
             .Select(r => new RelacaoResumo(r.Origem, r.Destino, r.Tipo))
             .ToArray();
@@ -155,7 +163,7 @@ public sealed class RepositorioDeAtivosEmMemoria(
         while (pilha.Count > 0)
         {
             var atual = pilha.Pop();
-            foreach (var (_, destino, _) in _relacoes.Where(
+            foreach (var (_, _, destino, _) in MinhasRelacoes.Where(
                          r => r.Origem == atual && r.Tipo == "depende_de"))
             {
                 if (destino == id) return Task.FromResult(true);
@@ -168,7 +176,7 @@ public sealed class RepositorioDeAtivosEmMemoria(
     public Task<IReadOnlyList<string>> NomesDeDestinosForaDeVigenciaAsync(
         IdDeAtivo id, CancellationToken ct = default)
     {
-        var nomes = _relacoes
+        var nomes = MinhasRelacoes
             .Where(r => r.Origem == id)
             .Select(r => _ativos.TryGetValue(r.Destino, out var d) ? d : null)
             .Where(d => d is not null && MinhaEmpresa(d) && MaquinaDeCicloDeVida.ForaDeVigencia(d.Status))
@@ -179,7 +187,7 @@ public sealed class RepositorioDeAtivosEmMemoria(
     }
 
     public Task<int> ContarImplementacoesAsync(IdDeAtivo idCapacidade, CancellationToken ct = default) =>
-        Task.FromResult(_relacoes.Count(r => r.Destino == idCapacidade && r.Tipo == "implementa"));
+        Task.FromResult(MinhasRelacoes.Count(r => r.Destino == idCapacidade && r.Tipo == "implementa"));
 
     // ───────────────────────────────────────────────────── IUnidadeDeTrabalho
 

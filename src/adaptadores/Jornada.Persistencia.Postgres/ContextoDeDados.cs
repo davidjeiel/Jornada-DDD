@@ -152,10 +152,8 @@ public sealed class TransacaoComTenant(ContextoDeDados contexto, IContextoDeTena
 
 /// <summary>
 /// Uma aresta do grafo de relações entre ativos (<c>implementa</c>,
-/// <c>expõe</c>, <c>consome</c>, <c>depende_de</c>...). Simplificação
-/// deliberada: hoje só existe leitura (<see cref="IRepositorioDeRelacoes"/>);
-/// a escrita chega junto da funcionalidade de relacionar ativos (ver
-/// docs/ARQUITETURA.md — ainda não tem caso de uso nem rota).
+/// <c>expõe</c>, <c>consome</c>, <c>depende_de</c>...). Lida e gravada por
+/// <see cref="IRepositorioDeRelacoes"/>.
 /// </summary>
 public sealed class RelacaoAtivo
 {

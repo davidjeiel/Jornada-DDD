@@ -17,6 +17,7 @@ imposto pelo banco.
 dotnet build Jornada-sem-nuget.slnx          # compila sem precisar de NuGet
 dotnet run --project tests/Jornada.Arquitetura.Testes   # guardas do ADR-0001
 dotnet run --project tests/Jornada.Dominio.Testes       # 49 testes de regra
+dotnet run --project tests/Jornada.Persistencia.Testes  # contrato das portas (Postgres: ver abaixo)
 dotnet run --project src/hosts/Jornada.Api              # API em memória
 ```
 
@@ -103,6 +104,7 @@ src/
 
 tests/
 ├── Jornada.Dominio.Testes/           49 casos portados do pytest
+├── Jornada.Persistencia.Testes/      o mesmo contrato para todo adaptador de persistência
 └── Jornada.Arquitetura.Testes/       a regra de dependência como build gate
 
 docs/     13 ADRs + ARQUITETURA.md + AMBIENTE-LOCAL.md + CARTILHA.md
@@ -260,6 +262,24 @@ que é onde bug de contexto de tenant se esconde ([ADR-0003](docs/adr/0003-model
 Depois das migrations, aplique `Esquema.sql`: ele traz RLS, políticas e a função
 `plataforma.exigir_rls()`. **As migrations do EF não criam RLS** — sem esse
 arquivo, o ADR-0003 está documentado, não implementado.
+
+### Contrato de persistência contra o Postgres
+
+`tests/Jornada.Persistencia.Testes` roda a mesma suíte contra o adaptador em
+memória e contra o Postgres. Sem banco, a parte Postgres aparece como PULO. Com
+o `local/compose.yaml` no ar:
+
+```bash
+export JORNADA_TESTES_POSTGRES="Host=localhost;Database=catalogo;Username=catalogo_app;Password=dev_app"
+export JORNADA_TESTES_POSTGRES_MIGRADOR="Host=localhost;Database=catalogo;Username=catalogo_migrador;Password=dev_migrador"
+dotnet run --project tests/Jornada.Persistencia.Testes
+```
+
+A segunda variável é opcional: se definida, a suíte aplica migrations e
+`Esquema.sql` antes. A primeira precisa ser do papel da aplicação; a suíte
+recusa rodar com superusuário ou `BYPASSRLS`, porque aí o RLS ficaria sem
+cobertura. Cada teste usa empresas novas, então não é preciso limpar o banco.
+Um adaptador novo (ex.: Cosmos DB) entra herdando `ContratoDePersistencia`.
 
 ---
 

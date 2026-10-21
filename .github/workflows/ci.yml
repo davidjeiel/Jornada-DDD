@@ -38,6 +38,43 @@ jobs:
       - name: Testes de dominio
         run: dotnet run --project tests/Jornada.Dominio.Testes -c Release --no-build
 
+  # O mesmo contrato para todo adaptador de persistencia: memoria e Postgres
+  # de verdade, com RLS e com o papel da aplicacao (sem BYPASSRLS). E o que
+  # garante que os testes de caso de uso, que rodam em memoria, valem para o
+  # banco, e o que vai dizer se um adaptador novo substitui o atual.
+  # Locale C de proposito, igual ao local/compose.yaml: pega regra de negocio
+  # que dependeria do locale do banco.
+  contrato-de-persistencia:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: catalogo
+          POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Preparar papeis
+        env:
+          PGPASSWORD: ci
+        run: psql -h localhost -U postgres -d catalogo -v ON_ERROR_STOP=1 -f local/postgres/01-papeis.sql
+
+      - name: Contrato (memoria e Postgres)
+        env:
+          JORNADA_TESTES_POSTGRES: Host=localhost;Database=catalogo;Username=catalogo_app;Password=dev_app
+          JORNADA_TESTES_POSTGRES_MIGRADOR: Host=localhost;Database=catalogo;Username=catalogo_migrador;Password=dev_migrador
+        run: dotnet run --project tests/Jornada.Persistencia.Testes -c Release
+
   # O contrato OpenAPI commitado (contratos/v1/openapi.yaml) tem de bater com o
   # código, e passar nas regras do guia CAIXA (Spectral). Mudar rota, campo ou
   # código de resposta sem regenerar o arquivo quebra o build (ADR-0014).
