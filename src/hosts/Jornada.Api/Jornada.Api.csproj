@@ -3,16 +3,25 @@
   <!-- Adaptador de ENTRADA. Traduz HTTP para caso de uso e nada mais:
        nenhuma regra de negócio mora aqui (ADR-0001).
 
-       Este projeto não tem PackageReference próprio — os pacotes de EF
-       Core/Npgsql/Dapper chegam de forma TRANSITIVA via
+       Os pacotes de EF Core/Npgsql/Dapper chegam de forma TRANSITIVA via
        Jornada.Persistencia.Postgres, só quando essa referência de projeto é
-       usada em runtime (Persistencia:Provedor=postgres). Microsoft.AspNetCore.OpenApi
-       (geração do contrato, ADR-0009) é o próximo candidato a PackageReference direto. -->
+       usada em runtime (Persistencia:Provedor=postgres). O Swashbuckle é a única
+       dependência direta: gera o contrato OpenAPI 3.0 no padrão CAIXA (ADR-0014). -->
 
   <PropertyGroup>
     <RootNamespace>Jornada.Api</RootNamespace>
     <AssemblyName>Jornada.Api</AssemblyName>
+
+    <!-- Os comentários XML (/// summary, example) viram descrição e exemplo no
+         contrato OpenAPI. CS1591 (membro público sem comentário) fica desligado:
+         só os tipos do contrato precisam de documentação. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />

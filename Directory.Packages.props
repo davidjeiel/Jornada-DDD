@@ -15,6 +15,10 @@
     <PackageVersion Include="Dapper" Version="2.1.66" />
   </ItemGroup>
 
+  <ItemGroup Label="Contrato OpenAPI — só o host da API usa (ADR-0014)">
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.3.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Testes — entram quando o NuGet estiver acessível (ver README §Limitações)">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />

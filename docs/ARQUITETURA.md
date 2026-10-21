@@ -426,3 +426,4 @@ Detalhe de execução, critérios de corte e plano de dados em
 | [0011](adr/0011-infraestrutura-como-codigo.md) | Terraform + Azure Container Apps + stamps |
 | [0012](adr/0012-estrategia-de-migracao.md) | Strangler Fig e migração de dados SQLite → PostgreSQL |
 | [0013](adr/0013-ambiente-local-podman.md) | Podman no ambiente local ([guia](AMBIENTE-LOCAL.md)) |
+| [0014](adr/0014-contrato-openapi-padrao-caixa.md) | Contrato OpenAPI no padrão CAIXA |

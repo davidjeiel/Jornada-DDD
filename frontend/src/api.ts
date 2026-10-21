@@ -86,8 +86,9 @@ async function requisicao<T>(caminho: string, init?: RequestInit): Promise<T> {
   });
 
   if (!resposta.ok) {
-    const problema = await resposta.json().catch(() => null);
-    throw new Error(problema?.detail ?? `A API respondeu com ${resposta.status}`);
+    // Erro no padrão CAIXA (ApiError): { codigo, mensagem, correlationId, dataHora }.
+    const erro = await resposta.json().catch(() => null);
+    throw new Error(erro?.mensagem ?? `A API respondeu com ${resposta.status}`);
   }
 
   return resposta.status === 204 ? (undefined as T) : resposta.json();

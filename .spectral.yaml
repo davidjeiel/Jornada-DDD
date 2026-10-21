@@ -1,0 +1,91 @@
+# Regras do Spectral para o contrato da API (guia CAIXA §17).
+#
+#   npx @stoplight/spectral-cli lint contratos/v1/openapi.yaml
+#
+# Parte das regras oficiais de OpenAPI (spectral:oas) e acrescenta as do
+# checklist do guia CAIXA que dá para verificar por máquina. Quando a
+# governança publicar o ruleset corporativo, ele entra no `extends` e as regras
+# locais equivalentes saem daqui.
+
+extends: ["spectral:oas"]
+
+rules:
+  # O guia pede descrições e exemplos; servidores são definidos por ambiente
+  # (configuração OpenApi:Servidores) e não fazem parte do arquivo commitado.
+  oas3-api-servers: off
+
+  caixa-operacao-com-resumo-e-descricao:
+    description: Toda operação tem resumo e descrição.
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch]"
+    then:
+      - field: summary
+        function: truthy
+      - field: description
+        function: truthy
+
+  caixa-x-correlation-id:
+    description: Toda operação aceita o cabeçalho x-correlation-id (guia CAIXA §7).
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch].parameters"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: array
+          contains:
+            type: object
+            properties:
+              name: { const: x-correlation-id }
+              in: { const: header }
+            required: [name, in]
+
+  caixa-erros-no-modelo-padrao:
+    description: Toda resposta de erro (4xx/5xx) usa o modelo ApiError (guia CAIXA §9).
+    severity: error
+    # Olha o documento sem resolver os $ref: resolvido, o $ref some e a regra
+    # passaria sempre, sem verificar nada.
+    resolved: false
+    # /saude fica de fora: o 503 da prontidão é a resposta da sonda para o
+    # orquestrador, não um erro de negócio.
+    given: "$.paths[?(!@property.match(/^\\/saude/))][get,put,post,delete,patch].responses[?(@property.match(/^[45]/))].content['application/json'].schema"
+    then:
+      field: $ref
+      function: pattern
+      functionOptions:
+        match: "#/components/schemas/ApiError$"
+
+  caixa-erros-documentados:
+    description: Rotas de negócio documentam 400, 401 e 500.
+    severity: error
+    given: "$.paths[?(!@property.match(/^\\/saude/))][get,put,post,delete,patch].responses"
+    then:
+      - field: "400"
+        function: truthy
+      - field: "401"
+        function: truthy
+      - field: "500"
+        function: truthy
+
+  caixa-metadados-de-governanca:
+    description: O contrato declara equipe, gestor, classificação da informação e RTC (guia CAIXA §4).
+    severity: error
+    given: "$.info"
+    then:
+      - field: x-equipe-responsavel
+        function: truthy
+      - field: x-gestor-negocial
+        function: truthy
+      - field: x-classificacao-informacao
+        function: truthy
+      - field: x-identificacao-rtc
+        function: truthy
+
+  caixa-metadados-pendentes:
+    description: Metadado de governança ainda não preenchido (valor padrão "a definir").
+    severity: warn
+    given: "$.info[x-equipe-responsavel,x-gestor-negocial,x-classificacao-informacao,x-identificacao-rtc,x-timeout-gateway,x-timeout-backend]"
+    then:
+      function: pattern
+      functionOptions:
+        notMatch: "^a definir"

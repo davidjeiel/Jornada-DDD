@@ -44,6 +44,7 @@ já pontua (`qualidade.py`, dimensão *evidência*) — dogfooding.
 | [0011](0011-infraestrutura-como-codigo.md) | Terraform, Azure Container Apps e deployment stamps | proposto |
 | [0012](0012-estrategia-de-migracao.md) | Strangler Fig e migração de dados SQLite → PostgreSQL | proposto |
 | [0013](0013-ambiente-local-podman.md) | Podman como runtime de containers no ambiente local | proposto |
+| [0014](0014-contrato-openapi-padrao-caixa.md) | Contrato OpenAPI no padrão CAIXA (substitui parcialmente o 0009) | proposto |
 
 ## Modelo
 

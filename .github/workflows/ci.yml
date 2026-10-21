@@ -38,6 +38,28 @@ jobs:
       - name: Testes de dominio
         run: dotnet run --project tests/Jornada.Dominio.Testes -c Release --no-build
 
+  # O contrato OpenAPI commitado (contratos/v1/openapi.yaml) tem de bater com o
+  # código, e passar nas regras do guia CAIXA (Spectral). Mudar rota, campo ou
+  # código de resposta sem regenerar o arquivo quebra o build (ADR-0014).
+  contrato-openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Contrato em dia com o codigo
+        run: ./scripts/gerar-contrato.sh --verificar
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Regras do guia CAIXA (Spectral)
+        run: npx --yes @stoplight/spectral-cli@6 lint contratos/v1/openapi.yaml --fail-severity error
+
   # Exercita o isolamento entre empresas contra um Postgres DE VERDADE
   # (ADR-0003). Sem isto, a aposta de seguranca do produto fica so no papel.
   isolamento-entre-empresas:

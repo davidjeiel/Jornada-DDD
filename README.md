@@ -50,6 +50,41 @@ Podman): [`docs/AMBIENTE-LOCAL.md`](docs/AMBIENTE-LOCAL.md).
 
 ---
 
+## Contrato da API (Swagger / OpenAPI)
+
+A API segue o guia CAIXA de APIs .NET, com as adaptações registradas no
+[ADR-0014](docs/adr/0014-contrato-openapi-padrao-caixa.md).
+
+| O quê | Onde |
+|---|---|
+| Swagger UI (só em Development, ou com `OpenApi:HabilitarUi=true`) | `http://localhost:5080/swagger` |
+| Documento OpenAPI 3.0 | `/swagger/v1/swagger.json` e `/swagger/v1/swagger.yaml` |
+| Contrato commitado, revisado no PR | [`contratos/v1/openapi.yaml`](contratos/v1/openapi.yaml) |
+| Regras de validação (Spectral) | [`.spectral.yaml`](.spectral.yaml) |
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/hosts/Jornada.Api   # liga o Swagger UI
+./scripts/gerar-contrato.sh                  # regenera contratos/v1/openapi.yaml depois de mudar uma rota
+npx @stoplight/spectral-cli lint contratos/v1/openapi.yaml
+```
+
+O CI falha se o arquivo commitado divergir do código ou se o Spectral achar erro.
+Os avisos "metadado de governança ainda não preenchido" somem quando a seção
+`OpenApi` do `appsettings.json` receber equipe, gestor, classificação, RTC e timeouts.
+
+Toda resposta de erro usa o modelo `ApiError` e devolve o `x-correlation-id`:
+
+```json
+{
+  "codigo": "ATIVO_NAO_ENCONTRADO",
+  "mensagem": "Ativo não encontrado.",
+  "correlationId": "1cf88bdf-48c6-4421-a40b-79fb835a6c4d",
+  "dataHora": "2026-10-09T14:54:25+00:00"
+}
+```
+
+---
+
 ## Estrutura
 
 ```

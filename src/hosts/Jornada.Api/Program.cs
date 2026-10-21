@@ -1,17 +1,17 @@
 using Jornada.Adaptadores.Memoria;
 using Jornada.Api;
-using Jornada.Aplicacao;
+using Jornada.Api.Contrato;
 using Jornada.Aplicacao.Catalogo.Comandos;
 using Jornada.Aplicacao.Catalogo.Consultas;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
-using Jornada.Dominio.Governanca;
 using Jornada.Dominio.Tenancy;
 using Jornada.Persistencia.Postgres;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.OpenApi;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -103,6 +103,14 @@ if (usaPostgres)
     checagensDeSaude.AddCheck<VerificacaoDePostgres>("postgres", tags: ["pronto"]);
 }
 
+// ── Contrato OpenAPI no padrão CAIXA (ver ADR-0014 e docs/swagger.pdf).
+var metadados = builder.Configuration.GetSection("OpenApi").Get<MetadadosDoContrato>() ?? new MetadadosDoContrato();
+builder.Services.AdicionarContratoOpenApi(metadados);
+
+// Corpo malformado ou sem campo obrigatório vira exceção (e não um 400 de corpo
+// vazio, que é o padrão fora de Development): só assim ele sai como ApiError.
+builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
+
 var app = builder.Build();
 
 // Migração + Esquema.sql (RLS) ANTES de aceitar tráfego. Roda com a conexão do
@@ -116,47 +124,106 @@ if (usaPostgres && builder.Configuration.GetValue("Persistencia:AplicarEsquemaNa
     await AplicarEsquemaDoBancoAsync(app.Configuration, app.Logger);
 }
 
-app.UseMiddleware<MiddlewareDeTenant>();
+// ── Pipeline. A ORDEM importa: a correlação vem antes de tudo, para que até o
+// erro do middleware de tenant (401) e a exceção inesperada (500) carreguem o
+// mesmo x-correlation-id que o consumidor recebe.
+app.UseMiddleware<MiddlewareDeCorrelacao>();
 
-// Traduz exceção de domínio em Problem Details. A regra decide; o adaptador formata.
 app.Use(async (http, proximo) =>
 {
     try { await proximo(); }
-    catch (SemPermissao e)
+    catch (BadHttpRequestException) when (!http.Response.HasStarted)
     {
-        await MiddlewareDeTenant.EscreverProblema(http, StatusCodes.Status403Forbidden,
-            e.Codigo, "Ação não permitida", e.Message);
+        // O texto do framework cita tipo e parâmetro internos: não vai para fora.
+        await RespostaDeErro.EscreverAsync(http, CodigosDeErro.RequisicaoInvalida,
+            "Corpo ou parâmetro da requisição inválido. Confira os campos obrigatórios e os formatos no contrato OpenAPI.");
     }
-    catch (ErroDeDominio e)
+    catch (ErroDeDominio e) when (!http.Response.HasStarted)
     {
-        await MiddlewareDeTenant.EscreverProblema(http, StatusCodes.Status422UnprocessableEntity,
-            e.Codigo, "Regra de negócio violada", e.Message);
+        // SemPermissao é ErroDeDominio com código SEM_PERMISSAO: sai 403 pela tabela.
+        await RespostaDeErro.EscreverAsync(http, e.Codigo, e.Message);
+    }
+    catch (Exception e) when (!http.Response.HasStarted)
+    {
+        // Sem stack trace para o consumidor (guia CAIXA §16): o detalhe fica no
+        // log, achável pelo x-correlation-id que vai na resposta.
+        app.Logger.LogError(e, "Erro não tratado em {Metodo} {Caminho}", http.Request.Method, http.Request.Path);
+        await RespostaDeErro.EscreverAsync(http, CodigosDeErro.ErroInterno,
+            "Erro interno não esperado. Informe o correlationId ao suporte.");
     }
 });
+
+// 404/405 do roteamento saem sem corpo; aqui ganham o mesmo formato de erro.
+app.UseStatusCodePages(async contexto =>
+{
+    var http = contexto.HttpContext;
+    if (http.Response.ContentLength is > 0 || http.Response.ContentType is not null) return;
+
+    var (codigo, mensagem) = http.Response.StatusCode switch
+    {
+        StatusCodes.Status404NotFound => ("RECURSO_NAO_ENCONTRADO", "Recurso não encontrado."),
+        StatusCodes.Status405MethodNotAllowed => ("METODO_NAO_PERMITIDO", "Método HTTP não permitido para esta rota."),
+        _ => ((string?)null, ""),
+    };
+    if (codigo is null) return;
+    await http.Response.WriteAsJsonAsync(RespostaDeErro.Montar(http, codigo, mensagem));
+});
+
+// Documento OpenAPI 3.0 (o guia CAIXA pede 3.0.x). Em JSON e YAML:
+// /swagger/v1/swagger.json e /swagger/v1/swagger.yaml.
+app.UseSwagger(o => o.OpenApiVersion = OpenApiSpecVersion.OpenApi3_0);
+
+// A interface visual só em Development ou com aprovação explícita
+// (OpenApi:HabilitarUi) — guia CAIXA §12.
+if (app.Environment.IsDevelopment() || metadados.HabilitarUi)
+{
+    app.UseSwaggerUI(o =>
+    {
+        o.SwaggerEndpoint($"/swagger/{OpenApiCaixa.NomeDoDocumento}/swagger.json", metadados.Titulo);
+        o.DocumentTitle = metadados.Titulo;
+    });
+}
+
+app.UseMiddleware<MiddlewareDeTenant>();
 
 // ═══════════════════════════════════════════════════════════════ rotas
 
 app.MapGet("/", () => Results.Ok(new
 {
     produto = "Jornada DDD",
-    versao = "0.1.0",
-    situacao = "primeira versão — estrutura hexagonal + domínio portado",
+    versao = metadados.Versao,
     provedor = provedorDePersistencia,
-    documentacao = "docs/ARQUITETURA.md",
-    dica = "toda rota /v1 exige o cabeçalho X-Empresa. Veja /demo para um exemplo pronto.",
-}));
+    contrato = $"/swagger/{OpenApiCaixa.NomeDoDocumento}/swagger.json",
+    dica = $"toda rota {metadados.PrefixoDasRotas} exige o cabeçalho X-Empresa. Veja /demo para um exemplo pronto.",
+})).ExcludeFromDescription();
 
 // Liveness: "o processo responde?". Nunca toca banco — um Postgres lento não
 // deve fazer o orquestrador matar um pod que está saudável.
-app.MapGet("/saude", () => Results.Ok(new { situacao = "ok" }));
+app.MapGet("/saude", () => TypedResults.Ok(new SaudeResponse("ok")))
+    .WithName("verificarVida")
+    .WithTags(OpenApiCaixa.TagOperacao)
+    .WithSummary("Verifica se o processo responde")
+    .WithDescription("Liveness. Não consulta dependências.");
 
 // Readiness: "este pod pode receber tráfego agora?". Só aqui é honesto tocar
 // a dependência externa — é exatamente a pergunta que a probe de prontidão de
 // um orquestrador de containers faz antes de rotear uma requisição (Grupo 1).
-app.MapHealthChecks("/saude/pronto", new HealthCheckOptions
+// Rota comum (e não MapHealthChecks) para entrar no contrato OpenAPI; o
+// orquestrador só olha o status: 200 pronto, 503 não pronto.
+app.MapGet("/saude/pronto", async Task<Results<Ok<SaudeResponse>, JsonHttpResult<SaudeResponse>>> (
+    HealthCheckService saude, CancellationToken ct) =>
 {
-    Predicate = c => c.Tags.Contains("pronto"),
-});
+    var relatorio = await saude.CheckHealthAsync(c => c.Tags.Contains("pronto"), ct);
+    var corpo = new SaudeResponse(relatorio.Status.ToString().ToLowerInvariant());
+    return relatorio.Status == HealthStatus.Unhealthy
+        ? TypedResults.Json(corpo, statusCode: StatusCodes.Status503ServiceUnavailable)
+        : TypedResults.Ok(corpo);
+})
+    .WithName("verificarProntidao")
+    .WithTags(OpenApiCaixa.TagOperacao)
+    .WithSummary("Verifica se a API pode receber tráfego")
+    .WithDescription("Readiness. Com persistência Postgres, testa a conexão com o banco. situacao: healthy, degraded ou unhealthy.")
+    .Produces<SaudeResponse>(StatusCodes.Status503ServiceUnavailable);
 
 app.MapGet("/demo", () => Results.Ok(new
 {
@@ -167,35 +234,28 @@ app.MapGet("/demo", () => Results.Ok(new
         X_Papel = "curador",
         X_Pessoa = "33333333-3333-3333-3333-333333333333",
     },
-    exemplo = "curl -H 'X-Empresa: 11111111-1111-1111-1111-111111111111' http://localhost:5080/v1/ativos",
-}));
+    exemplo = $"curl -H 'X-Empresa: 11111111-1111-1111-1111-111111111111' http://localhost:5080{metadados.PrefixoDasRotas}/ativos",
+})).ExcludeFromDescription();
 
-var v1 = app.MapGroup("/v1");
+var v1 = app.MapGroup(metadados.PrefixoDasRotas);
 
 // ── catálogo ────────────────────────────────────────────────────────────────
 
-v1.MapGet("/ativos", async (IRepositorioDeAtivos repo, string? tipo, CancellationToken ct) =>
+var catalogo = v1.MapGroup("").WithTags(OpenApiCaixa.TagCatalogo);
+
+catalogo.MapGet("/ativos", async (IRepositorioDeAtivos repo, string? tipo, CancellationToken ct) =>
 {
     var ativos = await repo.ListarAsync(tipo, ct: ct);
-    return Results.Ok(new
-    {
-        total = ativos.Count,
-        ativos = ativos.Select(a => new
-        {
-            id = a.Id.Valor,
-            codigo = a.Codigo.Valor,
-            nome = a.Nome,
-            tipo = a.TipoItem,
-            status = MaquinaDeCicloDeVida.Rotulo(a.Status),
-            criticidade = a.Criticidade.Chave(),
-        }),
-    });
-});
+    return TypedResults.Ok(new ListaDeAtivosResponse(
+        ativos.Count, ativos.Select(AtivoResumoResponse.De).ToArray()));
+})
+    .WithName("listarAtivos")
+    .WithSummary("Lista os ativos da empresa")
+    .WithDescription("Até 200 ativos, ordenados por código. O parâmetro tipo filtra pela chave do metamodelo (ex.: sistema).");
 
-v1.MapPost("/ativos", async (CadastrarAtivo caso, CorpoCadastrarAtivo corpo, CancellationToken ct) =>
+catalogo.MapPost("/ativos", async Task<Results<Created<AtivoCriadoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, CadastrarAtivo caso, CadastrarAtivoRequest corpo, CancellationToken ct) =>
 {
-    // Note o que o corpo NÃO tem: `usuario` e `tenant_id`. No api.py atual,
-    // POST /itens lê corpo["usuario"] — quem chama declara quem é (ADR-0009).
     var r = await caso.ExecutarAsync(new ComandoCadastrarAtivo(
         corpo.Tipo, corpo.Nome, corpo.Descricao ?? "",
         CriticidadeExtensoes.De(corpo.Criticidade),
@@ -203,172 +263,149 @@ v1.MapPost("/ativos", async (CadastrarAtivo caso, CorpoCadastrarAtivo corpo, Can
         corpo.Atributos), ct);
 
     return r.Sucesso
-        ? Results.Created($"/v1/ativos/{r.Valor.Valor}", new { id = r.Valor.Valor })
-        : Problema(r.Codigo!, r.Mensagem!);
-});
+        ? TypedResults.Created($"{metadados.PrefixoDasRotas}/ativos/{r.Valor.Valor}", new AtivoCriadoResponse(r.Valor.Valor))
+        : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("cadastrarAtivo")
+    .WithSummary("Cadastra um ativo")
+    .WithDescription("O ativo nasce em rascunho, com código gerado pelo tipo (ex.: SIS-0001). O papel precisa escrever no bloco do tipo: negócio cadastra a estrutura DDD, tech lead os ativos técnicos.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status422UnprocessableEntity);
 
-v1.MapGet("/ativos/{id:guid}", async (Guid id, ObterVisaoDoAtivo caso, CancellationToken ct) =>
+catalogo.MapGet("/ativos/{id:guid}", async Task<Results<Ok<FichaDoAtivoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, ObterVisaoDoAtivo caso, CancellationToken ct) =>
 {
     var r = await caso.ExecutarAsync(new IdDeAtivo(id), ct);
-    return r.Sucesso ? Results.Ok(r.Valor) : Problema(r.Codigo!, r.Mensagem!, 404);
-});
+    return r.Sucesso ? TypedResults.Ok(FichaDoAtivoResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("consultarAtivo")
+    .WithSummary("Consulta a ficha completa de um ativo")
+    .WithDescription("Atributos, trilha hierárquica, responsáveis, evidências e relações nos dois sentidos.")
+    .ComErros(StatusCodes.Status404NotFound);
 
 // Recurso inteiro, não PATCH parcial: o formulário de edição já manda o
 // estado completo dos campos editáveis — mais simples de raciocinar e de
 // testar do que merge de patch parcial (ADR-0009 mantém isso simples).
-v1.MapPut("/ativos/{id:guid}", async (Guid id, CorpoEditarAtivo corpo, EditarAtivo caso, CancellationToken ct) =>
+catalogo.MapPut("/ativos/{id:guid}", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, EditarAtivoRequest corpo, EditarAtivo caso, CancellationToken ct) =>
 {
     var r = await caso.ExecutarAsync(new ComandoEditarAtivo(
         new IdDeAtivo(id), corpo.Nome, corpo.Descricao ?? "",
         CriticidadeExtensoes.De(corpo.Criticidade), corpo.Atributos), ct);
 
-    return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
-});
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("editarAtivo")
+    .WithSummary("Altera os campos editáveis de um ativo")
+    .WithDescription("Substitui nome, descrição e criticidade; grava os atributos informados.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity);
 
-v1.MapPost("/ativos/{id:guid}/responsaveis",
-    async (Guid id, AtribuirResponsavel caso, CorpoResponsavel corpo, CancellationToken ct) =>
+catalogo.MapPost("/ativos/{id:guid}/responsaveis", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, AtribuirResponsavel caso, AtribuirResponsavelRequest corpo, CancellationToken ct) =>
 {
     if (!Enum.TryParse<PapelDeOwnership>(corpo.Papel, ignoreCase: true, out var papel))
-        return Problema("PAPEL_INVALIDO",
-            $"Papel '{corpo.Papel}' inválido. Use: " +
-            string.Join(", ", Enum.GetNames<PapelDeOwnership>()));
+        return Erro(http, "PAPEL_INVALIDO",
+            $"Papel '{corpo.Papel}' inválido. Use: {string.Join(", ", Enum.GetNames<PapelDeOwnership>())}.");
 
-    var r = await caso.ExecutarAsync(
-        new ComandoAtribuirResponsavel(new IdDeAtivo(id), corpo.IdPessoa, papel), ct);
+    var r = await caso.ExecutarAsync(new ComandoAtribuirResponsavel(new IdDeAtivo(id), corpo.IdPessoa, papel), ct);
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("atribuirResponsavel")
+    .WithSummary("Define um responsável pelo ativo")
+    .WithDescription("Sem os owners que o tipo exige, o pré-check bloqueia a submissão.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound);
 
-    return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
-});
-
-v1.MapPost("/ativos/{id:guid}/evidencias",
-    async (Guid id, CorpoEvidencia corpo, AnexarEvidencia caso, CancellationToken ct) =>
+catalogo.MapPost("/ativos/{id:guid}/evidencias", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, AnexarEvidenciaRequest corpo, AnexarEvidencia caso, CancellationToken ct) =>
 {
-    var r = await caso.ExecutarAsync(
-        new ComandoAnexarEvidencia(new IdDeAtivo(id), corpo.Tipo, corpo.Titulo, corpo.Url), ct);
+    var r = await caso.ExecutarAsync(new ComandoAnexarEvidencia(new IdDeAtivo(id), corpo.Tipo, corpo.Titulo, corpo.Url), ct);
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("anexarEvidencia")
+    .WithSummary("Anexa uma evidência ao ativo")
+    .WithDescription("A política do tipo define quantas evidências são exigidas para publicar.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound);
 
-    return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
-});
-
-v1.MapPost("/ativos/{id:guid}/relacoes",
-    async (Guid id, CorpoRelacao corpo, RelacionarAtivos caso, CancellationToken ct) =>
+catalogo.MapPost("/ativos/{id:guid}/relacoes", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, RelacionarAtivosRequest corpo, RelacionarAtivos caso, CancellationToken ct) =>
 {
-    var r = await caso.ExecutarAsync(
-        new ComandoRelacionarAtivos(new IdDeAtivo(id), new IdDeAtivo(corpo.IdDestino), corpo.Tipo), ct);
-
-    return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
-});
+    var r = await caso.ExecutarAsync(new ComandoRelacionarAtivos(new IdDeAtivo(id), new IdDeAtivo(corpo.IdDestino), corpo.Tipo), ct);
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("relacionarAtivos")
+    .WithSummary("Relaciona este ativo a outro")
+    .WithDescription("Cria uma aresta do grafo do catálogo, com este ativo como origem.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity);
 
 // ── governança ──────────────────────────────────────────────────────────────
 
-v1.MapGet("/ativos/{id:guid}/pre-check", async (Guid id, AvaliarPreCheck caso, CancellationToken ct) =>
+var governanca = v1.MapGroup("").WithTags(OpenApiCaixa.TagGovernanca);
+
+governanca.MapGet("/ativos/{id:guid}/pre-check", async Task<Results<Ok<PreCheckResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, AvaliarPreCheck caso, CancellationToken ct) =>
 {
     var r = await caso.ExecutarAsync(new IdDeAtivo(id), ct);
-    if (!r.Sucesso) return Problema(r.Codigo!, r.Mensagem!, 404);
-
-    var s = r.Valor!;
-    return Results.Ok(new
-    {
-        aprovado = s.Checagem.Aprovado,
-        score = s.Score.Total,
-        dimensoes = new
-        {
-            completude = s.Score.Completude,
-            consistencia = s.Score.Consistencia,
-            ownership = s.Score.Ownership,
-            evidencia = s.Score.Evidencia,
-            temporalidade = s.Score.Temporalidade,
-        },
-        // Os códigos são contrato público: o cliente automatiza a correção
-        // em vez de casar mensagens de erro (ADR-0009).
-        bloqueios = s.Checagem.Bloqueios.Select(b => new { codigo = b.Codigo.Chave(), mensagem = b.Mensagem }),
-        alertas = s.Checagem.Alertas,
-        politica = new
-        {
-            scoreMinimo = s.Checagem.Politica.ScoreMinimo,
-            evidenciaMinima = s.Checagem.Politica.EvidenciaMinima,
-            slaHoras = s.Checagem.Politica.SlaHoras,
-            etapas = s.Checagem.Politica.Etapas.Select(e => e.ToString().ToLowerInvariant()),
-        },
-        caminho = s.Caminho.Select(p => new
-        {
-            passo = p.Chave,
-            rotulo = p.Rotulo,
-            concluido = p.Concluido,
-            impedimentos = p.Impedimentos.Select(b => b.Codigo.Chave()),
-        }),
-    });
-});
+    // Os códigos de bloqueio são contrato público: o cliente automatiza a
+    // correção em vez de casar mensagens de erro (ADR-0009).
+    return r.Sucesso ? TypedResults.Ok(PreCheckResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("avaliarPreCheck")
+    .WithSummary("Avalia se o ativo pode ser submetido")
+    .WithDescription("Devolve score de qualidade, bloqueios com código estável, alertas, a política aplicável e o caminho até a publicação. Não altera nada.")
+    .ComErros(StatusCodes.Status404NotFound);
 
 // Recurso, não procedimento: POST /submissoes em vez de POST /submeter (ADR-0009).
-v1.MapPost("/ativos/{id:guid}/submissoes",
-    async (Guid id, SubmeterAtivo caso, CorpoSubmeter? corpo, CancellationToken ct) =>
+governanca.MapPost("/ativos/{id:guid}/submissoes", async Task<Results<Created<SubmissaoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, SubmeterAtivo caso, SubmeterAtivoRequest? corpo, CancellationToken ct) =>
 {
     var r = await caso.ExecutarAsync(new ComandoSubmeterAtivo(new IdDeAtivo(id), corpo?.Motivo ?? ""), ct);
+    if (!r.Sucesso) return Erro(http, r.Codigo!, r.Mensagem!);
 
-    return r.Sucesso
-        ? Results.Created($"/v1/ativos/{id}/submissoes/{r.Valor!.Revisao}", new
-        {
-            revisao = r.Valor.Revisao,
-            score = r.Valor.Score,
-            etapasAbertas = r.Valor.EtapasAbertas.Select(e => e.ToString().ToLowerInvariant()),
-        })
-        : Problema(r.Codigo!, r.Mensagem!);
-});
+    var s = r.Valor!;
+    return TypedResults.Created($"{metadados.PrefixoDasRotas}/ativos/{id}/submissoes/{s.Revisao}",
+        new SubmissaoResponse(s.Revisao, s.Score, s.EtapasAbertas.Select(e => e.ToString().ToLowerInvariant()).ToArray()));
+})
+    .WithName("submeterAtivo")
+    .WithSummary("Submete o ativo para validação")
+    .WithDescription("Roda o pré-check; se aprovado, abre uma nova revisão e as etapas de validação exigidas pela política. Reprovado no pré-check: 422 PRECHECK_REPROVADO.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound,
+              StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity);
 
-v1.MapGet("/validacoes", async (IRepositorioDeValidacoes repo, string? ativo, CancellationToken ct) =>
+governanca.MapGet("/validacoes", async (IRepositorioDeValidacoes repo, Guid? ativo, CancellationToken ct) =>
 {
-    IdDeAtivo? idAtivo = Guid.TryParse(ativo, out var id) ? new IdDeAtivo(id) : null;
-    var validacoes = await repo.ListarAsync(idAtivo, ct);
-    return Results.Ok(new
-    {
-        total = validacoes.Count,
-        validacoes = validacoes.Select(v => new
-        {
-            id = v.Id,
-            ativo = v.Ativo.Valor,
-            revisao = v.Revisao,
-            etapa = v.Etapa.ToString().ToLowerInvariant(),
-            status = v.Status.ToString().ToLowerInvariant(),
-            submetidaPor = v.IdSubmissor,
-            decididaPor = v.IdDecisor,
-            motivo = v.Motivo,
-        }),
-    });
-});
+    var validacoes = await repo.ListarAsync(ativo is { } id ? new IdDeAtivo(id) : null, ct);
+    return TypedResults.Ok(new ListaDeValidacoesResponse(
+        validacoes.Count, validacoes.Select(ValidacaoResponse.De).ToArray()));
+})
+    .WithName("listarValidacoes")
+    .WithSummary("Lista as validações da empresa")
+    .WithDescription("Abertas primeiro. O parâmetro ativo restringe a um ativo.");
 
-v1.MapPost("/validacoes/{id:guid}/decisoes",
-    async (Guid id, CorpoDecisaoValidacao corpo, DecidirValidacao caso, CancellationToken ct) =>
+governanca.MapPost("/validacoes/{id:guid}/decisoes", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, DecidirValidacaoRequest corpo, DecidirValidacao caso, CancellationToken ct) =>
 {
-    var r = await caso.ExecutarAsync(
-        new ComandoDecidirValidacao(id, corpo.Aprovada, corpo.Motivo), ct);
-    return r.Sucesso ? Results.NoContent() : Problema(r.Codigo!, r.Mensagem!);
-});
+    var r = await caso.ExecutarAsync(new ComandoDecidirValidacao(id, corpo.Aprovada, corpo.Motivo), ct);
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("decidirValidacao")
+    .WithSummary("Aprova ou reprova uma etapa de validação")
+    .WithDescription("Quem submeteu a revisão não decide sobre ela, nem sendo admin. Cada etapa exige o papel correspondente (negocial: negócio; técnica: tech lead; arquitetural: arquiteto) ou ser o owner do ativo.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
 
 app.Run();
 return;
 
-static IResult Problema(string codigo, string mensagem, int status = 422)
-{
-    // Falta de papel é 403 em qualquer rota — não deixe cada endpoint decidir,
-    // senão uma delas esquece e devolve 422 para uma recusa de autorização.
-    if (codigo == "SEM_PERMISSAO") status = 403;
+// O status sai do código do erro (CodigosDeErro), nunca da rota: assim nenhuma
+// rota devolve 422 para uma recusa de autorização, ou para um "não encontrado".
+static JsonHttpResult<ApiError> Erro(HttpContext http, string codigo, string mensagem) =>
+    TypedResults.Json(RespostaDeErro.Montar(http, codigo, mensagem), statusCode: CodigosDeErro.StatusPara(codigo));
 
-    return Results.Problem(
-        type: $"https://jornada-ddd.exemplo/erros/{codigo.ToLowerInvariant().Replace('_', '-')}",
-        title: status == 403 ? "Ação não permitida" : "Requisição não processada",
-        detail: mensagem,
-        statusCode: status,
-        extensions: new Dictionary<string, object?> { ["codigo"] = codigo });
-}
-
-/// <summary>
-/// Aplica migrations do EF Core e depois <c>Esquema.sql</c> (RLS, outbox),
-/// nessa ordem — a mesma que o comentário do arquivo exige: toda tabela com
-/// <c>tenant_id</c> precisa existir ANTES do bloco que liga RLS.
-///
-/// Usa <c>ConnectionStrings:Migracoes</c> (papel <c>catalogo_migrador</c>, dono
-/// do schema), nunca a conexão de requisição — essa nem tem privilégio de DDL,
-/// de propósito (ADR-0003).
-/// </summary>
+// Aplica migrations do EF Core e depois <c>Esquema.sql</c> (RLS, outbox),
+// nessa ordem — a mesma que o comentário do arquivo exige: toda tabela com
+// <c>tenant_id</c> precisa existir ANTES do bloco que liga RLS.
+//
+// Usa <c>ConnectionStrings:Migracoes</c> (papel <c>catalogo_migrador</c>, dono
+// do schema), nunca a conexão de requisição — essa nem tem privilégio de DDL,
+// de propósito (ADR-0003).
 static async Task AplicarEsquemaDoBancoAsync(IConfiguration configuracao, ILogger logger)
 {
     var stringDeMigracao = configuracao.GetConnectionString("Migracoes")
@@ -422,27 +459,12 @@ internal sealed class VerificacaoDePostgres(ContextoDeDados db) : IHealthCheck
     }
 }
 
-// Contratos de entrada. Ficam aqui, no adaptador: o domínio não conhece JSON.
-internal sealed record CorpoCadastrarAtivo(
-    string Tipo,
-    string Nome,
-    string? Descricao = null,
-    string? Criticidade = null,
-    Guid? IdPai = null,
-    Dictionary<string, string>? Atributos = null);
-
-internal sealed record CorpoEditarAtivo(
-    string Nome,
-    string? Descricao = null,
-    string? Criticidade = null,
-    Dictionary<string, string>? Atributos = null);
-
-internal sealed record CorpoSubmeter(string? Motivo);
-
-internal sealed record CorpoResponsavel(Guid IdPessoa, string Papel);
-
-internal sealed record CorpoEvidencia(string Tipo, string Titulo, string? Url = null);
-
-internal sealed record CorpoRelacao(Guid IdDestino, string Tipo);
-
-internal sealed record CorpoDecisaoValidacao(bool Aprovada, string? Motivo = null);
+/// <summary>Documenta, numa linha por rota, os erros específicos dela no formato ApiError.</summary>
+internal static class DocumentacaoDeErros
+{
+    public static RouteHandlerBuilder ComErros(this RouteHandlerBuilder rota, params int[] status)
+    {
+        foreach (var s in status) rota.Produces<ApiError>(s);
+        return rota;
+    }
+}
