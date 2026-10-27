@@ -14,9 +14,8 @@ namespace Jornada.Persistencia.Testes.Contrato;
 ///
 /// Os testes de caso de uso rodam sobre o adaptador em memória. Se ele se
 /// comportar diferente do banco real, os testes passam e o defeito aparece em
-/// produção. Esta suíte é a ponte entre os dois, e é ela que vai dizer se um
-/// adaptador novo (Cosmos DB) pode substituir o Postgres sem que nenhum caso
-/// de uso perceba.
+/// produção. Esta suíte é a ponte entre os dois: o adaptador Cosmos DB e o de
+/// memória passam pelos mesmos testes, e nenhum caso de uso percebe a troca.
 ///
 /// Cada teste usa empresas NOVAS (<see cref="IdDeEmpresa.Novo"/>). Assim os
 /// testes não dependem de limpar o banco entre um e outro, e o isolamento
@@ -24,7 +23,7 @@ namespace Jornada.Persistencia.Testes.Contrato;
 ///
 /// Fora do contrato, de propósito: no adaptador em memória uma alteração no
 /// agregado vale antes do <c>ConfirmarAsync</c> (o objeto é o mesmo do
-/// armazém); no Postgres, só depois. Nenhum caso de uso depende disso hoje.
+/// armazém); no Cosmos, só depois. Nenhum caso de uso depende disso hoje.
 /// </summary>
 public abstract class ContratoDePersistencia
 {

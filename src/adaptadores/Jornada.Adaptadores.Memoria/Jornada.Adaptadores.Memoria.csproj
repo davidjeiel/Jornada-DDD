@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Adaptador em memória: implementa as MESMAS portas que o Postgres.
+  <!-- Adaptador em memória: implementa as MESMAS portas que o Cosmos DB.
        Serve para (a) os testes de domínio e de caso de uso, e (b) rodar a API
        sem infraestrutura (provedor "memoria").
 

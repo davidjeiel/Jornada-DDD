@@ -38,7 +38,7 @@ public sealed class ArmazemEmMemoria
 /// Repositório em memória que FILTRA POR EMPRESA em toda consulta.
 ///
 /// Isso não é detalhe de brinquedo: é o que faz o comportamento aqui espelhar
-/// o do Postgres com RLS (ADR-0003). Se este adaptador devolvesse ativos de
+/// o do Cosmos, onde toda consulta leva a empresa na chave (ADR-0016). Se este adaptador devolvesse ativos de
 /// outra empresa, os testes de caso de uso passariam e a proteção real ficaria
 /// sem cobertura até a integração.
 ///
@@ -193,7 +193,7 @@ public sealed class RepositorioDeAtivosEmMemoria(
 
     /// <summary>
     /// Drena os eventos dos agregados — o mesmo ponto único em que o adaptador
-    /// Postgres grava na outbox dentro da transação (ADR-0008).
+    /// Cosmos grava os eventos no lote do ativo (ADR-0008, ADR-0016).
     /// </summary>
     public Task<int> ConfirmarAsync(CancellationToken ct = default)
     {

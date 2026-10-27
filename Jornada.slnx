@@ -2,7 +2,7 @@
   <Folder Name="/src/" />
   <Folder Name="/src/adaptadores/">
     <Project Path="src/adaptadores/Jornada.Adaptadores.Memoria/Jornada.Adaptadores.Memoria.csproj" />
-    <Project Path="src/adaptadores/Jornada.Persistencia.Postgres/Jornada.Persistencia.Postgres.csproj" />
+    <Project Path="src/adaptadores/Jornada.Persistencia.Cosmos/Jornada.Persistencia.Cosmos.csproj" />
   </Folder>
   <Folder Name="/src/aplicacao/">
     <Project Path="src/aplicacao/Jornada.Aplicacao/Jornada.Aplicacao.csproj" />

@@ -1,6 +1,6 @@
 # ADR-0012 — Migrar por Strangler Fig, usando a suíte pytest atual como especificação executável
 
-- **Status:** proposto
+- **Status:** proposto; o destino da migração de dados passa a ser o Cosmos DB (ADR-0016)
 - **Data:** 2026-09-22
 - **Relacionados:** todos
 

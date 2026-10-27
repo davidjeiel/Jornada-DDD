@@ -17,16 +17,16 @@ variable "regiao" {
   default     = "brazilsouth"
 }
 
-variable "versao_postgres" {
-  description = "Versão maior do PostgreSQL Flexible Server (ADR-0004)."
+variable "nivel_de_consistencia_cosmos" {
+  description = "Nível de consistência padrão da conta Cosmos DB (ADR-0016)."
   type        = string
-  default     = "17"
+  default     = "Session"
 }
 
 variable "tier_de_isolamento" {
   description = <<-DESC
-    padrao   — pooled: app e banco compartilhados, isolamento por RLS
-    dedicado — schema ou banco próprio, app compartilhada
+    padrao   — pooled: app e conta compartilhadas, isolamento pela chave de partição
+    dedicado — container ou conta Cosmos própria, app compartilhada
     soberano — stamp completo: rede, banco e app próprios
     Ver ADR-0003.
   DESC

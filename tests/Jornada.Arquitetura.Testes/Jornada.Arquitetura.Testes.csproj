@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\dominio\Jornada.Dominio\Jornada.Dominio.csproj" />
     <ProjectReference Include="..\..\src\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
     <ProjectReference Include="..\..\src\adaptadores\Jornada.Adaptadores.Memoria\Jornada.Adaptadores.Memoria.csproj" />
+    <ProjectReference Include="..\..\src\adaptadores\Jornada.Persistencia.Cosmos\Jornada.Persistencia.Cosmos.csproj" />
   </ItemGroup>
 
 </Project>

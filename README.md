@@ -17,7 +17,7 @@ imposto pelo banco.
 dotnet build Jornada-sem-nuget.slnx          # compila sem precisar de NuGet
 dotnet run --project tests/Jornada.Arquitetura.Testes   # guardas do ADR-0001
 dotnet run --project tests/Jornada.Dominio.Testes       # 49 testes de regra
-dotnet run --project tests/Jornada.Persistencia.Testes  # contrato das portas (Postgres: ver abaixo)
+dotnet run --project tests/Jornada.Persistencia.Testes  # contrato das portas (Cosmos: ver abaixo)
 dotnet run --project src/hosts/Jornada.Api              # API em memória
 ```
 
@@ -46,7 +46,7 @@ curl -s -X POST http://localhost:5080/v1/ativos/$ID/submissoes \
   -H 'Content-Type: application/json' -H "X-Empresa: $A" -d '{"motivo":"primeira versao"}'
 ```
 
-Ambiente local completo (PostgreSQL + PgBouncer + Service Bus + Keycloak sobre
+Ambiente local completo (emulador do Cosmos DB + Service Bus + Keycloak sobre
 Podman): [`docs/AMBIENTE-LOCAL.md`](docs/AMBIENTE-LOCAL.md).
 
 ---
@@ -99,7 +99,7 @@ src/
 ├── aplicacao/Jornada.Aplicacao/      ← casos de uso + DEFINIÇÃO das portas
 ├── adaptadores/
 │   ├── Jornada.Adaptadores.Memoria/    implementa as portas em memória
-│   └── Jornada.Persistencia.Postgres/  EF Core + RLS + outbox
+│   └── Jornada.Persistencia.Cosmos/    Cosmos DB NoSQL: partição por empresa, lote atômico (ADR-0016)
 └── hosts/Jornada.Api/                ← Minimal API: traduz HTTP e nada mais
 
 tests/
@@ -108,7 +108,7 @@ tests/
 └── Jornada.Arquitetura.Testes/       a regra de dependência como build gate
 
 docs/     13 ADRs + ARQUITETURA.md + AMBIENTE-LOCAL.md + CARTILHA.md
-local/    ambiente Podman (compose, RLS, Keycloak, Service Bus)
+local/    ambiente Podman (compose, Cosmos DB, Keycloak, Service Bus)
 infra/    esqueleto Terraform
 ```
 
@@ -184,23 +184,12 @@ negócio cadastrando API  →  403 SEM_PERMISSAO
 
 Ditas com clareza porque afetam o que você pode rodar hoje.
 
-### 1. O adaptador Postgres não foi compilado
+### 1. O emulador do Cosmos não mede custo nem índices
 
-O ambiente onde esta versão foi gerada não tinha acesso ao **nuget.org**. Isso
-não impediu o núcleo — `Jornada.Dominio` e `Jornada.Aplicacao` são, por decisão
-de arquitetura, projetos **sem nenhum pacote externo** ([ADR-0001](docs/adr/0001-arquitetura-hexagonal-ddd.md)),
-e a API usa só o framework compartilhado do ASP.NET Core.
-
-Mas `Jornada.Persistencia.Postgres` precisa de EF Core e Npgsql. O código está
-escrito e revisado; **não foi compilado**. Na sua máquina:
-
-```bash
-dotnet restore Jornada.slnx && dotnet build Jornada.slnx
-```
-
-O SQL dele, por outro lado, **foi validado** contra um PostgreSQL 16 real — e a
-validação achou um bug de ordenação que já está corrigido (ver
-`src/adaptadores/Jornada.Persistencia.Postgres/Esquema.sql`).
+O emulador Linux (vNext) responde à mesma API da conta real, e é contra ele que
+a suíte de contrato roda. Mas ele não cobra RU nem usa índices de intervalo ou
+compostos: desempenho e custo só se medem numa conta Cosmos DB no Azure
+([ADR-0016](docs/adr/0016-cosmos-db-como-sistema-de-registro.md)).
 
 ### 2. Os testes não usam xUnit
 
@@ -226,7 +215,7 @@ As versões dos pacotes já estão fixadas em `Directory.Packages.props`.
 
 Fatia vertical ≠ produto. Falta, em ordem de roteiro ([ADR-0012](docs/adr/0012-estrategia-de-migracao.md)):
 
-- migrations do EF Core e a carga inicial;
+- a carga inicial (dados de demonstração);
 - fluxo de validação em etapas (abrir, assumir, decidir) — o `submeter` já
   devolve as etapas que a política exige, mas elas ainda não viram registro;
 - workers de outbox, SLA e snapshot de indicadores;
@@ -237,49 +226,36 @@ Fatia vertical ≠ produto. Falta, em ordem de roteiro ([ADR-0012](docs/adr/0012
 
 ---
 
-## Ligar o Postgres
+## Rodar com Cosmos DB
 
-O hexágono existe justamente para isso ser barato. Em `src/hosts/Jornada.Api/Program.cs`,
-troque **estas linhas** — nenhum caso de uso muda:
-
-```csharp
-// de:
-builder.Services.AddSingleton<ArmazemEmMemoria>();
-builder.Services.AddScoped<RepositorioDeAtivosEmMemoria>();
-builder.Services.AddScoped<IRepositorioDeAtivos>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
-
-// para:
-builder.Services.AddDbContext<ContextoDeDados>(o =>
-    o.UseNpgsql(builder.Configuration.GetConnectionString("Catalogo")));
-builder.Services.AddScoped<IRepositorioDeAtivos, RepositorioDeAtivosPostgres>();
-builder.Services.AddScoped<IUnidadeDeTrabalho, TransacaoComTenant>();
-```
-
-A connection string aponta para a **porta 6432** (PgBouncer), não 5432. Apontar
-para 5432 funciona e, em silêncio, deixa de exercitar o transaction pooling —
-que é onde bug de contexto de tenant se esconde ([ADR-0003](docs/adr/0003-modelo-multi-tenancy.md)).
-
-Depois das migrations, aplique `Esquema.sql`: ele traz RLS, políticas e a função
-`plataforma.exigir_rls()`. **As migrations do EF não criam RLS** — sem esse
-arquivo, o ADR-0003 está documentado, não implementado.
-
-### Contrato de persistência contra o Postgres
-
-`tests/Jornada.Persistencia.Testes` roda a mesma suíte contra o adaptador em
-memória e contra o Postgres. Sem banco, a parte Postgres aparece como PULO. Com
-o `local/compose.yaml` no ar:
+O adaptador Cosmos DB ([ADR-0016](docs/adr/0016-cosmos-db-como-sistema-de-registro.md))
+é o sistema de registro, escolhido por `Persistencia:Provedor=cosmos`; sem essa
+configuração a API roda em memória. Para subir API e front sobre o emulador:
 
 ```bash
-export JORNADA_TESTES_POSTGRES="Host=localhost;Database=catalogo;Username=catalogo_app;Password=dev_app"
-export JORNADA_TESTES_POSTGRES_MIGRADOR="Host=localhost;Database=catalogo;Username=catalogo_migrador;Password=dev_migrador"
+cd local && docker compose --profile full up -d --build cosmos api frontend
+```
+
+Front em <http://localhost:5173>, API em <http://localhost:5080> e Data Explorer
+do emulador em <http://localhost:1234>.
+
+`tests/Jornada.Persistencia.Testes` roda a mesma suíte de contrato contra o
+adaptador em memória e contra o Cosmos. Sem emulador, a parte Cosmos aparece
+como PULO. Com ele no ar:
+
+```bash
+export JORNADA_TESTES_COSMOS="AccountEndpoint=https://localhost:8081/;AccountKey=<chave pública do emulador>"
+export JORNADA_TESTES_COSMOS_EMULADOR=true
 dotnet run --project tests/Jornada.Persistencia.Testes
 ```
 
-A segunda variável é opcional: se definida, a suíte aplica migrations e
-`Esquema.sql` antes. A primeira precisa ser do papel da aplicação; a suíte
-recusa rodar com superusuário ou `BYPASSRLS`, porque aí o RLS ficaria sem
-cobertura. Cada teste usa empresas novas, então não é preciso limpar o banco.
-Um adaptador novo (ex.: Cosmos DB) entra herdando `ContratoDePersistencia`.
+Cada teste usa empresas novas, então não é preciso limpar o banco. Um adaptador
+novo entra herdando `ContratoDePersistencia`.
+
+Sem RLS, o isolamento entre empresas é imposto pelo `AcessoDoTenant`, o ponto
+único de acesso ao SDK; uma guarda em `tests/Jornada.Arquitetura.Testes` falha o
+build se outro tipo do adaptador usar o SDK direto. `./local/dev.sh
+testar-isolamento` roda a suíte contra o emulador local.
 
 ---
 

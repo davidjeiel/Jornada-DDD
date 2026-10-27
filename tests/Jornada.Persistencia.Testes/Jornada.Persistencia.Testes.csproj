@@ -3,10 +3,10 @@
   <!-- Testes de CONTRATO das portas de persistência. Uma suíte só, escrita
        contra as portas (IRepositorioDeAtivos, IRepositorioDeRelacoes,
        IRepositorioDeValidacoes, IUnidadeDeTrabalho), que todo adaptador
-       precisa passar: memória, Postgres e, quando chegar, Cosmos DB.
+       precisa passar: memória e Cosmos DB.
 
-       A suíte Postgres só roda com JORNADA_TESTES_POSTGRES definida (ver
-       Adaptadores/ContratoPostgres.cs); sem ela, os testes aparecem como PULO.
+       A suíte Cosmos só roda com JORNADA_TESTES_COSMOS definida (ver
+       Adaptadores/ContratoCosmos.cs); sem ela, os testes aparecem como PULO.
 
        O harness é o mesmo da suíte de domínio, linkado, não copiado. -->
 
@@ -24,7 +24,7 @@
     <ProjectReference Include="..\..\src\dominio\Jornada.Dominio\Jornada.Dominio.csproj" />
     <ProjectReference Include="..\..\src\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
     <ProjectReference Include="..\..\src\adaptadores\Jornada.Adaptadores.Memoria\Jornada.Adaptadores.Memoria.csproj" />
-    <ProjectReference Include="..\..\src\adaptadores\Jornada.Persistencia.Postgres\Jornada.Persistencia.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\adaptadores\Jornada.Persistencia.Cosmos\Jornada.Persistencia.Cosmos.csproj" />
   </ItemGroup>
 
 </Project>

@@ -48,7 +48,7 @@ public interface IRepositorioDeAtivos
 /// <summary>Uma aresta do grafo de relações, já resolvida para os dois lados.</summary>
 public sealed record RelacaoResumo(IdDeAtivo Origem, IdDeAtivo Destino, string Tipo);
 
-/// <summary>Consultas e escrita sobre o grafo de relações (ADR-0004: CTE recursiva no Postgres).</summary>
+/// <summary>Consultas e escrita sobre o grafo de relações.</summary>
 public interface IRepositorioDeRelacoes
 {
     public Task<bool> TemDependenciaCircularAsync(IdDeAtivo id, CancellationToken ct = default);
@@ -120,6 +120,20 @@ public sealed class ValidacaoEmProcesso(
         Status = StatusDaValidacao.Cancelada;
         Motivo = motivo;
     }
+
+    /// <summary>
+    /// Reidratação pela persistência, para adaptador sem mapeamento por reflexão
+    /// (o EF preenche os setters privados sozinho; o Cosmos não). Não usar em regra de negócio.
+    /// </summary>
+    public static ValidacaoEmProcesso Reidratar(
+        Guid id, IdDeAtivo ativo, IdDeEmpresa empresa, int revisao, EtapaValidacao etapa,
+        Guid idSubmissor, StatusDaValidacao status, Guid? idDecisor, string? motivo) =>
+        new(id, ativo, empresa, revisao, etapa, idSubmissor)
+        {
+            Status = status,
+            IdDecisor = idDecisor,
+            Motivo = motivo,
+        };
 }
 
 public interface IRepositorioDeValidacoes

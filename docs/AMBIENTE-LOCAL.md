@@ -4,11 +4,12 @@
 > [ADR-0013](adr/0013-ambiente-local-podman.md); produção continua sendo Azure
 > ([ADR-0011](adr/0011-infraestrutura-como-codigo.md)).
 
-Hoje o ambiente local é `python run.py` e um arquivo SQLite. Isso vai virar seis
-containers. A troca só se justifica por uma razão: **três das apostas mais
-arriscadas da arquitetura — isolamento entre empresas por RLS, transaction
-pooling e outbox transacional — não podem ser exercitadas com SQLite.** Se elas
-só forem testadas em homologação, os bugs aparecem tarde e caros.
+No painel-ddd, o ambiente local é `python run.py` e um banco local. Aqui ele
+vira containers. A troca só se justifica por uma razão: **as apostas mais
+arriscadas da arquitetura — isolamento entre empresas pela chave de partição,
+lote atômico por ativo e outbox — só se exercitam contra o Cosmos DB de verdade**
+(o emulador). Se elas só forem testadas em homologação, os bugs aparecem tarde e
+caros.
 
 ---
 
@@ -71,10 +72,10 @@ cd painel-ddd
 ```
 
 O script verifica pré-requisitos, cria `local/.env` a partir do exemplo, sobe os
-containers e espera Postgres e PgBouncer ficarem saudáveis. Depois:
+containers e espera o emulador do Cosmos DB ficar saudável. Depois:
 
 ```powershell
-.\local\dev.ps1 testar-rls     # confirme o isolamento ANTES de escrever código
+.\local\dev.ps1 testar-isolamento   # confirme o isolamento ANTES de escrever código
 dotnet run --project src/hosts/Catalogo.AppHost
 ```
 
@@ -85,9 +86,7 @@ Dentro do WSL ou em Linux nativo, use `./local/dev.sh` com os mesmos comandos.
 | `subir` | Sobe tudo e espera ficar saudável |
 | `descer` / `recriar` | Para; ou apaga volumes e recomeça do zero |
 | `estado` | Tabela de endereços + status dos containers |
-| `testar-rls` | **As 7 verificações de isolamento entre empresas** |
-| `psql` | Shell SQL como `catalogo_app`, via PgBouncer |
-| `pool` | `SHOW POOLS` — inspeciona o pooler durante um teste |
+| `testar-isolamento` | **A suíte de contrato contra o emulador**: isolamento entre empresas em toda porta |
 | `limpar` | Recolhe containers órfãos de Testcontainers |
 | `logs [serviço]` | Segue os logs |
 
@@ -97,13 +96,12 @@ Dentro do WSL ou em Linux nativo, use `./local/dev.sh` com os mesmos comandos.
 
 | Papel | Local (Podman) | Produção (Azure) | Paridade |
 |---|---|---|---|
-| Banco | `postgres:17-alpine` | Database for PostgreSQL Flexible Server | **Total** |
-| Pooler | PgBouncer (container) | PgBouncer gerenciado | **Total** |
+| Banco | Emulador do Cosmos DB (vNext) | Azure Cosmos DB, API NoSQL | **Alta** — sem RU nem índices; §6 |
 | Cache | Valkey 8 | Cache for Redis | Alta |
 | Blob | Azurite | Blob Storage | Alta |
 | Mensageria | Emulador oficial de Service Bus | Service Bus | Alta |
 | Identidade | Keycloak | Entra External ID | **Parcial** — §6 |
-| Busca | `tsvector` do Postgres | Azure AI Search | **Nenhuma** — §6 |
+| Busca | Consultas do próprio Cosmos | Azure AI Search | **Nenhuma** — §6 |
 | Gateway | *ausente* | API Management | **Nenhuma** — §6 |
 | Telemetria | Painel Aspire (OTLP) | Azure Monitor | Alta — mesmo protocolo |
 | Execução | `dotnet run` nativo | Container Apps | Média — §4 |
@@ -111,8 +109,8 @@ Dentro do WSL ou em Linux nativo, use `./local/dev.sh` com os mesmos comandos.
 ### Endereços
 
 ```
-PgBouncer      localhost:6432      <- A APLICAÇÃO CONECTA AQUI
-PostgreSQL     localhost:5432         migrações, psql, DBeaver
+Cosmos DB      https://localhost:8081   <- A APLICAÇÃO CONECTA AQUI
+Data Explorer  http://localhost:1234       consultar documentos
 Valkey         localhost:6379
 Azurite        localhost:10000
 Service Bus    localhost:5672 (AMQP) / :5300 (gestão, /health)
@@ -120,9 +118,9 @@ Keycloak       http://localhost:8080
 Painel OTel    http://localhost:18888
 ```
 
-**A porta 6432 não é detalhe.** Apontar a aplicação para 5432 funciona
-perfeitamente e, em silêncio, deixa de exercitar o transaction pooling — que é
-exatamente onde bug de contexto de tenant se esconde. Veja §5.
+**HTTPS não é detalhe.** O SDK .NET não fala HTTP com o emulador; o compose já o
+sobe com `PROTOCOL=https`, e a aplicação só aceita o certificado autoassinado com
+`Cosmos__Emulador=true`.
 
 ---
 
@@ -131,7 +129,7 @@ exatamente onde bug de contexto de tenant se esconde. Veja §5.
 ```
 Containers                    Processo nativo
 ──────────────────────        ───────────────────────────
-PostgreSQL + PgBouncer        Catalogo.Api
+Cosmos DB (emulador)          Catalogo.Api
 Valkey, Azurite               Catalogo.Workers
 Service Bus + MSSQL           Catalogo.AppHost  ← orquestra os containers
 Keycloak, painel OTel
@@ -146,11 +144,10 @@ só a eles: validar o `Dockerfile` antes de publicar no ACR, e reproduzir um bug
 que só aparece containerizado.
 
 ```powershell
-podman compose -f local/compose.yaml --profile full up --build
+podman compose -f local/compose.yaml --profile full up --build cosmos api frontend
 ```
 
-Ele está comentado em `local/compose.yaml` até o `Dockerfile` existir — o que
-acontece na Fase 1 ([ADR-0012](adr/0012-estrategia-de-migracao.md)).
+Front em `http://localhost:5173`, API em `http://localhost:5080`.
 
 ---
 
@@ -158,54 +155,29 @@ acontece na Fase 1 ([ADR-0012](adr/0012-estrategia-de-migracao.md)).
 
 ### 5.1 Isolamento entre empresas
 
-`.\local\dev.ps1 testar-rls` roda sete verificações:
+O Cosmos não tem RLS: o isolamento é imposto pelo adaptador (ADR-0016 §4).
+`.\local\dev.ps1 testar-isolamento` roda a suíte de contrato contra o emulador.
+Cada teste usa empresas novas, e para toda porta (ativos, relações, validações)
+confere que:
 
-| # | Verificação | Esperado |
-|---|---|---|
-| 1 | Sem contexto de tenant, não se vê nada | 0 linhas |
-| 2 | Empresa A vê os 2 ativos dela | 2 |
-| 3 | Empresa B vê só o dela | 1 |
-| 4 | **Contexto morre no COMMIT** | 0 |
-| 5 | `UPDATE` cruzando empresa não afeta nada | 0 |
-| 6 | `INSERT` com `tenant_id` alheio é recusado pelo banco | erro de RLS |
-| 7 | Nenhuma tabela com `tenant_id` sem RLS completa | vazio |
+| Verificação | Esperado |
+|---|---|
+| Empresa B lê, lista, busca por código ou checa nome de ativo da A | nada |
+| Empresa B lista relações ou validações da A | nada |
+| Sessão da empresa B grava ativo em nome da A | recusado, nada gravado |
+| Duas edições simultâneas do mesmo ativo | a segunda recebe `CONFLITO_DE_EDICAO` |
+| Lote com uma operação que falha | nada do lote entra |
 
-A verificação 4 é a razão de o PgBouncer não ser opcional aqui. Em *session
-pooling* — ou sem pooler — a conexão pertence a uma requisição do início ao fim, e
-um contexto de tenant vazado **nunca aparece**. Só em *transaction pooling* a
-conexão volta ao pool entre transações e pode ser entregue à requisição de outra
-empresa. O `set_config('app.tenant_id', ..., true)` existe por causa disso, e o
-`true` (LOCAL) é o que faz o contexto morrer junto com a transação.
+A rede contra o erro que de fato acontece — alguém, meses depois, consultar o
+Cosmos por fora do `AcessoDoTenant` — é a guarda em
+`tests/Jornada.Arquitetura.Testes`, que lê a IL do adaptador e quebra o build.
 
-A verificação 7 é a rede contra o erro que de fato acontece: alguém cria uma
-tabela nova seis meses depois e esquece a política. `plataforma.exigir_rls()`
-levanta exceção nomeando as tabelas culpadas, e o teste de integração a chama.
+### 5.2 O emulador não é a conta real
 
-### 5.2 Uma armadilha que custa caro se descoberta em produção
-
-Na política de RLS, **não** escreva:
-
-```sql
-USING (tenant_id = current_setting('app.tenant_id', true)::uuid)   -- ERRADO
-```
-
-Depois que uma GUC personalizada é usada uma vez na sessão, "limpá-la" (fim da
-transação com `set_config` LOCAL) devolve **string vazia, não NULL**. E `''::uuid`
-não dá NULL — dá erro:
-
-```
-ERROR:  invalid input syntax for type uuid: ""
-```
-
-Ou seja: a requisição sem contexto **explodiria com erro de tipo** em vez de
-simplesmente não enxergar nada. Use o auxiliar, que faz o `NULLIF`:
-
-```sql
-USING (tenant_id = plataforma.tenant_atual())                      -- CERTO
-```
-
-`tenant_id = NULL` é NULL, a política nega tudo, e a falha é fechada e limpa.
-Este comportamento está verificado nas asserções de `testar-rls`.
+Ele responde à mesma API, mas não cobra RU, não usa índices de intervalo ou
+compostos e não valida autenticação. Desempenho, custo e permissões (identidade
+gerenciada com papel de dados de menor privilégio) só se verificam numa conta
+Cosmos DB no Azure.
 
 ### 5.3 Outbox de verdade
 
@@ -229,10 +201,9 @@ submete não decide). **Não se testa localmente:** federação com o IdP do cli
 passkeys e políticas de MFA — isso exige homologação com Entra real, e está na
 Fase 2.
 
-**Busca.** Azure AI Search não tem emulador. Consequência favorável: na Fase 1 a
-porta `IIndiceDeBusca` roda sobre `tsvector` do próprio Postgres, exatamente como
-o [ADR-0004](adr/0004-persistencia-poliglota.md) já recomendava. A ausência de
-emulador reforça uma decisão tomada por outro motivo. Se precisar exercitar um
+**Busca.** Azure AI Search não tem emulador. Na Fase 1 a busca roda sobre
+consultas do próprio Cosmos (ADR-0016), e a ausência de emulador reforça esse
+adiamento. Se precisar exercitar um
 índice externo, `--profile busca` sobe um OpenSearch.
 
 **Gateway.** APIM não tem equivalente local, então cota, rate limit e assinatura
@@ -248,14 +219,14 @@ aplicação resolve regra" — funciona a favor aqui.
 
 | Sintoma | Causa | Correção |
 |---|---|---|
-| `short-name resolution enforced but cannot prompt` | Podman não assume Docker Hub | Registro explícito: `docker.io/library/postgres:17-alpine` |
+| `short-name resolution enforced but cannot prompt` | Podman não assume Docker Hub | Registro explícito: `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest` |
 | Container não acha o host | Podman usa outro nome | `host.containers.internal`, não `host.docker.internal` |
 | `dotnet watch` não recarrega; tudo lento | Código em `/mnt/c/...` | Mova para `~/src/` no sistema de arquivos do WSL (§1.4) |
 | `Container runtime 'podman' could not be found` | Aspire procura no PATH; alias de shell não vale | `sudo apt install -y podman` no WSL, ou link em `/usr/local/bin/podman` |
 | Testcontainers não conecta | `DOCKER_HOST` ausente | Ligue Docker Compatibility (§1.2) e defina a variável |
 | `NullReferenceException` em teste de integração | Ryuk não funciona em rootless | `TESTCONTAINERS_RYUK_DISABLED=true` |
 | Containers acumulando | Ryuk desligado não recolhe | `.\local\dev.ps1 limpar` |
-| `unsupported startup parameter: extra_float_digits` | Npgsql manda parâmetros que o PgBouncer recusa | Já tratado em `ignore_startup_parameters` |
+| `The SSL connection could not be established` | Emulador em HTTP, ou certificado autoassinado recusado | `PROTOCOL=https` no emulador e `Cosmos__Emulador=true` na aplicação — já no compose |
 | `permission denied` em volume (Fedora/RHEL) | Rótulo do SELinux | Sufixo `:Z` — já presente no compose |
 | Porta abaixo de 1024 recusada | Rootless não abre portas privilegiadas | Nenhuma porta do projeto está abaixo disso; mantenha assim |
 | Service Bus não sobe | O instalador oficial ainda cita `azure-sql-edge`, **aposentado em 30/09/2025** | O compose já usa `mssql/server:2022-latest` |
@@ -290,12 +261,6 @@ local/
 ├── dev.sh                            WSL / Linux
 ├── .env.exemplo                      copie para local/.env (não versionado)
 ├── testcontainers.properties.exemplo copie para %USERPROFILE%
-├── postgres/
-│   ├── 01-papeis.sql                 papéis SEM BYPASSRLS + auditoria de RLS
-│   └── 02-sandbox-rls.sql            prova o isolamento antes de existir código .NET
-├── pgbouncer/
-│   ├── pgbouncer.ini                 transaction pooling
-│   └── userlist.txt                  credenciais de brinquedo
 ├── servicebus/config.json            tópicos e assinaturas do ADR-0008
 └── keycloak/realm-catalogo.json      2 empresas, 3 usuários
 ```
@@ -306,10 +271,6 @@ Acrescente ao `.gitignore`:
 local/.env
 local/dados/
 ```
-
-`local/postgres/02-sandbox-rls.sql` é andaime: apague quando as migrações reais do
-EF Core existirem. Ele serve para que, no dia 1 — antes de haver uma linha de C# —
-já se possa provar que o ambiente reproduz a aposta de segurança do produto.
 
 ---
 

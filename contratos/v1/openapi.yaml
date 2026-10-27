@@ -1275,7 +1275,7 @@ paths:
       tags:
         - Operação
       summary: Verifica se a API pode receber tráfego
-      description: 'Readiness. Com persistência Postgres, testa a conexão com o banco. situacao: healthy, degraded ou unhealthy.'
+      description: 'Readiness. Com persistência Cosmos DB, testa o acesso ao container do catálogo. situacao: healthy, degraded ou unhealthy.'
       operationId: verificarProntidao
       parameters:
         - name: x-correlation-id

@@ -7,12 +7,10 @@ using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Tenancy;
-using Jornada.Persistencia.Postgres;
+using Jornada.Persistencia.Cosmos;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi;
-using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,34 +35,35 @@ builder.Services.AddScoped<IAtorAtual>(sp => sp.GetRequiredService<ContextoDaReq
 // Adaptador de persistência escolhido em RUNTIME, por configuração — nunca por
 // rebuild de imagem (Grupo 1 do plano de containers: um container só é
 // reconfigurável de verdade se isso for verdade). Zero-config continua sendo
-// "memoria" (appsettings.json); container/pod liga Postgres via variável de
-// ambiente Persistencia__Provedor (ver local/compose.yaml).
+// "memoria" (appsettings.json); container/pod liga o Cosmos DB via variável de
+// ambiente Persistencia__Provedor (ver local/compose.yaml). O Postgres saiu do
+// produto (ADR-0016): um valor desconhecido derruba a partida, em vez de cair
+// em silêncio na memória e perder os dados a cada reinício.
 var provedorDePersistencia = builder.Configuration.GetValue("Persistencia:Provedor", "memoria")!;
-var usaPostgres = string.Equals(provedorDePersistencia, "postgres", StringComparison.OrdinalIgnoreCase);
+var usaCosmos = string.Equals(provedorDePersistencia, "cosmos", StringComparison.OrdinalIgnoreCase);
+if (!usaCosmos && !string.Equals(provedorDePersistencia, "memoria", StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException(
+        $"Persistencia:Provedor='{provedorDePersistencia}' não existe. Use 'cosmos' ou 'memoria'.");
 
-if (usaPostgres)
+if (usaCosmos)
 {
-    var stringDeConexao = builder.Configuration.GetConnectionString("Catalogo")
+    // Cosmos DB, API NoSQL (ADR-0016). O banco (cliente + containers) é
+    // singleton; o repositório é scoped porque carrega o contexto de tenant,
+    // pelo mesmo motivo de dependência cativa do adaptador em memória.
+    var stringDoCosmos = builder.Configuration.GetConnectionString("Cosmos")
         ?? throw new InvalidOperationException(
-            "ConnectionStrings:Catalogo é obrigatória quando Persistencia:Provedor=postgres.");
+            "ConnectionStrings:Cosmos é obrigatória quando Persistencia:Provedor=cosmos.");
 
-    // EnableDynamicJson: sem isto, o Npgsql 8+ recusa serializar
-    // Dictionary<string,string> (o campo `atributos`) para jsonb — é opt-in de
-    // propósito, para não pagar reflexão em cenários AOT que não precisam.
-    builder.Services.AddSingleton(_ =>
-        new NpgsqlDataSourceBuilder(stringDeConexao).EnableDynamicJson().Build());
+    builder.Services.AddSingleton(_ => BancoDoCatalogo.Conectar(
+        stringDoCosmos,
+        builder.Configuration.GetValue("Cosmos:Banco", "jornada")!,
+        emulador: builder.Configuration.GetValue("Cosmos:Emulador", false)));
 
-    // O DbContext é scoped (padrão do AddDbContext): carrega o contexto de
-    // tenant da requisição, do mesmo jeito que o repositório em memória já
-    // fazia — inverter isso reabriria a dependência cativa do ADR-0003.
-    builder.Services.AddDbContext<ContextoDeDados>((sp, o) =>
-        o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>()));
-
-    builder.Services.AddScoped<RepositorioDeAtivosPostgres>();
-    builder.Services.AddScoped<IRepositorioDeAtivos>(sp => sp.GetRequiredService<RepositorioDeAtivosPostgres>());
-    builder.Services.AddScoped<IRepositorioDeRelacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosPostgres>());
-    builder.Services.AddScoped<IRepositorioDeValidacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosPostgres>());
-    builder.Services.AddScoped<IUnidadeDeTrabalho, TransacaoComTenant>();
+    builder.Services.AddScoped<RepositorioCosmos>();
+    builder.Services.AddScoped<IRepositorioDeAtivos>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IRepositorioDeRelacoes>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IRepositorioDeValidacoes>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IUnidadeDeTrabalho>(sp => sp.GetRequiredService<RepositorioCosmos>());
 }
 else
 {
@@ -99,9 +98,9 @@ builder.Services.AddScoped<ObterVisaoDoAtivo>();
 // health checks responde saudável por padrão quando não há checagem alguma —
 // o que é o comportamento certo nesse caso (não há dependência a aguardar).
 var checagensDeSaude = builder.Services.AddHealthChecks();
-if (usaPostgres)
+if (usaCosmos)
 {
-    checagensDeSaude.AddCheck<VerificacaoDePostgres>("postgres", tags: ["pronto"]);
+    checagensDeSaude.AddCheck<VerificacaoDeCosmos>("cosmos", tags: ["pronto"]);
 }
 
 // ── Contrato OpenAPI no padrão CAIXA (ver ADR-0014 e docs/swagger.pdf).
@@ -114,15 +113,13 @@ builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true)
 
 var app = builder.Build();
 
-// Migração + Esquema.sql (RLS) ANTES de aceitar tráfego. Roda com a conexão do
-// DONO do schema (catalogo_migrador via ConnectionStrings:Migracoes) — nunca
-// com a conexão de requisição (catalogo_app), que nem tem privilégio de DDL
-// (ADR-0003). Guardado por flag porque, com mais de uma réplica do pod, só UMA
-// deveria aplicar schema; hoje o produto ainda não tem esse segundo processo
-// (ver README > Limitações), então o próprio host faz o papel de migrador.
-if (usaPostgres && builder.Configuration.GetValue("Persistencia:AplicarEsquemaNaInicializacao", true))
+// Database e containers do Cosmos, se não existirem, ANTES de aceitar tráfego.
+// Guardado por flag porque, com mais de uma réplica do pod, só UMA deveria
+// provisionar; hoje o produto ainda não tem esse segundo processo.
+if (usaCosmos && builder.Configuration.GetValue("Persistencia:AplicarEsquemaNaInicializacao", true))
 {
-    await AplicarEsquemaDoBancoAsync(app.Configuration, app.Logger);
+    app.Logger.LogInformation("Provisionando database e containers do Cosmos DB...");
+    await app.Services.GetRequiredService<BancoDoCatalogo>().ProvisionarAsync();
 }
 
 // ── Pipeline. A ORDEM importa: a correlação vem antes de tudo, para que até o
@@ -198,7 +195,7 @@ app.MapGet("/", () => Results.Ok(new
     dica = $"toda rota {metadados.PrefixoDasRotas} exige o cabeçalho X-Empresa. Veja /demo para um exemplo pronto.",
 })).ExcludeFromDescription();
 
-// Liveness: "o processo responde?". Nunca toca banco — um Postgres lento não
+// Liveness: "o processo responde?". Nunca toca banco — um banco lento não
 // deve fazer o orquestrador matar um pod que está saudável.
 app.MapGet("/saude", () => TypedResults.Ok(new SaudeResponse("ok")))
     .WithName("verificarVida")
@@ -223,7 +220,7 @@ app.MapGet("/saude/pronto", async Task<Results<Ok<SaudeResponse>, JsonHttpResult
     .WithName("verificarProntidao")
     .WithTags(OpenApiCaixa.TagOperacao)
     .WithSummary("Verifica se a API pode receber tráfego")
-    .WithDescription("Readiness. Com persistência Postgres, testa a conexão com o banco. situacao: healthy, degraded ou unhealthy.")
+    .WithDescription("Readiness. Com persistência Cosmos DB, testa o acesso ao container do catálogo. situacao: healthy, degraded ou unhealthy.")
     .Produces<SaudeResponse>(StatusCodes.Status503ServiceUnavailable);
 
 app.MapGet("/demo", () => Results.Ok(new
@@ -414,64 +411,14 @@ return;
 static JsonHttpResult<ApiError> Erro(HttpContext http, string codigo, string mensagem) =>
     TypedResults.Json(RespostaDeErro.Montar(http, codigo, mensagem), statusCode: CodigosDeErro.StatusPara(codigo));
 
-// Aplica migrations do EF Core e depois <c>Esquema.sql</c> (RLS, outbox),
-// nessa ordem — a mesma que o comentário do arquivo exige: toda tabela com
-// <c>tenant_id</c> precisa existir ANTES do bloco que liga RLS.
-//
-// Usa <c>ConnectionStrings:Migracoes</c> (papel <c>catalogo_migrador</c>, dono
-// do schema), nunca a conexão de requisição — essa nem tem privilégio de DDL,
-// de propósito (ADR-0003).
-static async Task AplicarEsquemaDoBancoAsync(IConfiguration configuracao, ILogger logger)
-{
-    var stringDeMigracao = configuracao.GetConnectionString("Migracoes")
-        ?? throw new InvalidOperationException(
-            "ConnectionStrings:Migracoes é obrigatória para aplicar migrations/RLS na inicialização.");
-
-    // catalogo_migrador não tem USAGE em `public` (REVOKE ALL ... FROM PUBLIC em
-    // 01-papeis.sql, de propósito — ADR-0006 §2) e não tem search_path próprio.
-    // Sem apontar o schema explicitamente, o Postgres recusa criar
-    // __EFMigrationsHistory com "no schema has been selected to create in".
-    var opcoes = new DbContextOptionsBuilder<ContextoDeDados>()
-        .UseNpgsql(stringDeMigracao, o => o.MigrationsHistoryTable("__ef_migrations_historico", "catalogo"))
-        .Options;
-
-    // Tenant fixo: migração é DDL puro, nunca consulta filtrada por empresa —
-    // o valor não importa, só precisa satisfazer o construtor do DbContext.
-    await using var db = new ContextoDeDados(opcoes, ContextoDeTenantFixo.Para(IdDeEmpresa.Novo()));
-
-    logger.LogInformation("Aplicando migrations do EF Core (catalogo_migrador)...");
-    await db.Database.MigrateAsync();
-
-    var caminhoDoEsquema = Path.Combine(AppContext.BaseDirectory, "Esquema.sql");
-    logger.LogInformation("Aplicando {Arquivo} (RLS + outbox)...", caminhoDoEsquema);
-    var esquemaSql = await File.ReadAllTextAsync(caminhoDoEsquema);
-    await db.Database.ExecuteSqlRawAsync(esquemaSql);
-
-    logger.LogInformation("Schema do Postgres pronto — RLS ligada em toda tabela com tenant_id.");
-}
-
-/// <summary>
-/// Readiness real (Grupo 1): pergunta ao Postgres, pela MESMA conexão de
-/// requisição que a API usa (catalogo_app, via PgBouncer). Um orquestrador de
-/// containers só deveria rotear tráfego para este pod depois disto responder
-/// saudável.
-/// </summary>
-internal sealed class VerificacaoDePostgres(ContextoDeDados db) : IHealthCheck
+/// <summary>Readiness com Cosmos DB: o container do catálogo responde?</summary>
+internal sealed class VerificacaoDeCosmos(BancoDoCatalogo banco) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext contexto, CancellationToken ct = default)
-    {
-        try
-        {
-            return await db.Database.CanConnectAsync(ct)
-                ? HealthCheckResult.Healthy("Postgres alcançável.")
-                : HealthCheckResult.Unhealthy("Postgres não respondeu.");
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy("Falha ao conectar no Postgres.", ex);
-        }
-    }
+        HealthCheckContext contexto, CancellationToken ct = default) =>
+        await banco.VerificarAsync(ct)
+            ? HealthCheckResult.Healthy("Cosmos DB alcançável.")
+            : HealthCheckResult.Unhealthy("Cosmos DB não respondeu.");
 }
 
 /// <summary>Documenta, numa linha por rota, os erros específicos dela no formato ApiError.</summary>

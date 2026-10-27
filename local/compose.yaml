@@ -17,52 +17,24 @@ x-saude: &saude
 
 services:
 
-  # ─────────────────────────────────────────────────── PostgreSQL (ADR-0004)
-  postgres:
-    image: docker.io/library/postgres:17-alpine
-    container_name: catalogo-postgres
+  # ───────────────────────────────────── Cosmos DB, API NoSQL (ADR-0016)
+  # O sistema de registro. Emulador Linux (vNext): mesma API da conta real,
+  # sem RU nem índices de verdade — custo e desempenho só se medem no Azure.
+  cosmos:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest
+    container_name: catalogo-cosmos
     environment:
-      POSTGRES_DB: catalogo
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_local_nao_use_em_producao}
-      # pt-BR para ordenação e busca textual, igual ao Flexible Server
-      LANG: pt_BR.utf8
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
-    command:
-      - postgres
-      - -c
-      - max_connections=100
-      - -c
-      - shared_preload_libraries=pg_stat_statements
-      - -c
-      - log_statement=none
-      - -c
-      - log_min_duration_statement=500   # loga consulta lenta: pega degradação por RLS
+      # O SDK .NET não fala HTTP com o emulador: tem de ser HTTPS (certificado
+      # autoassinado, aceito pela API só com Cosmos__Emulador=true).
+      PROTOCOL: https
+      ENABLE_TELEMETRY: "false"
     ports:
-      - "5432:5432"                      # acesso direto: migrações, psql, DBeaver
+      - "8081:8081"     # endpoint do Cosmos
+      - "1234:1234"     # Data Explorer
     volumes:
-      - pgdados:/var/lib/postgresql/data
-      - ./postgres:/docker-entrypoint-initdb.d:ro,Z
+      - cosmosdados:/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d catalogo"]
-      <<: *saude
-
-  # ───────────────────────────── PgBouncer — transaction pooling (ADR-0003)
-  # NÃO É OPCIONAL. É aqui que se prova que `set_config('app.tenant_id', ..., true)`
-  # não vaza contexto entre requisições que reusam a mesma conexão.
-  pgbouncer:
-    image: docker.io/edoburu/pgbouncer:v1.23.1-p3
-    container_name: catalogo-pgbouncer
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro,Z
-      - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro,Z
-    ports:
-      - "6432:6432"                      # ← a APLICAÇÃO conecta AQUI, não na 5432
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U catalogo_app"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/ready"]
       <<: *saude
 
   # ─────────────────────────────────────────────── Cache / rate limit (ADR-0004)
@@ -150,8 +122,8 @@ services:
       - "18889:18889"   # OTLP/gRPC — é para cá que a aplicação exporta
 
   # ─────────────────────── Busca — OPCIONAL, só quando mexer no adaptador de busca
-  # Na Fase 1, IIndiceDeBusca é implementada sobre tsvector do próprio Postgres
-  # (ADR-0004) e este serviço nem sobe.
+  # A busca do catálogo ainda roda sobre consultas do próprio Cosmos (ADR-0016);
+  # este serviço só sobe quando alguém estiver mexendo num adaptador de busca.
   opensearch:
     profiles: ["busca"]
     image: docker.io/opensearchproject/opensearch:2
@@ -164,10 +136,14 @@ services:
       - "9200:9200"
 
   # ─────────────────────────────── Perfil "full" — a APLICAÇÃO em container
-  # Grupo 1 (containers/pods): a API já liga Postgres de verdade aqui — não é
-  # mais o adaptador em memória. Por isso agora ela DEPENDE de pgbouncer/postgres
-  # saudáveis, e migrations + Esquema.sql (RLS) rodam na própria inicialização
-  # do container, antes de `/saude/pronto` responder saudável.
+  # Grupo 1 (containers/pods): a API liga o Cosmos DB de verdade aqui — não é
+  # o adaptador em memória. Por isso ela DEPENDE do emulador saudável, e
+  # database e containers são criados na própria inicialização, antes de
+  # `/saude/pronto` responder saudável.
+  #
+  #   docker compose --profile full up -d --build cosmos api frontend
+  #
+  # Front em http://localhost:5173, Data Explorer em http://localhost:1234.
   # Não é o modo de trabalho diário: em container você perde hot reload e
   # depurador (ADR-0013 §2).
   api:
@@ -177,17 +153,13 @@ services:
       dockerfile: src/hosts/Jornada.Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      Persistencia__Provedor: postgres
-      # A APLICAÇÃO conecta no PgBouncer (6432), nunca direto no Postgres —
-      # é lá que o transaction pooling do ADR-0003 é exercitado de verdade.
-      ConnectionStrings__Catalogo: Host=pgbouncer;Port=6432;Database=catalogo;Username=catalogo_app;Password=${POSTGRES_APP_PASSWORD:-dev_app}
-      # Migrations e Esquema.sql (DDL) rodam como DONO do schema, direto no
-      # Postgres (5432) — catalogo_app nem tem privilégio de DDL, de propósito.
-      ConnectionStrings__Migracoes: Host=postgres;Port=5432;Database=catalogo;Username=catalogo_migrador;Password=${POSTGRES_MIGRADOR_PASSWORD:-dev_migrador}
+      Persistencia__Provedor: cosmos
+      # Chave PÚBLICA e fixa do emulador (documentada pela Microsoft); o emulador
+      # vNext nem valida autenticação. Conta real usa identidade gerenciada.
+      ConnectionStrings__Cosmos: AccountEndpoint=https://cosmos:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+      Cosmos__Emulador: "true"
     depends_on:
-      postgres:
-        condition: service_healthy
-      pgbouncer:
+      cosmos:
         condition: service_healthy
     ports:
       - "5080:8080"
@@ -214,6 +186,7 @@ services:
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       <<: *saude
+
   #
   # workers:
   #   profiles: ["full"]
@@ -221,8 +194,8 @@ services:
   #     context: ..
   #     dockerfile: src/hosts/Catalogo.Workers/Dockerfile
   #   depends_on:
-  #     pgbouncer: { condition: service_healthy }
+  #     cosmos: { condition: service_healthy }
 
 volumes:
-  pgdados:
+  cosmosdados:
   azuritedados:
