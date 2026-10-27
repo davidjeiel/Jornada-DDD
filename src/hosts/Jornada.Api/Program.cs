@@ -1,6 +1,7 @@
 using Jornada.Adaptadores.Memoria;
 using Jornada.Api;
 using Jornada.Api.Contrato;
+using Jornada.Api.Demonstracao;
 using Jornada.Aplicacao.Catalogo.Comandos;
 using Jornada.Aplicacao.Catalogo.Consultas;
 using Jornada.Aplicacao.Portas;
@@ -120,6 +121,13 @@ if (usaCosmos && builder.Configuration.GetValue("Persistencia:AplicarEsquemaNaIn
 {
     app.Logger.LogInformation("Provisionando database e containers do Cosmos DB...");
     await app.Services.GetRequiredService<BancoDoCatalogo>().ProvisionarAsync();
+}
+
+// O cenário piloto do painel-ddd nas empresas de teste, pelos próprios casos de
+// uso. Desligado por padrão; o ambiente local liga (local/compose.yaml).
+if (builder.Configuration.GetValue("Demonstracao:Carregar", false))
+{
+    await ActivatorUtilities.CreateInstance<CargaDeDemonstracao>(app.Services).CarregarAsync();
 }
 
 // ── Pipeline. A ORDEM importa: a correlação vem antes de tudo, para que até o

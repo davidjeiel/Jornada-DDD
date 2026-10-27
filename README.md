@@ -213,16 +213,13 @@ As versões dos pacotes já estão fixadas em `Directory.Packages.props`.
 
 ### 3. O que ainda não existe
 
-Fatia vertical ≠ produto. Falta, em ordem de roteiro ([ADR-0012](docs/adr/0012-estrategia-de-migracao.md)):
+O alvo imediato é fazer tudo o que o `painel-ddd` faz. A régua é objetiva:
+cada comportamento que o painel testa precisa de um teste equivalente passando
+aqui. [docs/PARIDADE.md](docs/PARIDADE.md) acompanha os 153 comportamentos, fase
+por fase. Fora da paridade, falta ainda:
 
-- a carga inicial (dados de demonstração);
-- fluxo de validação em etapas (abrir, assumir, decidir) — o `submeter` já
-  devolve as etapas que a política exige, mas elas ainda não viram registro;
-- workers de outbox, SLA e snapshot de indicadores;
 - control plane (empresas, unidades, planos) — [ADR-0006](docs/adr/0006-topologia-de-servicos.md);
-- identidade real (Entra External ID) — hoje o contexto vem de cabeçalhos HTTP;
-- descoberta automática (OpenAPI/Git), notificações, relações e grafo;
-- front React.
+- identidade real (Entra External ID) — hoje o contexto vem de cabeçalhos HTTP.
 
 ---
 
@@ -238,6 +235,23 @@ cd local && docker compose --profile full up -d --build cosmos api frontend
 
 Front em <http://localhost:5173>, API em <http://localhost:5080> e Data Explorer
 do emulador em <http://localhost:1234>.
+
+O compose liga a **carga de demonstração** (`Demonstracao__Carregar=true`): o
+cenário piloto do painel-ddd (domínios Contrato e Garantias, 28 ativos, 23
+publicados e 2 na fila de validação) em cada uma das duas empresas de teste. A
+carga passa pelos casos de uso, com o curador submetendo e o admin decidindo, e
+só roda em empresa vazia. Fora do compose, ligue a mesma chave para ter o
+cenário com a API em memória.
+
+### Front
+
+O front (`frontend/`) tem o menu do painel-ddd, com rotas próprias por tela.
+As telas que ainda não foram portadas mostram em que fase chegam. Os testes de
+esqueleto (menu, tema, paleta por token, acessibilidade) rodam com Vitest:
+
+```bash
+cd frontend && npm ci && npm test && npm run build
+```
 
 `tests/Jornada.Persistencia.Testes` roda a mesma suíte de contrato contra o
 adaptador em memória e contra o Cosmos. Sem emulador, a parte Cosmos aparece

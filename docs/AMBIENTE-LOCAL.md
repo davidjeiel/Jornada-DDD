@@ -147,7 +147,11 @@ que só aparece containerizado.
 podman compose -f local/compose.yaml --profile full up --build cosmos api frontend
 ```
 
-Front em `http://localhost:5173`, API em `http://localhost:5080`.
+Front em `http://localhost:5173`, API em `http://localhost:5080`. A API sobe
+com a carga de demonstração ligada (`Demonstracao__Carregar`): o cenário piloto
+do painel-ddd em cada empresa de teste, gravado pelos casos de uso e só em
+empresa vazia. Para recomeçar do zero, apague o volume do emulador
+(`.\local\dev.ps1 recriar`).
 
 ---
 

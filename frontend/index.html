@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101a22" />
     <title>Jornada DDD | Catálogo</title>
+    <script>
+      /* Antes do CSS e do React: a preferência guardada é aplicada sem piscar a
+         tela clara nem o menu aberto. Mesmas chaves de src/preferencias.ts. */
+      (function () {
+        try {
+          var raiz = document.documentElement;
+          var tema = localStorage.getItem('jornada-ddd:tema');
+          if (tema === 'light' || tema === 'dark') { raiz.setAttribute('data-theme', tema); }
+          if (localStorage.getItem('jornada-ddd:menu') === 'compacto') { raiz.setAttribute('data-menu', 'compacto'); }
+        } catch (e) { /* navegação anônima ou storage bloqueado: fica no padrão */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

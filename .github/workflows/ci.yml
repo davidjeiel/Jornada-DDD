@@ -1,10 +1,11 @@
 name: CI
 
+# A branch padrão do repositório é feat/estrutura-inicial (não existe main).
+# Todo PR roda, qualquer que seja a base; push só na branch padrão.
 on:
   push:
-    branches: [main]
+    branches: [feat/estrutura-inicial]
   pull_request:
-    branches: [main]
 
 env:
   DOTNET_NOLOGO: true
@@ -43,8 +44,6 @@ jobs:
   # que prova o isolamento entre empresas em toda consulta. E o que
   # garante que os testes de caso de uso, que rodam em memoria, valem para o
   # banco, e o que vai dizer se um adaptador novo substitui o atual.
-  # Locale C de proposito, igual ao local/compose.yaml: pega regra de negocio
-  # que dependeria do locale do banco.
   contrato-de-persistencia:
     runs-on: ubuntu-latest
     services:
@@ -92,3 +91,28 @@ jobs:
 
       - name: Regras do guia CAIXA (Spectral)
         run: npx --yes @stoplight/spectral-cli@6 lint contratos/v1/openapi.yaml --fail-severity error
+
+  # O front tem os mesmos testes de esqueleto que o painel-ddd (menu, tema,
+  # paleta por token, acessibilidade), e o build checa os tipos (tsc -b).
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar
+        run: npm ci
+
+      - name: Testes
+        run: npm test
+
+      - name: Build
+        run: npm run build
