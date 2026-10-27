@@ -9,13 +9,13 @@
 
 .EXAMPLE
   .\local\dev.ps1 subir        # sobe as dependências e espera ficarem saudáveis
-  .\local\dev.ps1 testar-rls   # prova que o isolamento entre empresas funciona
+  .\local\dev.ps1 testar-isolamento   # prova que o isolamento entre empresas funciona
   .\local\dev.ps1 limpar       # remove containers órfãos de Testcontainers
 #>
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('verificar','subir','descer','recriar','psql','pool','testar-rls','limpar','estado','logs')]
+    [ValidateSet('verificar','subir','descer','recriar','testar-isolamento','limpar','estado','logs')]
     [string]$Comando = 'estado',
 
     [Parameter(Position = 1)]
@@ -26,35 +26,13 @@ $ErrorActionPreference = 'Stop'
 $Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Compose = Join-Path $Raiz 'compose.yaml'
 
-$EMPRESA_A = '11111111-1111-1111-1111-111111111111'
-$EMPRESA_B = '22222222-2222-2222-2222-222222222222'
+# Chave PÚBLICA e fixa do emulador do Cosmos (documentada pela Microsoft).
+$COSMOS_LOCAL = 'AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=='
 
 function Info($m) { Write-Host "  $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "  OK   $m" -ForegroundColor Green }
 function Aviso($m){ Write-Host "  !    $m" -ForegroundColor Yellow }
 function Erro($m) { Write-Host "  X    $m" -ForegroundColor Red }
-
-function Invoke-Psql([string]$Sql, [string]$Usuario = 'catalogo_app', [int]$Porta = 6432) {
-    # Roda psql DE DENTRO do container do Postgres: não exige cliente no Windows.
-    # O host 'pgbouncer'/'postgres' resolve pela rede do compose.
-    $alvoHost = if ($Porta -eq 6432) { 'pgbouncer' } else { 'postgres' }
-    $senha = switch ($Usuario) {
-        'catalogo_app'      { 'dev_app' }
-        'catalogo_migrador' { 'dev_migrador' }
-        default             { 'dev_leitor' }
-    }
-    $bruto = podman exec -e PGPASSWORD=$senha catalogo-postgres `
-        psql -h $alvoHost -p $Porta -U $Usuario -d catalogo -tA -c $Sql 2>&1
-
-    # psql imprime os rótulos de comando (BEGIN, COMMIT, SET, "UPDATE 0"...)
-    # junto com os resultados, mesmo com -tA. Sem filtrar, o último valor seria
-    # "COMMIT" em vez do número — e a verificação compararia lixo.
-    return ($bruto | Where-Object {
-        $_ -and $_ -notmatch '^(BEGIN|COMMIT|ROLLBACK|SET|INSERT|UPDATE|DELETE|SELECT \d)'
-    })
-}
-
-function Get-Valor($Saida) { if ($Saida) { ([string[]]$Saida)[-1].Trim() } else { '' } }
 
 function Test-Ferramentas {
     Info 'Verificando pré-requisitos...'
@@ -113,24 +91,15 @@ function Start-Ambiente {
     podman compose -f $Compose up -d
     if ($LASTEXITCODE -ne 0) { throw 'podman compose falhou.' }
 
-    Info 'Aguardando Postgres...'
+    Info 'Aguardando o emulador do Cosmos DB...'
     $limite = (Get-Date).AddMinutes(2)
     do {
         Start-Sleep -Seconds 2
-        podman exec catalogo-postgres pg_isready -U postgres -d catalogo 2>&1 | Out-Null
+        podman exec catalogo-cosmos curl -fsS http://127.0.0.1:8080/ready 2>&1 | Out-Null
         $pronto = $LASTEXITCODE -eq 0
     } while (-not $pronto -and (Get-Date) -lt $limite)
-    if (-not $pronto) { throw 'Postgres não ficou pronto em 2 min. Veja: .\dev.ps1 logs postgres' }
-    Ok 'Postgres pronto'
-
-    Info 'Aguardando PgBouncer...'
-    $limite = (Get-Date).AddSeconds(60)
-    do {
-        Start-Sleep -Seconds 2
-        $r = Invoke-Psql 'SELECT 1' 2>&1
-        $pronto = $r -match '1'
-    } while (-not $pronto -and (Get-Date) -lt $limite)
-    if ($pronto) { Ok 'PgBouncer pronto (porta 6432)' } else { Aviso 'PgBouncer não respondeu; veja os logs.' }
+    if (-not $pronto) { throw 'Cosmos DB não ficou pronto em 2 min. Veja: .\dev.ps1 logs cosmos' }
+    Ok 'Cosmos DB pronto (porta 8081)'
 
     Aviso 'Service Bus leva ~60 s a mais (o MSSQL precisa subir antes).'
     Write-Host ''
@@ -138,15 +107,15 @@ function Start-Ambiente {
     Write-Host ''
     Info 'Próximos passos:'
     Write-Host '    dotnet run --project src/hosts/Catalogo.AppHost'
-    Write-Host '    .\local\dev.ps1 testar-rls     # confirme o isolamento antes de codar'
+    Write-Host '    .\local\dev.ps1 testar-isolamento   # confirme o isolamento antes de codar'
 }
 
 function Show-Estado {
     Write-Host ''
     Write-Host '  SERVIÇO            ENDEREÇO                        PAPEL' -ForegroundColor DarkGray
     Write-Host '  ─────────────────  ──────────────────────────────  ─────────────────────────' -ForegroundColor DarkGray
-    Write-Host '  PgBouncer          localhost:6432                  <- a APLICAÇÃO usa esta'
-    Write-Host '  PostgreSQL         localhost:5432                  migrações, psql, DBeaver'
+    Write-Host '  Cosmos DB          https://localhost:8081          <- a APLICAÇÃO usa esta'
+    Write-Host '  Data Explorer      http://localhost:1234           consultar documentos'
     Write-Host '  Valkey (Redis)     localhost:6379                  cache, rate limit'
     Write-Host '  Azurite (Blob)     localhost:10000                 evidências, exports'
     Write-Host '  Service Bus        localhost:5672 / :5300          outbox (AMQP)'
@@ -156,52 +125,16 @@ function Show-Estado {
     podman compose -f $Compose ps --format 'table {{.Names}}\t{{.Status}}' 2>$null
 }
 
-function Test-Rls {
-    Info 'Verificando o isolamento entre empresas (ADR-0003)...'
+function Test-Isolamento {
+    # Sem RLS, o isolamento entre empresas é imposto pelo adaptador (ADR-0016 §4).
+    # A prova é a suíte de contrato contra o emulador: toda consulta, em toda
+    # porta, conferida com duas empresas.
+    Info 'Verificando o isolamento entre empresas no Cosmos DB (ADR-0016)...'
     Write-Host ''
-    $falhas = 0
-
-    function Checar($nome, $sql, $esperado) {
-        $obtido = Get-Valor (Invoke-Psql $sql)
-        if ($obtido -eq $esperado) { Ok "$nome  ->  $obtido" }
-        else { Erro "$nome  ->  esperado '$esperado', obtido '$obtido'"; $script:falhas++ }
-    }
-
-    # Sem BEGIN/COMMIT: `psql -c` já roda várias instruções numa transação
-    # implícita, então o set_config LOCAL vale para o SELECT seguinte.
-    Checar 'sem contexto não vê nada       ' `
-           'SELECT count(*) FROM sandbox.ativo_exemplo' '0'
-
-    Checar 'Empresa A vê os 2 ativos dela  ' `
-           "SELECT set_config('app.tenant_id','$EMPRESA_A',true); SELECT count(*) FROM sandbox.ativo_exemplo" '2'
-
-    Checar 'Empresa B vê só o dela         ' `
-           "SELECT set_config('app.tenant_id','$EMPRESA_B',true); SELECT count(*) FROM sandbox.ativo_exemplo" '1'
-
-    # O teste que justifica o PgBouncer existir no ambiente local: o COMMIT
-    # encerra a transação, o contexto LOCAL morre junto, e a mesma conexão —
-    # que o pooler entregaria a outra requisição — volta a não ver nada.
-    Checar 'contexto morre no COMMIT       ' `
-           "BEGIN; SELECT set_config('app.tenant_id','$EMPRESA_A',true); COMMIT; SELECT count(*) FROM sandbox.ativo_exemplo" '0'
-
-    Checar 'UPDATE cruzando empresa é nulo ' `
-           "SELECT set_config('app.tenant_id','$EMPRESA_A',true); UPDATE sandbox.ativo_exemplo SET nome='x' WHERE tenant_id='$EMPRESA_B'; SELECT count(*) FROM sandbox.ativo_exemplo WHERE nome='x'" '0'
-
-    $insercao = Invoke-Psql "SELECT set_config('app.tenant_id','$EMPRESA_A',true); INSERT INTO sandbox.ativo_exemplo (tenant_id,codigo,nome) VALUES ('$EMPRESA_B','X-1','invasor')"
-    if ("$insercao" -match 'row-level security') { Ok 'INSERT com tenant alheio é recusado' }
-    else { Erro "INSERT com tenant alheio NÃO foi recusado: $insercao"; $falhas++ }
-
-    $orfas = Get-Valor (Invoke-Psql "SELECT coalesce(string_agg(schema_nome||'.'||tabela,', '),'-') FROM plataforma.auditoria_rls() WHERE tem_coluna_tenant AND NOT (rls_ligado AND rls_forcado AND tem_politica)")
-    if ($orfas -eq '-') { Ok 'nenhuma tabela com tenant_id sem RLS' }
-    else { Erro "tabelas desprotegidas: $orfas"; $falhas++ }
-
-    $bypass = Get-Valor (Invoke-Psql "SELECT count(*) FROM pg_roles WHERE rolname='catalogo_app' AND (rolbypassrls OR rolsuper)" 'catalogo_migrador' 5432)
-    if ($bypass -eq '0') { Ok 'catalogo_app não tem BYPASSRLS nem é superusuário' }
-    else { Erro 'catalogo_app PODE contornar RLS — a política vira decoração'; $falhas++ }
-
-    Write-Host ''
-    if ($falhas -eq 0) { Ok 'Isolamento entre empresas íntegro.' }
-    else { Erro "$falhas verificação(ões) falharam. NÃO prossiga sem entender."; exit 1 }
+    $env:JORNADA_TESTES_COSMOS = $COSMOS_LOCAL
+    $env:JORNADA_TESTES_COSMOS_EMULADOR = 'true'
+    dotnet run --project (Join-Path $Raiz '..\tests\Jornada.Persistencia.Testes') -- Cosmos
+    if ($LASTEXITCODE -ne 0) { Erro 'Isolamento NÃO confirmado. NÃO prossiga sem entender.'; exit 1 }
 }
 
 function Clear-Orfaos {
@@ -222,13 +155,7 @@ switch ($Comando) {
     'descer'     { podman compose -f $Compose down }
     'recriar'    { podman compose -f $Compose down -v; Start-Ambiente }
     'estado'     { Show-Estado }
-    'testar-rls' { Test-Rls }
+    'testar-isolamento' { Test-Isolamento }
     'limpar'     { Clear-Orfaos }
     'logs'       { if ($Alvo) { podman compose -f $Compose logs -f $Alvo } else { podman compose -f $Compose logs --tail 50 } }
-    'psql'       { podman exec -it -e PGPASSWORD=dev_app catalogo-postgres psql -h pgbouncer -p 6432 -U catalogo_app -d catalogo }
-    'pool'       {
-        # SHOW POOLS roda no banco virtual "pgbouncer", não em "catalogo".
-        podman exec -e PGPASSWORD=dev_migrador catalogo-postgres `
-            psql -h pgbouncer -p 6432 -U catalogo_migrador -d pgbouncer -c 'SHOW POOLS'
-    }
 }

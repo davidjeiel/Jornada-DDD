@@ -1,6 +1,6 @@
 # ADR-0004 — PostgreSQL como sistema de registro, com poliglotismo deliberado no entorno
 
-- **Status:** proposto
+- **Status:** substituído parcialmente por ADR-0016 (o sistema de registro passa a ser o Cosmos DB; o poliglotismo no entorno continua)
 - **Data:** 2026-09-22
 - **Relacionados:** ADR-0003, ADR-0005, ADR-0008, ADR-0010
 

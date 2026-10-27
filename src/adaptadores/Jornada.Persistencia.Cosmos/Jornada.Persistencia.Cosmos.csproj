@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Adaptador de saída sobre Azure Cosmos DB, API NoSQL (ADR-0016).
+       Implementa as mesmas portas que o adaptador em memória e passa na mesma
+       suíte de contrato (tests/Jornada.Persistencia.Testes). -->
+
+  <PropertyGroup>
+    <RootNamespace>Jornada.Persistencia.Cosmos</RootNamespace>
+    <AssemblyName>Jornada.Persistencia.Cosmos</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\aplicacao\Jornada.Aplicacao\Jornada.Aplicacao.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Cosmos" />
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+</Project>

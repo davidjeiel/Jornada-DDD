@@ -40,6 +40,7 @@ string[] proibidos =
     "Microsoft.Extensions.Configuration",
     "Npgsql",
     "Azure.",
+    "Microsoft.Azure",
     "Dapper",
     "StackExchange.Redis",
     "System.Net.Http",
@@ -201,6 +202,28 @@ Regra("não há DateTime.Now / UtcNow solto no domínio (use IRelogio)", () =>
 });
 
 Console.WriteLine();
+Console.WriteLine("  Isolamento no Cosmos DB (ADR-0016 §4)");
+
+// Sem RLS, o isolamento entre empresas depende de TODA ida ao Cosmos passar
+// pelo AcessoDoTenant, que põe a empresa na chave de partição e no filtro. A
+// regra lê a IL dos métodos (inclusive das máquinas de estado de async), não
+// só os campos: uma variável local com um Container já furaria o isolamento.
+Regra("no adaptador Cosmos, só AcessoDoTenant e BancoDoCatalogo tocam o SDK", () =>
+{
+    var cosmos = typeof(Jornada.Persistencia.Cosmos.RepositorioCosmos).Assembly;
+    string[] permitidos = ["AcessoDoTenant", "BancoDoCatalogo"];
+
+    var infratores = cosmos.GetTypes()
+        .Where(t => !permitidos.Contains(TipoDeTopo(t).Name))
+        .Where(t => UsaCosmos(t))
+        .Select(t => TipoDeTopo(t).Name)
+        .Distinct()
+        .ToArray();
+    return infratores.Length == 0 ? null
+        : $"usam o SDK do Cosmos por fora do ponto único: {string.Join(", ", infratores)}";
+});
+
+Console.WriteLine();
 Console.WriteLine(new string('─', 72));
 if (falhas == 0)
 {
@@ -211,3 +234,91 @@ if (falhas == 0)
 Console.WriteLine($"  \u001b[31m{falhas} guarda(s) violada(s) — ver ADR-0001\u001b[0m");
 Console.WriteLine();
 return 1;
+
+// ── apoio da guarda do Cosmos ────────────────────────────────────────────────
+
+static Type TipoDeTopo(Type t)
+{
+    while (t.DeclaringType is { } externo) t = externo;
+    return t;
+}
+
+static bool DoCosmos(Type? t) =>
+    t is not null && (t.Assembly.GetName().Name ?? "").StartsWith("Microsoft.Azure.Cosmos", StringComparison.Ordinal);
+
+static bool UsaCosmos(Type tipo)
+{
+    const BindingFlags todos = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+                             | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+    if (tipo.GetFields(todos).Any(f => DoCosmos(f.FieldType))) return true;
+
+    var metodos = tipo.GetMethods(todos).Cast<MethodBase>().Concat(tipo.GetConstructors(todos));
+    return metodos.Any(m => MembrosNaIl(m).Any(membro => DoCosmos(membro.DeclaringType)
+        || membro is FieldInfo f && DoCosmos(f.FieldType)
+        || membro is MethodInfo mi && DoCosmos(mi.ReturnType)));
+}
+
+/// Decodifica a IL com a tabela de operandos do próprio runtime (OpCodes), e
+/// resolve cada token de método, campo ou tipo. Varrer bytes "no olho" daria
+/// falso positivo: um operando pode parecer um opcode.
+static IEnumerable<MemberInfo> MembrosNaIl(MethodBase metodo)
+{
+    var il = metodo.GetMethodBody()?.GetILAsByteArray();
+    if (il is null) yield break;
+
+    var i = 0;
+    while (i < il.Length)
+    {
+        var opcode = il[i] == 0xFE ? CodigosDeDoisBytes[il[i + 1]] : CodigosDeUmByte[il[i]];
+        i += opcode.Size;
+
+        var tamanho = opcode.OperandType switch
+        {
+            System.Reflection.Emit.OperandType.InlineNone => 0,
+            System.Reflection.Emit.OperandType.ShortInlineBrTarget
+                or System.Reflection.Emit.OperandType.ShortInlineI
+                or System.Reflection.Emit.OperandType.ShortInlineVar => 1,
+            System.Reflection.Emit.OperandType.InlineVar => 2,
+            System.Reflection.Emit.OperandType.InlineI8
+                or System.Reflection.Emit.OperandType.InlineR => 8,
+            System.Reflection.Emit.OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, i),
+            _ => 4,
+        };
+
+        if (opcode.OperandType is System.Reflection.Emit.OperandType.InlineMethod
+            or System.Reflection.Emit.OperandType.InlineField
+            or System.Reflection.Emit.OperandType.InlineType
+            or System.Reflection.Emit.OperandType.InlineTok)
+        {
+            MemberInfo? membro = null;
+            try
+            {
+                membro = metodo.Module.ResolveMember(BitConverter.ToInt32(il, i),
+                    metodo.DeclaringType?.GetGenericArguments(),
+                    metodo.IsGenericMethod ? metodo.GetGenericArguments() : null);
+            }
+            catch (ArgumentException) { }
+            if (membro is Type t && DoCosmos(t)) yield return t;
+            else if (membro is not null and not Type) yield return membro;
+        }
+        i += tamanho;
+    }
+}
+
+internal partial class Program
+{
+    private static readonly System.Reflection.Emit.OpCode[] CodigosDeUmByte = new System.Reflection.Emit.OpCode[0x100];
+    private static readonly System.Reflection.Emit.OpCode[] CodigosDeDoisBytes = new System.Reflection.Emit.OpCode[0x100];
+
+    static Program()
+    {
+        foreach (var campo in typeof(System.Reflection.Emit.OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static))
+        {
+            var opcode = (System.Reflection.Emit.OpCode)campo.GetValue(null)!;
+            var valor = (ushort)opcode.Value;
+            if (opcode.Size == 1) CodigosDeUmByte[valor] = opcode;
+            else CodigosDeDoisBytes[valor & 0xFF] = opcode;
+        }
+    }
+}

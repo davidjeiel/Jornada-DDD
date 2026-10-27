@@ -2,8 +2,7 @@
   <!--
     Solution para ambientes SEM acesso ao nuget.org.
 
-    Exclui apenas Jornada.Persistencia.Postgres, que precisa de EF Core e
-    Npgsql. Todo o resto — domínio, aplicação, adaptador em memória, API e as
+    Exclui Jornada.Persistencia.Cosmos, que precisa do SDK do Cosmos DB. Todo o resto — domínio, aplicação, adaptador em memória, API e as
     duas suítes de teste — compila e roda só com o SDK do .NET:
 
         dotnet build Jornada-sem-nuget.slnx

@@ -1,6 +1,6 @@
 # ADR-0003 — Empresa é fronteira de isolamento; unidade é escopo de autorização
 
-- **Status:** proposto
+- **Status:** proposto; §3 (isolamento por RLS) substituído por ADR-0016
 - **Data:** 2026-09-22
 - **Relacionados:** ADR-0004, ADR-0007, ADR-0011
 

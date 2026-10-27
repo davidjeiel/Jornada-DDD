@@ -5,8 +5,8 @@ namespace Jornada.Persistencia.Testes.Contrato;
 /// <summary>
 /// As portas de persistência como uma requisição as enxerga: um conjunto por
 /// empresa e por unidade de trabalho. Abrir uma sessão nova equivale a uma
-/// requisição nova. No Postgres é um <c>DbContext</c> novo, então o que ela lê
-/// veio do banco, não do change tracker da sessão anterior.
+/// requisição nova. No Cosmos é um repositório novo, então o que ela lê veio do
+/// banco, não do mapa de identidade da sessão anterior.
 /// </summary>
 public sealed class Sessao(
     IRepositorioDeAtivos ativos,

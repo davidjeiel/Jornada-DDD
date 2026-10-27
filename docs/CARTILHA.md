@@ -75,8 +75,8 @@ deixa você mesmo decidir sobre ela — nem se o seu papel permitir aquela etapa
 segregação de função, e não tem exceção, nem para admin.
 
 **Empresa é fronteira, unidade é escopo.** Trocar de empresa no seletor troca o catálogo
-inteiro — cada empresa só vê os próprios ativos, sempre (Postgres aplica isso por Row-Level
-Security, não só a tela). Unidade não isola nada; hoje ela só viaja junto com o ativo
+inteiro — cada empresa só vê os próprios ativos, sempre (o banco guarda cada empresa na
+própria partição e toda consulta leva a empresa, não só a tela). Unidade não isola nada; hoje ela só viaja junto com o ativo
 cadastrado, como contexto.
 
 ---
@@ -363,8 +363,8 @@ e bloqueios nomeados. O mais comum é evidência faltando ou owner do tipo certo
 anexe uma evidência ou assuma o ativo, e o score sobe.
 
 **"Cadastrei em uma empresa e não vejo em outra"**
-Esperado, não é bug: cada empresa é isolada por Row-Level Security no Postgres
-([ADR-0003](adr/0003-modelo-multi-tenancy.md)). Troque de usuário para uma pessoa da
+Esperado, não é bug: cada empresa é isolada pela chave de partição no Cosmos DB
+([ADR-0016](adr/0016-cosmos-db-como-sistema-de-registro.md)). Troque de usuário para uma pessoa da
 outra empresa no seletor — o catálogo é outro, de propósito.
 
 **Recursos do `painel-ddd` que esta cartilha não promete ainda**

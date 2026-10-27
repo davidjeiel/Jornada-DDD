@@ -60,6 +60,7 @@ public static class CodigosDeErro
         ["VALIDACAO_JA_DECIDIDA"] = StatusCodes.Status409Conflict,
         ["VALIDACAO_OBSOLETA"] = StatusCodes.Status409Conflict,
         ["ATIVO_NAO_EDITAVEL"] = StatusCodes.Status409Conflict,
+        ["CONFLITO_DE_EDICAO"] = StatusCodes.Status409Conflict,
 
         [ErroInterno] = StatusCodes.Status500InternalServerError,
     };

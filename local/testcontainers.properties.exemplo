@@ -37,4 +37,4 @@ testcontainers.reuse.enable=true
 
 # Imagens sempre com registro explícito: Podman não assume docker.io.
 # Sintoma de esquecer: "short-name resolution enforced but cannot prompt".
-# No código dos testes use docker.io/library/postgres:17-alpine, nunca postgres:17.
+# No código dos testes use o nome completo, ex.: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest.

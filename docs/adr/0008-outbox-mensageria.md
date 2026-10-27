@@ -1,6 +1,6 @@
 # ADR-0008 — Manter o padrão outbox transacional, com Azure Service Bus como transporte
 
-- **Status:** proposto
+- **Status:** proposto; §2 e §3 (tabela de outbox e despacho no Postgres) substituídos por ADR-0016 (eventos na partição do ativo, despacho pelo change feed)
 - **Data:** 2026-09-22
 - **Relacionados:** ADR-0004, ADR-0006
 

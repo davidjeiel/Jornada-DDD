@@ -33,7 +33,7 @@ primeiro parâmetro de quase toda função de domínio, e nenhuma noção de "em
 | Uma instalação, um catálogo | N empresas, cada uma com suas unidades |
 | Taxonomia fixa em `tipos.py` (código) | Metamodelo configurável por empresa (dado) |
 | Identidade local (`pessoa.login`) | Entra External ID + federação com o IdP de cada cliente |
-| SQLite arquivo local | PostgreSQL gerenciado, RLS, pool de conexões |
+| SQLite arquivo local | Cosmos DB (API NoSQL), partição por empresa |
 | API interna sem contrato | API pública versionada, com plano e cota |
 | Sem receita | Assinatura por empresa + medição de uso por serviço |
 | `python run.py` | IaC + pipeline + ambientes + observabilidade |
@@ -136,13 +136,13 @@ flowchart LR
   FE --> APIM["Azure API Management<br/><i>authn, cota, plano, medição</i>"]
   APIM --> API["Catalogo.Api<br/>.NET 10 · Container Apps"]
 
-  API --> PG[("PostgreSQL Flexible Server<br/><i>sistema de registro · RLS</i>")]
+  API --> PG[("Azure Cosmos DB · NoSQL<br/><i>sistema de registro · partição por empresa</i>")]
   API --> RED[("Azure Cache for Redis<br/><i>cache, rate limit, idempotência</i>")]
   API --> SRCH[("Azure AI Search<br/><i>busca facetada do catálogo</i>")]
   API --> BLOB[("Blob Storage<br/><i>evidências, exports</i>")]
   API -.grava outbox.-> PG
 
-  W["Catalogo.Workers<br/><i>outbox, SLA, snapshot, descoberta</i>"] --> PG
+  W["Catalogo.Workers<br/><i>outbox (change feed), SLA, snapshot, descoberta</i>"] --> PG
   W --> SB[["Service Bus<br/><i>eventos de domínio</i>"]]
   SB --> W
 
@@ -178,7 +178,7 @@ flowchart LR
   end
 
   subgraph ADAPTOUT["Adaptadores de saída"]
-    PGA["Postgres<br/>(EF Core / Dapper)"]
+    PGA["Cosmos DB<br/>(SDK .NET)"]
     SBA["Service Bus"]
     SRA["Azure AI Search"]
     IDA["Entra External ID"]
@@ -256,7 +256,7 @@ painel-ddd/
 │   │       └── Portas/                  #   IRepositorio*, IPublicadorDeEventos, IIndiceDeBusca...
 │   │
 │   ├── adaptadores/
-│   │   ├── Catalogo.Persistencia.Postgres/   # EF Core + Dapper, migrations, RLS, outbox
+│   │   ├── Catalogo.Persistencia.Cosmos/     # SDK do Cosmos, partição por empresa, lote atômico, outbox
 │   │   ├── Catalogo.Mensageria.ServiceBus/
 │   │   ├── Catalogo.Busca.AzureSearch/
 │   │   ├── Catalogo.Identidade.Entra/
@@ -280,12 +280,12 @@ painel-ddd/
 ├── tests/
 │   ├── Catalogo.Dominio.Testes/         # unitários puros, sem I/O
 │   ├── Catalogo.Aplicacao.Testes/       # casos de uso com portas falsas
-│   ├── Catalogo.Integracao.Testes/      # Testcontainers: Postgres real, RLS real
+│   ├── Catalogo.Persistencia.Testes/    # contrato das portas: memória e emulador do Cosmos
 │   ├── Catalogo.Contrato.Testes/        # o OpenAPI publicado não quebrou
 │   └── Catalogo.Arquitetura.Testes/     # NetArchTest: a regra de dependência
 │
 ├── infra/
-│   ├── modules/{rede,postgres,aca,apim,keyvault,observabilidade}/
+│   ├── modules/{rede,cosmos,aca,apim,keyvault,observabilidade}/
 │   ├── envs/{dev,hml,prd}/
 │   └── stamps/                          # unidade de escala replicável
 │
@@ -300,33 +300,34 @@ que agora a natureza determina também o custo e a velocidade de cada suíte.
 
 ## 7. Banco de dados: por que poliglota, e onde cada um entra
 
-A pergunta "qual o banco ideal" tem uma resposta chata: **o PostgreSQL resolve 85%
-do problema e você não deveria pagar o preço operacional dos outros 15% antes de
-precisar.** Detalhe em [ADR-0004](adr/0004-persistencia-poliglota.md).
+O sistema de registro é o **Cosmos DB, API NoSQL**, por decisão da gestão, sobre a
+modelagem da prova de conceito do painel-ddd adaptada para várias empresas
+([ADR-0016](adr/0016-cosmos-db-como-sistema-de-registro.md), que substitui o
+sistema de registro do [ADR-0004](adr/0004-persistencia-poliglota.md)). O
+poliglotismo no entorno continua valendo.
 
 | Necessidade real do catálogo | Onde vive | Por quê |
 |---|---|---|
-| Ativos, relações, revisões, validações, auditoria | **PostgreSQL** | Transação + constraint + RLS. É o sistema de registro. |
-| `atributos` por tipo de ativo | PostgreSQL **JSONB** + JSON Schema | Substitui a coluna TEXT com JSON de hoje, com índice GIN e validação |
-| Trilha hierárquica, grafo de vizinhança (`vizinhanca`, `arvore`) | PostgreSQL **CTE recursiva** + closure table | Nos volumes reais do catálogo, isso é rápido. Banco de grafo é custo sem retorno agora |
-| Busca no catálogo (hoje `LIKE`) | **Azure AI Search** | Facetas, relevância, sinônimos, pt-BR. O `LIKE` não escala nem em qualidade nem em tempo |
+| Ativos, validações, relações, eventos (outbox) | **Cosmos DB**, container `catalogo`, chave `[/empresa, /idAtivo]` | O que muda junto mora na mesma partição e grava num `TransactionalBatch` atômico |
+| `atributos` por tipo de ativo | Campo do documento do ativo | Documento JSON nativo: tipo novo não pede migração |
+| Sequencial do código (`SIS-0001`) | Container `contadores`, chave `/empresa` | `patch` com incremento atômico |
+| Trilha hierárquica, grafo de vizinhança | Consultas por prefixo da empresa + travessia na aplicação | Nos volumes de um catálogo por empresa, é rápido; banco de grafo é custo sem retorno agora |
+| Busca no catálogo | **Azure AI Search** (alvo) | Facetas, relevância, sinônimos, pt-BR |
 | Cache, rate limit distribuído, idempotência | **Azure Cache for Redis** | |
 | Evidências, anexos, exports | **Blob Storage** | Não coloque binário no banco |
-| Eventos de domínio | **Service Bus** (despachado pela outbox) | |
-| Medição de uso (alto volume, append-only) | **Event Hubs → partição/ADX** | Perfil totalmente diferente do OLTP; não polua o Postgres |
-| Indicadores executivos | `snapshot_indicador` no Postgres, → Fabric quando doer | Já funciona; evolua quando o volume justificar |
+| Eventos de domínio | **Service Bus**, despachado a partir do change feed | |
+| Medição de uso (alto volume, append-only) | **Event Hubs → partição/ADX** | Perfil totalmente diferente do OLTP |
+| Indicadores executivos | Snapshots mensais no Cosmos, → Fabric quando doer | Evolua quando o volume justificar |
 
 **Sobre a Fase 1:** a tabela acima é o estado-alvo, não o dia 1. Redis e AI Search
-entram quando doerem. Na Fase 1, a porta `IIndiceDeBusca` é implementada sobre
-`tsvector` do próprio PostgreSQL e trocada depois sem tocar no domínio — é
-exatamente o tipo de adiamento que o hexágono torna barato.
+entram quando doerem; até lá, a busca roda sobre consultas do próprio Cosmos e é
+trocada depois sem tocar no domínio — é exatamente o tipo de adiamento que o
+hexágono torna barato.
 
-**Sobre grafo:** avaliamos adotar um banco de grafo dedicado. O SQL/PGQ (grafo de
-propriedades nativo no Postgres) chegou a ser commitado para o PostgreSQL 19 mas
-**foi revertido em 07/09/2026** e não sai no 19.0. Como a alternativa seria operar
-um segundo banco (Cosmos DB for Gremlin ou Neo4j) para consultas de 1–3 saltos que
-a CTE recursiva já atende, a decisão é **adiar** — com gatilho explícito de
-reavaliação registrado no ADR-0004.
+**Sobre isolamento:** o Cosmos não tem RLS. Toda ida ao banco passa pelo
+`AcessoDoTenant`, que põe a empresa na chave de partição e no filtro; uma guarda
+de arquitetura impede outro caminho, e a suíte de contrato prova o isolamento em
+toda consulta (ADR-0016 §4).
 
 ---
 
@@ -334,7 +335,7 @@ reavaliação registrado no ADR-0004.
 
 A distinção mais importante do projeto inteiro, e a mais fácil de errar:
 
-- **Empresa = fronteira de isolamento.** É `tenant_id`. Define RLS, backup,
+- **Empresa = fronteira de isolamento.** É o primeiro nível da chave de partição. Define o isolamento, backup,
   criptografia, residência de dados, plano, fatura e SLA.
 - **Unidade = escopo de autorização.** É *dentro* de uma empresa. Define quem vê e
   quem aprova o quê.
@@ -345,13 +346,13 @@ catálogo umas das outras. O projeto já tem a peça certa para isso: basta este
 `atribuicao_papel.escopo_tipo` de `global | dominio | squad` para incluir
 `unidade`, e o `papeis_efetivos` continua funcionando como hoje.
 
-O modelo é **pooled com RLS**, com dois degraus de escape para clientes que
+O modelo é **pooled com partição por empresa**, com dois degraus de escape para clientes que
 exigirem mais isolamento ([ADR-0003](adr/0003-modelo-multi-tenancy.md)):
 
 | Tier | Isolamento | Custo marginal/empresa | Para quem |
 |---|---|---|---|
-| **Padrão** | Pooled: app + banco compartilhados, RLS | Muito baixo | A maioria |
-| **Dedicado** | Schema próprio ou banco próprio, app compartilhada | Médio | Regulados, grande volume |
+| **Padrão** | Pooled: app + conta Cosmos compartilhadas, partição por empresa | Muito baixo | A maioria |
+| **Dedicado** | Container ou conta Cosmos própria, app compartilhada | Médio | Regulados, grande volume |
 | **Soberano** | *Deployment stamp* completo (rede, banco, app) | Alto — precifique | Setor público, exigência contratual |
 
 ---
@@ -384,7 +385,7 @@ depois voltar a entregar valor".
 | Fase | Entrega | Nada quebra porque… |
 |---|---|---|
 | **0 — Fundações** | Repo .NET, CI, Terraform de `dev`, ADRs aprovados, Aspire rodando local | O Flask continua no ar |
-| **1 — Núcleo** | Domínio puro extraído (Governança + Qualidade primeiro), Postgres com `tenant_id` + RLS, migração dos dados | Mesma UX, mesma API; só o motor mudou |
+| **1 — Núcleo** | Domínio puro extraído (Governança + Qualidade primeiro), Cosmos DB com partição por empresa, migração dos dados | Mesma UX, mesma API; só o motor mudou |
 | **2 — Tenancy + Identidade** | Control plane de empresas/unidades, Entra External ID, federação com o IdP do cliente | O modelo de papéis escopados já existia |
 | **3 — API pública** | Contrato v1, APIM, portal do desenvolvedor, planos e cotas | A API interna atual vira a base do contrato |
 | **4 — Monetização** | Entitlements na aplicação, medição, integração de cobrança | — |
@@ -401,9 +402,9 @@ Detalhe de execução, critérios de corte e plano de dados em
 | Risco | Impacto | Mitigação |
 |---|---|---|
 | Reescrita de linguagem perde regra de negócio tácita | Alto | A suíte pytest atual vira **especificação executável**: cada teste é portado antes do código que ele cobre |
-| Vazamento entre empresas | Existencial | RLS `FORCE` + role sem `BYPASSRLS` + teste de integração que tenta cruzar tenant e **espera falhar** |
+| Vazamento entre empresas | Existencial | Ponto único de acesso (`AcessoDoTenant`) + guarda de arquitetura + suíte de contrato que tenta cruzar empresa e **espera falhar** (ADR-0016 §4) |
 | Modular monolith vira monólito e ponto | Médio | Testes de arquitetura quebram o build no primeiro acoplamento indevido |
-| Complexidade de Azure acima da capacidade do time | Médio | Container Apps em vez de AKS; Postgres gerenciado; adiar grafo, Fabric e service mesh |
+| Complexidade de Azure acima da capacidade do time | Médio | Container Apps em vez de AKS; Cosmos DB gerenciado; adiar grafo, Fabric e service mesh |
 | Metamodelo por tenant vira configuração infinita | Médio | Catálogo padrão versionado, tenant só estende; migração de metamodelo é evento versionado |
 | LGPD: direito ao esquecimento × auditoria imutável | Médio | Pseudonimizar ator na auditoria; apagar o dado pessoal, preservar o fato e o hash |
 
@@ -415,8 +416,8 @@ Detalhe de execução, critérios de corte e plano de dados em
 |---|---|
 | [0001](adr/0001-arquitetura-hexagonal-ddd.md) | Arquitetura hexagonal com DDD tático e guardas automatizadas |
 | [0002](adr/0002-plataforma-de-execucao.md) | .NET 10 no núcleo, TypeScript/React no front |
-| [0003](adr/0003-modelo-multi-tenancy.md) | Empresa → Unidade; pooled com RLS e tiers de isolamento |
-| [0004](adr/0004-persistencia-poliglota.md) | PostgreSQL como sistema de registro, poliglota no entorno |
+| [0003](adr/0003-modelo-multi-tenancy.md) | Empresa → Unidade; pooled e tiers de isolamento (o §3, RLS, foi substituído pelo 0016) |
+| [0004](adr/0004-persistencia-poliglota.md) | ~~PostgreSQL como sistema de registro~~ (substituído pelo 0016), poliglota no entorno |
 | [0005](adr/0005-metamodelo-por-tenant.md) | Metamodelo do catálogo configurável por empresa |
 | [0006](adr/0006-topologia-de-servicos.md) | Control plane separado; monólito modular extraível |
 | [0007](adr/0007-identidade-autenticacao-autorizacao.md) | Entra External ID + autorização de domínio em um ponto só |
@@ -424,7 +425,8 @@ Detalhe de execução, critérios de corte e plano de dados em
 | [0009](adr/0009-api-publica-versionamento.md) | API pública versionada, contrato gerado do código |
 | [0010](adr/0010-monetizacao-medicao-uso.md) | Planos, entitlements e medição de uso |
 | [0011](adr/0011-infraestrutura-como-codigo.md) | Terraform + Azure Container Apps + stamps |
-| [0012](adr/0012-estrategia-de-migracao.md) | Strangler Fig e migração de dados SQLite → PostgreSQL |
+| [0012](adr/0012-estrategia-de-migracao.md) | Strangler Fig e migração de dados (o destino passou a ser o Cosmos DB, 0016) |
 | [0013](adr/0013-ambiente-local-podman.md) | Podman no ambiente local ([guia](AMBIENTE-LOCAL.md)) |
 | [0014](adr/0014-contrato-openapi-padrao-caixa.md) | Contrato OpenAPI no padrão CAIXA |
 | [0015](adr/0015-revisao-de-ativo-publicado.md) | Ciclo de revisão de ativo publicado |
+| [0016](adr/0016-cosmos-db-como-sistema-de-registro.md) | Cosmos DB como sistema de registro |

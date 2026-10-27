@@ -33,19 +33,20 @@ já pontua (`qualidade.py`, dimensão *evidência*) — dogfooding.
 |---|---|---|
 | [0001](0001-arquitetura-hexagonal-ddd.md) | Arquitetura hexagonal com DDD tático e guardas automatizadas | proposto |
 | [0002](0002-plataforma-de-execucao.md) | .NET 10 no núcleo e TypeScript/React no front | proposto |
-| [0003](0003-modelo-multi-tenancy.md) | Empresa como fronteira de isolamento, unidade como escopo | proposto |
-| [0004](0004-persistencia-poliglota.md) | PostgreSQL como sistema de registro, poliglota no entorno | proposto |
+| [0003](0003-modelo-multi-tenancy.md) | Empresa como fronteira de isolamento, unidade como escopo | proposto; §3 substituído por ADR-0016 |
+| [0004](0004-persistencia-poliglota.md) | PostgreSQL como sistema de registro, poliglota no entorno | substituído parcialmente por ADR-0016 |
 | [0005](0005-metamodelo-por-tenant.md) | Metamodelo do catálogo configurável por empresa | proposto |
 | [0006](0006-topologia-de-servicos.md) | Control plane separado e monólito modular extraível | proposto |
 | [0007](0007-identidade-autenticacao-autorizacao.md) | Entra External ID e autorização de domínio centralizada | proposto |
-| [0008](0008-outbox-mensageria.md) | Outbox transacional com Azure Service Bus | proposto |
+| [0008](0008-outbox-mensageria.md) | Outbox transacional com Azure Service Bus | proposto; §2–3 substituídos por ADR-0016 |
 | [0009](0009-api-publica-versionamento.md) | API pública versionada com contrato gerado do código | proposto |
 | [0010](0010-monetizacao-medicao-uso.md) | Planos, entitlements e medição de uso | proposto |
 | [0011](0011-infraestrutura-como-codigo.md) | Terraform, Azure Container Apps e deployment stamps | proposto |
 | [0012](0012-estrategia-de-migracao.md) | Strangler Fig e migração de dados SQLite → PostgreSQL | proposto |
-| [0013](0013-ambiente-local-podman.md) | Podman como runtime de containers no ambiente local | proposto |
+| [0013](0013-ambiente-local-podman.md) | Podman como runtime de containers no ambiente local | proposto; Postgres local substituído por ADR-0016 |
 | [0014](0014-contrato-openapi-padrao-caixa.md) | Contrato OpenAPI no padrão CAIXA (substitui parcialmente o 0009) | proposto |
 | [0015](0015-revisao-de-ativo-publicado.md) | Completar o ciclo de revisão de ativo publicado | proposto |
+| [0016](0016-cosmos-db-como-sistema-de-registro.md) | Cosmos DB (API NoSQL) como único sistema de registro; Postgres removido | proposto |
 
 ## Modelo
 

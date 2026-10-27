@@ -1,6 +1,6 @@
 # ADR-0013 — Usar Podman como runtime de containers no ambiente local, mantendo Azure em produção
 
-- **Status:** proposto
+- **Status:** proposto; Postgres e PgBouncer no ambiente local substituídos pelo emulador do Cosmos DB (ADR-0016)
 - **Data:** 2026-09-22
 - **Relacionados:** ADR-0002, ADR-0003, ADR-0004, ADR-0008, ADR-0011
 - **Guia prático:** [`docs/AMBIENTE-LOCAL.md`](../AMBIENTE-LOCAL.md)
