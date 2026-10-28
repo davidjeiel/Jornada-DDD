@@ -625,7 +625,7 @@ paths:
       tags:
         - Catálogo
       summary: Relaciona este ativo a outro
-      description: 'Cria uma aresta do grafo do catálogo, com este ativo como origem.'
+      description: 'Cria uma aresta do grafo do catálogo, com este ativo como origem. A criticidade é a da dependência; alta ou crítica faz a descontinuação do destino exigir confirmação.'
       operationId: relacionarAtivos
       parameters:
         - name: id
@@ -1004,6 +1004,329 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '422':
           description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/impacto':
+    get:
+      tags:
+        - Governança
+      summary: Lista quem depende do ativo
+      description: 'Consumidores em vigor (publicados ou em revisão) que apontam para este ativo, mais críticos primeiro, com contagem por criticidade da dependência e por tipo. Não altera nada.'
+      operationId: analisarImpacto
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImpactoResponse'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/descontinuacao':
+    post:
+      tags:
+        - Governança
+      summary: Descontinua um ativo publicado ou em revisão
+      description: 'Tira o ativo de vigência, com motivo obrigatório. Se algum consumidor depende dele com criticidade alta ou crítica, exige confirmacao igual ao código do ativo; sem ela devolve 422 CONFIRMACAO_NECESSARIA. Outro estado devolve 409 TRANSICAO_INVALIDA.'
+      operationId: descontinuarAtivo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DescontinuarAtivoRequest'
+        required: true
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DescontinuacaoResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/arquivamento':
+    post:
+      tags:
+        - Governança
+      summary: Arquiva um rascunho ou um ativo descontinuado
+      description: Estado terminal. Publicado precisa ser descontinuado antes; outro estado devolve 409 TRANSICAO_INVALIDA.
+      operationId: arquivarAtivo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '204':
+          description: 'Operação concluída, sem conteúdo de resposta.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: O papel da pessoa não permite esta ação neste ativo.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -1471,6 +1794,37 @@ components:
             plataforma: mainframe
       additionalProperties: false
       description: Cadastro de um ativo novo. Ele nasce em rascunho.
+    ConsumidorResponse:
+      required:
+        - id
+        - codigo
+        - nome
+        - tipoItem
+        - tipoRelacao
+        - criticidade
+      type: object
+      properties:
+        id:
+          type: string
+          description: O consumidor.
+          format: uuid
+        codigo:
+          type: string
+          description: Código do consumidor.
+        nome:
+          type: string
+          description: Nome do consumidor.
+        tipoItem:
+          type: string
+          description: Tipo do consumidor no metamodelo.
+        tipoRelacao:
+          type: string
+          description: 'Como ele depende do analisado (implementa, consome, depende_de...).'
+        criticidade:
+          type: string
+          description: 'Criticidade da dependência: baixa, media, alta ou critica.'
+      additionalProperties: false
+      description: Ativo que aponta para o analisado e ainda vale como referência (publicado ou em revisão).
     DecidirValidacaoRequest:
       required:
         - aprovada
@@ -1486,6 +1840,32 @@ components:
           example: Owner e evidência conferidos.
       additionalProperties: false
       description: Decisão sobre uma etapa de validação.
+    DescontinuacaoResponse:
+      required:
+        - afetados
+      type: object
+      properties:
+        afetados:
+          type: integer
+          description: Consumidores em vigor no momento da descontinuação.
+          format: int32
+      additionalProperties: false
+      description: Descontinuação aceita.
+    DescontinuarAtivoRequest:
+      required:
+        - motivo
+      type: object
+      properties:
+        motivo:
+          type: string
+          example: Substituído pelo Core Bancário 2.
+        confirmacao:
+          type: string
+          description: 'O código do ativo (ex.: CAP-0001). Obrigatório quando há consumidor de alta criticidade; nos demais casos é ignorado.'
+          nullable: true
+          example: CAP-0001
+      additionalProperties: false
+      description: Pedido para tirar o ativo de vigência.
     DimensoesDoScoreResponse:
       required:
         - completude
@@ -1638,6 +2018,55 @@ components:
             fimVigencia: null
             vigente: true
         relacoes: [ ]
+    ImpactoResponse:
+      required:
+        - id
+        - codigo
+        - total
+        - criticos
+        - exigeConfirmacao
+        - consumidores
+        - porCriticidade
+        - porTipo
+      type: object
+      properties:
+        id:
+          type: string
+          description: O ativo analisado.
+          format: uuid
+        codigo:
+          type: string
+          description: 'Código do ativo analisado: é o que se digita para confirmar a descontinuação.'
+        total:
+          type: integer
+          description: Quantos consumidores em vigor.
+          format: int32
+        criticos:
+          type: integer
+          description: 'Quantos de alta criticidade (alta ou critica). Acima de zero, descontinuar exige a confirmação.'
+          format: int32
+        exigeConfirmacao:
+          type: boolean
+          description: Verdadeiro quando há consumidor de alta criticidade.
+        consumidores:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsumidorResponse'
+          description: 'Os consumidores, mais críticos primeiro.'
+        porCriticidade:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Contagem por criticidade da dependência.
+        porTipo:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Contagem por tipo do consumidor.
+      additionalProperties: false
+      description: Quem seria afetado se o ativo fosse descontinuado.
     ListaDeAtivosResponse:
       required:
         - total
@@ -1778,6 +2207,7 @@ components:
         - codigo
         - nome
         - tipo
+        - criticidade
       type: object
       properties:
         direcao:
@@ -1796,6 +2226,9 @@ components:
         tipo:
           type: string
           description: Tipo da relação.
+        criticidade:
+          type: string
+          description: 'Quanto a origem depende do destino: baixa, media, alta ou critica.'
       additionalProperties: false
       description: Relação vista a partir deste ativo.
     RelacionarAtivosRequest:
@@ -1811,6 +2244,11 @@ components:
           type: string
           description: 'implementa, expoe, consome, produz, depende_de ou persiste_em.'
           example: depende_de
+        criticidade:
+          type: string
+          description: 'Quanto a origem depende do destino: baixa, media, alta ou critica. Ausente vale media. Alta ou crítica faz a descontinuação do destino exigir confirmação.'
+          nullable: true
+          example: critica
       additionalProperties: false
       description: Relação deste ativo (origem) com outro (destino).
     ResponsavelResponse:

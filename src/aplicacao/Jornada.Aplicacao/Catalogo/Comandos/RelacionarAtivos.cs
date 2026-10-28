@@ -5,7 +5,12 @@ using Jornada.Dominio.Comum;
 
 namespace Jornada.Aplicacao.Catalogo.Comandos;
 
-public sealed record ComandoRelacionarAtivos(IdDeAtivo Origem, IdDeAtivo Destino, string Tipo);
+/// <param name="Criticidade">
+/// Quanto a origem depende do destino. Alta ou crítica faz a descontinuação do
+/// destino exigir confirmação (<see cref="DescontinuarAtivo"/>).
+/// </param>
+public sealed record ComandoRelacionarAtivos(
+    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media);
 
 /// <summary>
 /// Grava uma aresta do grafo do catálogo (<c>implementa</c>, <c>expõe</c>,
@@ -49,7 +54,7 @@ public sealed class RelacionarAtivos(
         // busca em profundidade sobre "depende_de" — uma aresta na direção
         // errada nunca aparece nessa busca. Registrar só o sentido pedido é
         // suficiente e é o que os testes do domínio já esperam.
-        await relacoes.RelacionarAsync(cmd.Origem, cmd.Destino, cmd.Tipo.Trim().ToLowerInvariant(), ct);
+        await relacoes.RelacionarAsync(cmd.Origem, cmd.Destino, cmd.Tipo.Trim().ToLowerInvariant(), cmd.Criticidade, ct);
         return Resultado<bool>.Ok(true);
     }
 }

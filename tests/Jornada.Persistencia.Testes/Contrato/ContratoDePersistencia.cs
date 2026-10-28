@@ -255,6 +255,26 @@ public abstract class ContratoDePersistencia
         Verificar.Contem(await s.Relacoes.ListarRelacoesAsync(destino.Id), esperado);
     }
 
+    [Teste("relação guarda a criticidade da dependência; sem ela, vale média")]
+    public async Task RelacaoGuardaCriticidade()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var app = await Gravar(empresa, Novo(empresa, "aplicacao", "APP-0001", "Gestor"));
+        var cap = await Gravar(empresa, Novo(empresa, "capacidade", "CAP-0001", "Conceder crédito"));
+        var outra = await Gravar(empresa, Novo(empresa, "capacidade", "CAP-0002", "Cobrar"));
+
+        await using (var s = Abrir(empresa))
+        {
+            await s.Relacoes.RelacionarAsync(app.Id, cap.Id, "implementa", Criticidade.Critica);
+            await s.Relacoes.RelacionarAsync(app.Id, outra.Id, "implementa");
+        }
+
+        await using var nova = Abrir(empresa);
+        var relacoes = await nova.Relacoes.ListarRelacoesAsync(app.Id);
+        Verificar.Igual(Criticidade.Critica, relacoes.Single(r => r.Destino == cap.Id).Criticidade);
+        Verificar.Igual(Criticidade.Media, relacoes.Single(r => r.Destino == outra.Id).Criticidade);
+    }
+
     [Teste("dependência circular é detectada, inclusive indireta")]
     public async Task DependenciaCircular()
     {

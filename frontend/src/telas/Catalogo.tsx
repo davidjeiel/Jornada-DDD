@@ -8,6 +8,7 @@ import { Cabecalho, Criticidade, Status } from '../componentes';
 import { Link, navegar } from '../roteador';
 import type { UsuarioDeTeste } from '../usuarios';
 import { FichaDoAtivo } from './FichaDoAtivo';
+import { podeDescontinuar } from './Impacto';
 
 const FILTROS = ['todos', 'dominio', 'subdominio', 'contexto', 'capacidade', 'sistema', 'aplicacao', 'api', 'evento'] as const;
 type Filtro = (typeof FILTROS)[number];
@@ -204,6 +205,7 @@ export function Catalogo({ ativos, carregando, termo, idSelecionado, usuario, po
           ficha={ficha}
           ativos={ativos}
           podeEscrever={podeEscrever}
+          podeDescontinuar={podeDescontinuar(usuario.papel)}
           onFechar={() => setFichaAberta(false)}
           onAlterado={recarregarTudo}
           onErro={onErro}

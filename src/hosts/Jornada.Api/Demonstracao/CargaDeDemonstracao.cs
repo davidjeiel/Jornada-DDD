@@ -198,18 +198,21 @@ public sealed class CargaDeDemonstracao(
         }
 
         // ────────────────────────────────────────────────────────── relações
-        (IdDeAtivo Origem, IdDeAtivo Destino, string Tipo)[] relacoes =
+        // Criticidade da dependência como no seed do painel: é ela que faz a
+        // descontinuação de uma capacidade pedir o código de confirmação.
+        const Criticidade A = Criticidade.Alta, C = Criticidade.Critica, M = Criticidade.Media;
+        (IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade)[] relacoes =
         [
-            (appSim, capSim, "implementa"), (appCtr, capPort, "implementa"), (appGar, capAval, "implementa"),
-            (apiSim, capSim, "implementa"), (apiCtr, capPort, "implementa"), (apiGar, capAval, "implementa"),
-            (apiSim, endSim, "expoe"), (appSim, apiGar, "consome"), (appCtr, objCtr, "persiste_em"),
-            (ctxSim, ctxImob, "depende_de"), (ctxGestao, ctxImob, "depende_de"),
-            (appCtr, evt, "produz"), (appGar, evt, "consome"),
+            (appSim, capSim, "implementa", A), (appCtr, capPort, "implementa", C), (appGar, capAval, "implementa", A),
+            (apiSim, capSim, "implementa", A), (apiCtr, capPort, "implementa", C), (apiGar, capAval, "implementa", A),
+            (apiSim, endSim, "expoe", M), (appSim, apiGar, "consome", A), (appCtr, objCtr, "persiste_em", C),
+            (ctxSim, ctxImob, "depende_de", A), (ctxGestao, ctxImob, "depende_de", C),
+            (appCtr, evt, "produz", A), (appGar, evt, "consome", M),
         ];
-        foreach (var (origem, destino, tipo) in relacoes)
+        foreach (var (origem, destino, tipo, criticidade) in relacoes)
         {
             Exigir(await ComoAsync(e, e.Curador, sp => sp.GetRequiredService<RelacionarAtivos>().ExecutarAsync(
-                new ComandoRelacionarAtivos(origem, destino, tipo), ct)), $"relação {tipo}");
+                new ComandoRelacionarAtivos(origem, destino, tipo, criticidade), ct)), $"relação {tipo}");
         }
 
         // ───────────────────────────────────────────────────────── evidências

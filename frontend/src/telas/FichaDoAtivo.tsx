@@ -1,6 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link2, Paperclip, Plus, X } from 'lucide-react';
-import { anexarEvidencia, editarAtivo, relacionarAtivos, type AtivoResumo, type FichaDoAtivo as Ficha } from '../api';
+import {
+  analisarImpacto, anexarEvidencia, arquivarAtivo, descontinuarAtivo, editarAtivo, relacionarAtivos,
+  type AtivoResumo, type FichaDoAtivo as Ficha, type Impacto,
+} from '../api';
+import { Criticidade } from '../componentes';
+import { CartaoDeArquivamento, CartaoDeDescontinuacao, QuemDepende, podeSerArquivado, podeSerDescontinuado } from './Impacto';
 
 type Aba = 'detalhes' | 'evidencias' | 'relacoes';
 type Edicao = { nome: string; descricao: string; criticidade: string; atributos: Record<string, string> };
@@ -11,19 +16,30 @@ type Props = {
   ficha: Ficha;
   ativos: AtivoResumo[];
   podeEscrever: boolean;
+  podeDescontinuar: boolean;
   onFechar: () => void;
   onAlterado: () => Promise<void>;
   onErro: (mensagem: string) => void;
 };
 
-export function FichaDoAtivo({ ficha, ativos, podeEscrever, onFechar, onAlterado, onErro }: Props) {
+export function FichaDoAtivo({ ficha, ativos, podeEscrever, podeDescontinuar, onFechar, onAlterado, onErro }: Props) {
   const [aba, setAba] = useState<Aba>('detalhes');
   const [edicao, setEdicao] = useState<Edicao>({ nome: ficha.nome, descricao: ficha.descricao, criticidade: ficha.criticidade, atributos: { ...ficha.atributos } });
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [novaEvidencia, setNovaEvidencia] = useState({ tipo: 'documento', titulo: '', url: '' });
   const [salvandoEvidencia, setSalvandoEvidencia] = useState(false);
-  const [novaRelacao, setNovaRelacao] = useState({ destinoId: '', tipo: tiposDeRelacao[0] });
+  const [novaRelacao, setNovaRelacao] = useState({ destinoId: '', tipo: tiposDeRelacao[0], criticidade: 'media' });
   const [salvandoRelacao, setSalvandoRelacao] = useState(false);
+  const [impacto, setImpacto] = useState<Impacto | null>(null);
+
+  // Recarrega a cada mudança de status: depois de descontinuar, o cartão some.
+  useEffect(() => {
+    let vigente = true;
+    analisarImpacto(ficha.id)
+      .then((r) => { if (vigente) setImpacto(r); })
+      .catch(() => { if (vigente) setImpacto(null); });
+    return () => { vigente = false; };
+  }, [ficha.id, ficha.status, ficha.relacoes.length]);
 
   const outrosAtivos = ativos.filter((a) => a.id !== ficha.id);
 
@@ -58,9 +74,29 @@ export function FichaDoAtivo({ ficha, ativos, podeEscrever, onFechar, onAlterado
     evento.preventDefault();
     if (!novaRelacao.destinoId) return;
     void executar(async () => {
-      await relacionarAtivos(ficha.id, novaRelacao.destinoId, novaRelacao.tipo);
-      setNovaRelacao({ destinoId: '', tipo: tiposDeRelacao[0] });
+      await relacionarAtivos(ficha.id, novaRelacao.destinoId, novaRelacao.tipo, novaRelacao.criticidade);
+      setNovaRelacao({ destinoId: '', tipo: tiposDeRelacao[0], criticidade: 'media' });
     }, 'Não foi possível criar a relação.', setSalvandoRelacao);
+  }
+
+  async function descontinuar(motivo: string, confirmacao: string) {
+    onErro('');
+    try {
+      await descontinuarAtivo(ficha.id, motivo, confirmacao || undefined);
+      await onAlterado();
+    } catch (e) {
+      onErro(e instanceof Error ? e.message : 'Não foi possível descontinuar o ativo.');
+    }
+  }
+
+  async function arquivar() {
+    onErro('');
+    try {
+      await arquivarAtivo(ficha.id);
+      await onAlterado();
+    } catch (e) {
+      onErro(e instanceof Error ? e.message : 'Não foi possível arquivar o ativo.');
+    }
   }
 
   return (
@@ -136,6 +172,7 @@ export function FichaDoAtivo({ ficha, ativos, podeEscrever, onFechar, onAlterado
                     <div className="ficha-row" key={`${rel.ativoId}-${rel.tipo}-${i}`}>
                       <Link2 size={15} aria-hidden="true" />
                       <div><strong>{rel.direcao === 'saida' ? `${ficha.codigo} → ${rel.codigo}` : `${rel.codigo} → ${ficha.codigo}`}</strong><small>{rel.nome}</small></div>
+                      <Criticidade valor={rel.criticidade} />
                       <span className="tag">{rel.tipo.replace('_', ' ')}</span>
                     </div>
                   ))}</div>}
@@ -144,8 +181,14 @@ export function FichaDoAtivo({ ficha, ativos, podeEscrever, onFechar, onAlterado
                   <label>Ativo de destino<select required value={novaRelacao.destinoId} onChange={(e) => setNovaRelacao({ ...novaRelacao, destinoId: e.target.value })}><option value="">Selecione</option>{outrosAtivos.map((a) => <option key={a.id} value={a.id}>{a.codigo} · {a.nome}</option>)}</select></label>
                   <label>Tipo de relação<select value={novaRelacao.tipo} onChange={(e) => setNovaRelacao({ ...novaRelacao, tipo: e.target.value })}>{tiposDeRelacao.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}</select></label>
                   <button className="primary-button" disabled={salvandoRelacao} aria-label="Criar relação"><Plus size={15} /></button>
+                  <label className="linha-inteira">Criticidade da dependência<select value={novaRelacao.criticidade} onChange={(e) => setNovaRelacao({ ...novaRelacao, criticidade: e.target.value })}><option>baixa</option><option>media</option><option>alta</option><option>critica</option></select></label>
                 </form>
               )}
+              {impacto && <QuemDepende impacto={impacto} />}
+              {impacto && podeDescontinuar && podeSerDescontinuado(ficha.status) && (
+                <CartaoDeDescontinuacao key={ficha.status} impacto={impacto} onDescontinuar={descontinuar} />
+              )}
+              {podeDescontinuar && podeSerArquivado(ficha.status) && <CartaoDeArquivamento status={ficha.status} onArquivar={arquivar} />}
             </>
           )}
         </div>
