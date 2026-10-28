@@ -2,7 +2,7 @@
 // ainda não tem Entra/Keycloak plugado — o contexto vem de cabeçalho HTTP).
 //
 // Dois por papel, cobrindo DUAS empresas e MAIS DE UMA unidade cada, para dar
-// para testar ao vivo: isolamento entre empresas (RLS, ADR-0003), segregação
+// para testar ao vivo: isolamento entre empresas (ADR-0003, ADR-0016), segregação
 // de função (quem submete não decide) e o bloco de tipos por papel
 // (BLOCOS_POR_PAPEL) — tudo trocando de usuário, sem precisar de outra aba.
 
@@ -41,6 +41,8 @@ const rotulos: Record<Papel, string> = {
   consulta: 'Consulta',
 };
 
+// A carga de demonstração da API (src/hosts/Jornada.Api/Demonstracao) usa
+// estes mesmos ids como responsáveis e autores: mudar um aqui exige mudar lá.
 export const usuariosDeTeste: UsuarioDeTeste[] = [
   { id: '10000000-0000-0000-0000-000000000001', nome: 'Ana Ferreira', papel: 'admin', rotuloPapel: rotulos.admin, empresaId: empresas[0].id, unidadeId: unidades[0].id },
   { id: '10000000-0000-0000-0000-000000000002', nome: 'Bruno Alves', papel: 'admin', rotuloPapel: rotulos.admin, empresaId: empresas[1].id, unidadeId: unidades[2].id },

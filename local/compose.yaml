@@ -158,6 +158,9 @@ services:
       # vNext nem valida autenticação. Conta real usa identidade gerenciada.
       ConnectionStrings__Cosmos: AccountEndpoint=https://cosmos:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
       Cosmos__Emulador: "true"
+      # O cenário piloto do painel-ddd nas duas empresas de teste. Só carrega em
+      # empresa vazia: reiniciar não duplica (o volume do emulador guarda os dados).
+      Demonstracao__Carregar: "true"
     depends_on:
       cosmos:
         condition: service_healthy
