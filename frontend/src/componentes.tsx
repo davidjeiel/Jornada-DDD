@@ -28,9 +28,9 @@ export function Metric({ label, value, note, accent }: { label: string; value: s
   return <div className={`metric metric-${accent}`}><span>{label}</span><strong>{value}</strong><small>{note}</small></div>;
 }
 
+/** Etiqueta por estado do ciclo de vida, como .etiqueta.<status> do painel. */
 export function Status({ status }: { status: string }) {
-  const publicado = status.toLowerCase().includes('public');
-  return <span className={publicado ? 'status status-good' : 'status'}><i aria-hidden="true" />{status.replace('_', ' ')}</span>;
+  return <span className={`status status-${status.toLowerCase()}`}>{status.replace('_', ' ')}</span>;
 }
 
 /** Cada criticidade com estilo próprio: baixa e média não podem parecer "sem criticidade". */
