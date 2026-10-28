@@ -31,7 +31,9 @@ original no título, para facilitar a busca.
   pessoa e o papel chegam por cabeçalho. Na fase 2 o papel passa a ser
   **concedido** como no painel, e a escolha livre de papel fica atrás de
   `ModoDemonstracao`, ligado só no ambiente local.
-- **Visual.** As telas seguem o design do Jornada, não o do painel.
+- **Visual.** O tema segue o do painel (paleta, tipografia, menu lateral escuro,
+  cartões e etiquetas, em `frontend/src/styles.css`). A disposição de cada tela
+  acompanha a fase que a porta: até lá, ela pode diferir da do painel.
 - **Descontinuar.** No painel, o serviço bloqueia diante de consumidor de
   alta criticidade a menos que receba `forcar`, e a tela pede o código antes
   de mandar `forcar`. No Jornada é um mecanismo só, na API: com consumidor

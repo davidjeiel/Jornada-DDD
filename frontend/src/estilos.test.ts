@@ -51,7 +51,10 @@ describe('paleta', () => {
 describe('menu recolhido', () => {
   it('esconde o rótulo e mantém a inicial (test_menu_compacto_esconde_rotulo_e_mostra_inicial)', () => {
     expect(semComentarios).toMatch(/\[data-menu="compacto"\] \.menu \.rotulo[^{]*\{[^}]*display:\s*none/);
-    expect(regras('.inicial')).toMatch(/display:\s*grid/);
+    expect(semComentarios).toMatch(/\[data-menu="compacto"\] \.menu \.inicial\s*\{[^}]*display:\s*flex/);
+    // Aberto, só o rótulo: a inicial é do menu estreito, como no painel.
+    expect(semComentarios).toMatch(/(^|\})\s*\.menu \.inicial\s*\{[^}]*display:\s*none/m);
+    expect(semComentarios).toMatch(/\[data-menu="compacto"\] \.menu\s*\{[^}]*flex-basis:\s*68px/);
   });
 });
 
