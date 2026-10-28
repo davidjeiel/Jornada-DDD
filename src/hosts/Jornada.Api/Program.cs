@@ -91,6 +91,9 @@ builder.Services.AddScoped<RelacionarAtivos>();
 builder.Services.AddScoped<SubmeterAtivo>();
 builder.Services.AddScoped<AbrirRevisao>();
 builder.Services.AddScoped<DecidirValidacao>();
+builder.Services.AddScoped<DescontinuarAtivo>();
+builder.Services.AddScoped<ArquivarAtivo>();
+builder.Services.AddScoped<AnalisarImpacto>();
 builder.Services.AddScoped<AvaliarPreCheck>();
 builder.Services.AddScoped<ObterVisaoDoAtivo>();
 
@@ -335,12 +338,13 @@ catalogo.MapPost("/ativos/{id:guid}/evidencias", async Task<Results<NoContent, J
 catalogo.MapPost("/ativos/{id:guid}/relacoes", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
     HttpContext http, Guid id, RelacionarAtivosRequest corpo, RelacionarAtivos caso, CancellationToken ct) =>
 {
-    var r = await caso.ExecutarAsync(new ComandoRelacionarAtivos(new IdDeAtivo(id), new IdDeAtivo(corpo.IdDestino), corpo.Tipo), ct);
+    var r = await caso.ExecutarAsync(new ComandoRelacionarAtivos(new IdDeAtivo(id), new IdDeAtivo(corpo.IdDestino), corpo.Tipo,
+        CriticidadeExtensoes.De(corpo.Criticidade)), ct);
     return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
 })
     .WithName("relacionarAtivos")
     .WithSummary("Relaciona este ativo a outro")
-    .WithDescription("Cria uma aresta do grafo do catálogo, com este ativo como origem.")
+    .WithDescription("Cria uma aresta do grafo do catálogo, com este ativo como origem. A criticidade é a da dependência; alta ou crítica faz a descontinuação do destino exigir confirmação.")
     .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity);
 
 // ── governança ──────────────────────────────────────────────────────────────
@@ -389,6 +393,42 @@ governanca.MapPost("/ativos/{id:guid}/submissoes", async Task<Results<Created<Su
     .WithDescription("Roda o pré-check; se aprovado, abre uma nova revisão e as etapas de validação exigidas pela política. Reprovado no pré-check: 422 PRECHECK_REPROVADO.")
     .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound,
               StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity);
+
+governanca.MapGet("/ativos/{id:guid}/impacto", async Task<Results<Ok<ImpactoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, AnalisarImpacto caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(new IdDeAtivo(id), ct);
+    return r.Sucesso ? TypedResults.Ok(ImpactoResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("analisarImpacto")
+    .WithSummary("Lista quem depende do ativo")
+    .WithDescription("Consumidores em vigor (publicados ou em revisão) que apontam para este ativo, mais críticos primeiro, com contagem por criticidade da dependência e por tipo. Não altera nada.")
+    .ComErros(StatusCodes.Status404NotFound);
+
+// Com consumidor de alta criticidade, a confirmação é o código do ativo: quem
+// descontinua prova que leu a análise de impacto (painel-ddd, rota descontinuar).
+governanca.MapPost("/ativos/{id:guid}/descontinuacao", async Task<Results<Ok<DescontinuacaoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, DescontinuarAtivoRequest corpo, DescontinuarAtivo caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(new ComandoDescontinuarAtivo(new IdDeAtivo(id), corpo.Motivo, corpo.Confirmacao), ct);
+    return r.Sucesso ? TypedResults.Ok(new DescontinuacaoResponse(r.Valor!.Afetados)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("descontinuarAtivo")
+    .WithSummary("Descontinua um ativo publicado ou em revisão")
+    .WithDescription("Tira o ativo de vigência, com motivo obrigatório. Se algum consumidor depende dele com criticidade alta ou crítica, exige confirmacao igual ao código do ativo; sem ela devolve 422 CONFIRMACAO_NECESSARIA. Outro estado devolve 409 TRANSICAO_INVALIDA.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound,
+              StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity);
+
+governanca.MapPost("/ativos/{id:guid}/arquivamento", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, ArquivarAtivo caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(new ComandoArquivarAtivo(new IdDeAtivo(id)), ct);
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("arquivarAtivo")
+    .WithSummary("Arquiva um rascunho ou um ativo descontinuado")
+    .WithDescription("Estado terminal. Publicado precisa ser descontinuado antes; outro estado devolve 409 TRANSICAO_INVALIDA.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
 
 governanca.MapGet("/validacoes", async (IRepositorioDeValidacoes repo, Guid? ativo, CancellationToken ct) =>
 {

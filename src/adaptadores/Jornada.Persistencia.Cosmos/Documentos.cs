@@ -85,6 +85,9 @@ internal sealed class DocumentoDeRelacao : DocumentoDoCatalogo
 
     public required string Destino { get; init; }
     public required string TipoRelacao { get; init; }
+
+    /// <summary>baixa, media, alta ou critica. Ausente (documento anterior ao campo) vale media.</summary>
+    public string? Criticidade { get; init; }
     public DateTimeOffset CriadoEm { get; init; }
 }
 

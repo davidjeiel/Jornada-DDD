@@ -17,7 +17,7 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
         Guid IdPessoa, string Papel, DateOnly InicioVigencia, DateOnly? FimVigencia, bool Vigente);
 
     public sealed record RelacaoResumo(
-        string Direcao, string AtivoId, string Codigo, string Nome, string Tipo);
+        string Direcao, string AtivoId, string Codigo, string Nome, string Tipo, string Criticidade);
 
     public sealed record Saida(
         IdDeAtivo Id,
@@ -53,7 +53,8 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
             if (outroAtivo is null) continue; // relação órfã: já vira alerta no pré-check, não quebra a ficha
 
             relacoesResolvidas.Add(new RelacaoResumo(
-                direcao, outroAtivo.Id.Valor.ToString(), outroAtivo.Codigo.Valor, outroAtivo.Nome, aresta.Tipo));
+                direcao, outroAtivo.Id.Valor.ToString(), outroAtivo.Codigo.Valor, outroAtivo.Nome, aresta.Tipo,
+                aresta.Criticidade.Chave()));
         }
 
         return Resultado<Saida>.Ok(new Saida(

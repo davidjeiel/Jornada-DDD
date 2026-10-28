@@ -39,7 +39,28 @@ export type Responsavel = {
   vigente: boolean;
 };
 
-export type RelacaoDoAtivo = { direcao: 'saida' | 'entrada'; ativoId: string; codigo: string; nome: string; tipo: string };
+export type RelacaoDoAtivo = {
+  direcao: 'saida' | 'entrada';
+  ativoId: string;
+  codigo: string;
+  nome: string;
+  tipo: string;
+  criticidade: string;
+};
+
+export type Consumidor = { id: string; codigo: string; nome: string; tipoItem: string; tipoRelacao: string; criticidade: string };
+
+/** Quem seria afetado se o ativo fosse descontinuado (GET /ativos/{id}/impacto). */
+export type Impacto = {
+  id: string;
+  codigo: string;
+  total: number;
+  criticos: number;
+  exigeConfirmacao: boolean;
+  consumidores: Consumidor[];
+  porCriticidade: Record<string, number>;
+  porTipo: Record<string, number>;
+};
 
 export type FichaDoAtivo = {
   id: string;
@@ -137,11 +158,27 @@ export function anexarEvidencia(id: string, payload: { tipo: string; titulo: str
   return requisicao(`/v1/ativos/${id}/evidencias`, { method: 'POST', body: JSON.stringify(payload) });
 }
 
-export function relacionarAtivos(id: string, idDestino: string, tipo: string): Promise<void> {
+export function relacionarAtivos(id: string, idDestino: string, tipo: string, criticidade = 'media'): Promise<void> {
   return requisicao(`/v1/ativos/${id}/relacoes`, {
     method: 'POST',
-    body: JSON.stringify({ idDestino, tipo }),
+    body: JSON.stringify({ idDestino, tipo, criticidade }),
   });
+}
+
+export function analisarImpacto(id: string): Promise<Impacto> {
+  return requisicao(`/v1/ativos/${id}/impacto`);
+}
+
+// Com consumidor de alta criticidade, a API exige a confirmação: o código do ativo.
+export function descontinuarAtivo(id: string, motivo: string, confirmacao?: string): Promise<{ afetados: number }> {
+  return requisicao(`/v1/ativos/${id}/descontinuacao`, {
+    method: 'POST',
+    body: JSON.stringify({ motivo, confirmacao }),
+  });
+}
+
+export function arquivarAtivo(id: string): Promise<void> {
+  return requisicao(`/v1/ativos/${id}/arquivamento`, { method: 'POST' });
 }
 
 // Publicado é imutável: alterar exige abrir revisão (o ativo vai para em_revisao).

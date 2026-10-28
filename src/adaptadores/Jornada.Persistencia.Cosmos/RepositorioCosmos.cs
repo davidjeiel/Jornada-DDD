@@ -110,7 +110,8 @@ public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRela
 
     // ───────────────────────────────────────────────── IRepositorioDeRelacoes
 
-    public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo, CancellationToken ct = default) =>
+    public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo,
+        Criticidade criticidade = Criticidade.Media, CancellationToken ct = default) =>
         // Grava na hora: a porta não passa pela unidade de trabalho.
         _acesso.CriarAsync(new DocumentoDeRelacao
         {
@@ -119,6 +120,7 @@ public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRela
             IdAtivo = Mapeamento.Texto(origem.Valor),
             Destino = Mapeamento.Texto(destino.Valor),
             TipoRelacao = tipo,
+            Criticidade = criticidade.Chave(),
             CriadoEm = DateTimeOffset.UtcNow,
         }, ct);
 
@@ -278,7 +280,8 @@ public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRela
     private static string Retrato<T>(T documento) => JsonSerializer.Serialize(documento, BancoDoCatalogo.Json);
 
     private static RelacaoResumo Resumo(DocumentoDeRelacao r) => new(
-        new IdDeAtivo(Guid.Parse(r.IdAtivo)), new IdDeAtivo(Guid.Parse(r.Destino)), r.TipoRelacao);
+        new IdDeAtivo(Guid.Parse(r.IdAtivo)), new IdDeAtivo(Guid.Parse(r.Destino)), r.TipoRelacao,
+        CriticidadeExtensoes.De(r.Criticidade));
 
     private sealed class Rastreado<T>
     {

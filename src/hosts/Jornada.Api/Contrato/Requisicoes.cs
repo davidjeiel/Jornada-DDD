@@ -83,6 +83,21 @@ public sealed record RelacionarAtivosRequest
     /// <summary>implementa, expoe, consome, produz, depende_de ou persiste_em.</summary>
     /// <example>depende_de</example>
     public required string Tipo { get; init; }
+
+    /// <summary>Quanto a origem depende do destino: baixa, media, alta ou critica. Ausente vale media. Alta ou crítica faz a descontinuação do destino exigir confirmação.</summary>
+    /// <example>critica</example>
+    public string? Criticidade { get; init; }
+}
+
+/// <summary>Pedido para tirar o ativo de vigência.</summary>
+public sealed record DescontinuarAtivoRequest
+{
+    /// <example>Substituído pelo Core Bancário 2.</example>
+    public required string Motivo { get; init; }
+
+    /// <summary>O código do ativo (ex.: CAP-0001). Obrigatório quando há consumidor de alta criticidade; nos demais casos é ignorado.</summary>
+    /// <example>CAP-0001</example>
+    public string? Confirmacao { get; init; }
 }
 
 /// <summary>Envio do ativo para validação.</summary>

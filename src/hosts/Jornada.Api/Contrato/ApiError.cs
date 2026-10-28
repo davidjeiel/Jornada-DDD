@@ -45,6 +45,7 @@ public static class CodigosDeErro
         ["TIPO_OBRIGATORIO"] = StatusCodes.Status400BadRequest,
         ["TITULO_OBRIGATORIO"] = StatusCodes.Status400BadRequest,
         ["NOME_OBRIGATORIO"] = StatusCodes.Status400BadRequest,
+        ["MOTIVO_OBRIGATORIO"] = StatusCodes.Status400BadRequest,
         ["CODIGO_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["PAPEL_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["MATRICULA_INVALIDA"] = StatusCodes.Status400BadRequest,

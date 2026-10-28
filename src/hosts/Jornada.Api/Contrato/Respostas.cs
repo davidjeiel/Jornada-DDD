@@ -40,7 +40,8 @@ public sealed record ResponsavelResponse(
 /// <param name="Codigo">Código do ativo do outro lado.</param>
 /// <param name="Nome">Nome do ativo do outro lado.</param>
 /// <param name="Tipo">Tipo da relação.</param>
-public sealed record RelacaoResponse(string Direcao, Guid AtivoId, string Codigo, string Nome, string Tipo);
+/// <param name="Criticidade">Quanto a origem depende do destino: baixa, media, alta ou critica.</param>
+public sealed record RelacaoResponse(string Direcao, Guid AtivoId, string Codigo, string Nome, string Tipo, string Criticidade);
 
 /// <summary>Ficha completa do ativo (visão 360°).</summary>
 public sealed record FichaDoAtivoResponse(
@@ -65,8 +66,48 @@ public sealed record FichaDoAtivoResponse(
         s.Responsaveis.Select(r => new ResponsavelResponse(
             r.IdPessoa, r.Papel, r.InicioVigencia, r.FimVigencia, r.Vigente)).ToArray(),
         s.Relacoes.Select(r => new RelacaoResponse(
-            r.Direcao, Guid.Parse(r.AtivoId), r.Codigo, r.Nome, r.Tipo)).ToArray());
+            r.Direcao, Guid.Parse(r.AtivoId), r.Codigo, r.Nome, r.Tipo, r.Criticidade)).ToArray());
 }
+
+/// <summary>Ativo que aponta para o analisado e ainda vale como referência (publicado ou em revisão).</summary>
+/// <param name="Id">O consumidor.</param>
+/// <param name="Codigo">Código do consumidor.</param>
+/// <param name="Nome">Nome do consumidor.</param>
+/// <param name="TipoItem">Tipo do consumidor no metamodelo.</param>
+/// <param name="TipoRelacao">Como ele depende do analisado (implementa, consome, depende_de...).</param>
+/// <param name="Criticidade">Criticidade da dependência: baixa, media, alta ou critica.</param>
+public sealed record ConsumidorResponse(
+    Guid Id, string Codigo, string Nome, string TipoItem, string TipoRelacao, string Criticidade);
+
+/// <summary>Quem seria afetado se o ativo fosse descontinuado.</summary>
+/// <param name="Id">O ativo analisado.</param>
+/// <param name="Codigo">Código do ativo analisado: é o que se digita para confirmar a descontinuação.</param>
+/// <param name="Total">Quantos consumidores em vigor.</param>
+/// <param name="Criticos">Quantos de alta criticidade (alta ou critica). Acima de zero, descontinuar exige a confirmação.</param>
+/// <param name="ExigeConfirmacao">Verdadeiro quando há consumidor de alta criticidade.</param>
+/// <param name="Consumidores">Os consumidores, mais críticos primeiro.</param>
+/// <param name="PorCriticidade">Contagem por criticidade da dependência.</param>
+/// <param name="PorTipo">Contagem por tipo do consumidor.</param>
+public sealed record ImpactoResponse(
+    Guid Id,
+    string Codigo,
+    int Total,
+    int Criticos,
+    bool ExigeConfirmacao,
+    IReadOnlyList<ConsumidorResponse> Consumidores,
+    IReadOnlyDictionary<string, int> PorCriticidade,
+    IReadOnlyDictionary<string, int> PorTipo)
+{
+    public static ImpactoResponse De(AnalisarImpacto.Saida s) => new(
+        s.Id.Valor, s.Codigo, s.Total, s.Criticos.Count, s.Criticos.Count > 0,
+        s.Consumidores.Select(c => new ConsumidorResponse(
+            c.Id.Valor, c.Codigo, c.Nome, c.TipoItem, c.TipoRelacao, c.Criticidade.Chave())).ToArray(),
+        s.PorCriticidade, s.PorTipo);
+}
+
+/// <summary>Descontinuação aceita.</summary>
+/// <param name="Afetados">Consumidores em vigor no momento da descontinuação.</param>
+public sealed record DescontinuacaoResponse(int Afetados);
 
 /// <summary>As cinco dimensões do score de qualidade, de 0 a 100.</summary>
 public sealed record DimensoesDoScoreResponse(

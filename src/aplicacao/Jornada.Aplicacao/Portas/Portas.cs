@@ -45,8 +45,14 @@ public interface IRepositorioDeAtivos
     public Task<int> ProximoSequencialAsync(string tipoItem, CancellationToken ct = default);
 }
 
-/// <summary>Uma aresta do grafo de relações, já resolvida para os dois lados.</summary>
-public sealed record RelacaoResumo(IdDeAtivo Origem, IdDeAtivo Destino, string Tipo);
+/// <summary>
+/// Uma aresta do grafo de relações, já resolvida para os dois lados. A
+/// criticidade é a da DEPENDÊNCIA, não a dos ativos: uma aplicação de
+/// criticidade média pode consumir uma capacidade de forma crítica. É ela que
+/// decide se a descontinuação do destino exige confirmação.
+/// </summary>
+public sealed record RelacaoResumo(
+    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media);
 
 /// <summary>Consultas e escrita sobre o grafo de relações.</summary>
 public interface IRepositorioDeRelacoes
@@ -59,7 +65,8 @@ public interface IRepositorioDeRelacoes
     public Task<int> ContarImplementacoesAsync(IdDeAtivo idCapacidade, CancellationToken ct = default);
 
     /// <summary>Grava uma aresta (origem → destino). Não valida regra de negócio — isso é do caso de uso.</summary>
-    public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo, CancellationToken ct = default);
+    public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo,
+        Criticidade criticidade = Criticidade.Media, CancellationToken ct = default);
 
     /// <summary>Todas as arestas em que o ativo aparece, como origem OU destino.</summary>
     public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default);

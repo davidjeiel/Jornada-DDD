@@ -32,6 +32,16 @@ original no título, para facilitar a busca.
   **concedido** como no painel, e a escolha livre de papel fica atrás de
   `ModoDemonstracao`, ligado só no ambiente local.
 - **Visual.** As telas seguem o design do Jornada, não o do painel.
+- **Descontinuar.** No painel, o serviço bloqueia diante de consumidor de
+  alta criticidade a menos que receba `forcar`, e a tela pede o código antes
+  de mandar `forcar`. No Jornada é um mecanismo só, na API: com consumidor
+  crítico, a confirmação é o código do ativo. Assim um cliente da API não
+  contorna a confirmação. O motivo é obrigatório.
+- **Relações de um ativo descontinuado.** O painel encerra cada relação
+  (`fim_vigencia`). No Jornada a relação mora na partição de quem aponta
+  (ADR-0016), e encerrá-las seria um lote por consumidor, sem atomicidade.
+  Uma relação com um dos lados fora de vigência deixa de contar na análise de
+  impacto e vira alerta no pré-check de quem ainda aponta para ele.
 
 ## Fases
 
@@ -59,9 +69,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 33 |
-| 🟡 parcial | 18 |
-| ⬜ pendente | 101 |
+| ✅ coberto | 37 |
+| 🟡 parcial | 17 |
+| ⬜ pendente | 98 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -71,7 +81,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | Fase | Entrega | ✅ | 🟡 | ⬜ |
 |---|---|---|---|---|
 | 0 | Fundação, mais o que o domínio já cobria | 29 | 0 | 0 |
-| 1 | Ciclo de vida | 0 | 1 | 3 |
+| 1 | Ciclo de vida | 4 | 0 | 0 |
 | 2 | Pessoas e acesso | 4 | 7 | 34 |
 | 3 | Ficha e cadastro | 0 | 8 | 14 |
 | 4 | Validação e mesa | 0 | 0 | 9 |
@@ -85,14 +95,14 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Teste do painel | Fase | Situação | No Jornada |
 |---|---|---|---|
-| `test_hierarquia_invalida_e_recusada` | 1 | 🟡 | Regra em `CadastrarAtivo` (HIERARQUIA_INVALIDA); falta teste de caso de uso. |
+| `test_hierarquia_invalida_e_recusada` | 1 | ✅ | `HierarquiaInvalida` (DescontinuacaoTestes) |
 | `test_nome_duplicado_no_mesmo_tipo` | 0 | ✅ | `NomeDuplicadoBloqueia` (tests/Jornada.Dominio.Testes) e o contrato de persistência |
 | `test_precheck_bloqueia_sem_owner` | 0 | ✅ | `OwnerAusenteBloqueia` |
 | `test_fluxo_completo_ate_publicacao` | 0 | ✅ | `DuasEtapasSoPublicaComAsDuas`, `RejeitadoEReenviadoPublica` |
 | `test_publicado_e_imutavel` | 0 | ✅ | `PublicadoNaoEditaSemRevisao`, `PublicadoNaoRecebeEvidenciaNemResponsavel` |
 | `test_rejeicao_devolve_para_rascunho` | 0 | ✅ | `EmValidacaoVoltaParaRascunho`, `RejeicaoCancelaEtapasIrmas` |
 | `test_dependencia_circular_recusada` | 0 | ✅ | `CicloBloqueia` e o contrato de persistência |
-| `test_descontinuacao_bloqueada_por_consumidor_critico` | 1 | ⬜ | Não há caso de uso de descontinuar. |
+| `test_descontinuacao_bloqueada_por_consumidor_critico` | 1 | ✅ | `ConsumidorCriticoBloqueia`; digitar o código é o "forçar" (ver diferenças) |
 | `test_score_de_qualidade_sobe_com_cadastro_completo` | 0 | ✅ | `TudoPerfeitoDaCem`, `AtivoCompletoTemCompletudeCem` |
 | `test_api_lista_itens` | 0 | ✅ | `GET /v1/ativos` (contrato OpenAPI) |
 
@@ -109,7 +119,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | `test_sessao_sem_pessoa_e_mandada_ao_perfil` | 2 | ⬜ |  |
 | `test_modo_leitura_esconde_os_formularios` | 2 | ⬜ |  |
 | `test_modo_leitura_tambem_recusa_na_rota` | 2 | ⬜ |  |
-| `test_descontinuar_com_consumidor_critico_exige_o_codigo` | 1 | ⬜ |  |
+| `test_descontinuar_com_consumidor_critico_exige_o_codigo` | 1 | ✅ | `ConfirmacaoErradaNaoDescontinua` e `telas/Impacto.test.tsx` |
 | `test_acessibilidade_do_esqueleto` | 0 | ✅ | `Layout.test.tsx` e `estilos.test.ts` (frontend/src) |
 | `test_criticidade_media_e_baixa_tem_estilos_proprios` | 0 | ✅ | `estilos.test.ts` |
 | `test_submissao_avisa_quem_pode_decidir` | 8 | ⬜ |  |
@@ -246,7 +256,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | `test_arvore_conta_implementacoes_da_capacidade` | 6 | ⬜ |  |
 | `test_mapa_tem_as_duas_visoes` | 6 | ⬜ |  |
 | `test_analise_agrupa_os_consumidores` | 6 | ⬜ |  |
-| `test_tela_mostra_quem_depende_antes_de_descontinuar` | 1 | ⬜ |  |
+| `test_tela_mostra_quem_depende_antes_de_descontinuar` | 1 | ✅ | `telas/Impacto.test.tsx` (aba Relações da ficha) |
 | `test_ativo_sem_consumidor_diz_isso_claramente` | 6 | ⬜ |  |
 
 ### Cartilha — `tests/test_cartilha.py` (15)
