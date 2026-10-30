@@ -23,9 +23,13 @@ public sealed class ArmazemEmMemoria
     /// </summary>
     internal List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade)> Relacoes { get; } = [];
     internal ConcurrentDictionary<Guid, ValidacaoEmProcesso> Validacoes { get; } = new();
+    internal ConcurrentDictionary<(IdDeAtivo Ativo, int Numero), RevisaoDoAtivo> Revisoes { get; } = new();
+    internal ConcurrentQueue<RegistroDeAuditoria> Auditoria { get; } = new();
 
     public void Limpar()
     {
+        Revisoes.Clear();
+        Auditoria.Clear();
         Ativos.Clear();
         Sequenciais.Clear();
         Eventos.Clear();
@@ -58,7 +62,8 @@ public sealed class ArmazemEmMemoria
 /// </summary>
 public sealed class RepositorioDeAtivosEmMemoria(
     ArmazemEmMemoria armazem, IContextoDeTenantAtual tenant)
-    : IRepositorioDeAtivos, IRepositorioDeRelacoes, IUnidadeDeTrabalho, IRepositorioDeValidacoes
+    : IRepositorioDeAtivos, IRepositorioDeRelacoes, IUnidadeDeTrabalho, IRepositorioDeValidacoes,
+      IRepositorioDeRevisoes, ITrilhaDeAuditoria
 {
     private ConcurrentDictionary<IdDeAtivo, Ativo> _ativos => armazem.Ativos;
     private ConcurrentDictionary<string, int> _sequenciais => armazem.Sequenciais;
@@ -227,4 +232,44 @@ public sealed class RepositorioDeAtivosEmMemoria(
         return Task.FromResult<IReadOnlyList<ValidacaoEmProcesso>>(
             validacoes.OrderBy(v => v.Status).ThenBy(v => v.Etapa).ToArray());
     }
+
+    // ───────────────────────────────────────────────── IRepositorioDeRevisoes
+
+    public Task AdicionarAsync(RevisaoDoAtivo revisao, CancellationToken ct = default)
+    {
+        if (revisao.Empresa != Empresa)
+            throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de gravar revisão de outra empresa.");
+        if (!armazem.Revisoes.TryAdd((revisao.Ativo, revisao.Numero), revisao))
+            throw new ErroDeDominio("CONFLITO_DE_EDICAO", $"A revisão {revisao.Numero} deste ativo já existe.");
+        return Task.CompletedTask;
+    }
+
+    public Task<RevisaoDoAtivo?> ObterAsync(IdDeAtivo ativo, int numero, CancellationToken ct = default) =>
+        Task.FromResult(armazem.Revisoes.TryGetValue((ativo, numero), out var r) && r.Empresa == Empresa ? r : null);
+
+    Task<IReadOnlyList<RevisaoDoAtivo>> IRepositorioDeRevisoes.ListarAsync(IdDeAtivo ativo, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<RevisaoDoAtivo>>(armazem.Revisoes.Values
+            .Where(r => r.Empresa == Empresa && r.Ativo == ativo)
+            .OrderByDescending(r => r.Numero)
+            .ToArray());
+
+    // ──────────────────────────────────────────────────── ITrilhaDeAuditoria
+
+    public Task RegistrarAsync(RegistroDeAuditoria registro, CancellationToken ct = default)
+    {
+        if (registro.Empresa != Empresa)
+            throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de auditar ativo de outra empresa.");
+        armazem.Auditoria.Enqueue(registro);
+        return Task.CompletedTask;
+    }
+
+    Task<IReadOnlyList<RegistroDeAuditoria>> ITrilhaDeAuditoria.ListarAsync(IdDeAtivo ativo, int limite, CancellationToken ct) =>
+        // Mesmo instante (relógio fixo nos testes): vale a ordem de gravação.
+        Task.FromResult<IReadOnlyList<RegistroDeAuditoria>>(armazem.Auditoria
+            .Select((registro, ordem) => (registro, ordem))
+            .Where(x => x.registro.Empresa == Empresa && x.registro.Ativo == ativo)
+            .OrderByDescending(x => x.registro.Em).ThenByDescending(x => x.ordem)
+            .Take(Math.Max(limite, 0))
+            .Select(x => x.registro)
+            .ToArray());
 }

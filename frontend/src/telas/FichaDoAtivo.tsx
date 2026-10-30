@@ -1,13 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link2, Paperclip, Plus, X } from 'lucide-react';
 import {
-  analisarImpacto, anexarEvidencia, arquivarAtivo, descontinuarAtivo, editarAtivo, relacionarAtivos,
-  type AtivoResumo, type FichaDoAtivo as Ficha, type Impacto,
+  analisarImpacto, anexarEvidencia, arquivarAtivo, compararRevisoes, consultarHistorico, descontinuarAtivo,
+  editarAtivo, relacionarAtivos,
+  type AtivoResumo, type Comparacao, type FichaDoAtivo as Ficha, type Historico as DadosDoHistorico, type Impacto,
 } from '../api';
 import { Criticidade } from '../componentes';
+import { Historico } from './Historico';
 import { CartaoDeArquivamento, CartaoDeDescontinuacao, QuemDepende, podeSerArquivado, podeSerDescontinuado } from './Impacto';
 
-type Aba = 'detalhes' | 'evidencias' | 'relacoes';
+type Aba = 'detalhes' | 'evidencias' | 'relacoes' | 'historico';
 type Edicao = { nome: string; descricao: string; criticidade: string; atributos: Record<string, string> };
 
 const tiposDeRelacao = ['depende_de', 'implementa', 'expoe', 'consome'];
@@ -31,6 +33,28 @@ export function FichaDoAtivo({ ficha, ativos, podeEscrever, podeDescontinuar, on
   const [novaRelacao, setNovaRelacao] = useState({ destinoId: '', tipo: tiposDeRelacao[0], criticidade: 'media' });
   const [salvandoRelacao, setSalvandoRelacao] = useState(false);
   const [impacto, setImpacto] = useState<Impacto | null>(null);
+  const [historico, setHistorico] = useState<DadosDoHistorico | null>(null);
+  const [comparacao, setComparacao] = useState<Comparacao | null>(null);
+
+  // O histórico só é buscado quando a aba abre, e de novo a cada mudança no ativo.
+  useEffect(() => {
+    if (aba !== 'historico') return;
+    let vigente = true;
+    setComparacao(null);
+    consultarHistorico(ficha.id)
+      .then((r) => { if (vigente) setHistorico(r); })
+      .catch((e) => { if (vigente) onErro(e instanceof Error ? e.message : 'Não foi possível carregar o histórico.'); });
+    return () => { vigente = false; };
+  }, [aba, ficha.id, ficha.status, ficha.revisaoAtual, ficha.nome, ficha.evidencias.length, ficha.relacoes.length, onErro]);
+
+  async function comparar() {
+    onErro('');
+    try {
+      setComparacao(await compararRevisoes(ficha.id));
+    } catch (e) {
+      onErro(e instanceof Error ? e.message : 'Não foi possível comparar as revisões.');
+    }
+  }
 
   // Recarrega a cada mudança de status: depois de descontinuar, o cartão some.
   useEffect(() => {
@@ -111,6 +135,7 @@ export function FichaDoAtivo({ ficha, ativos, podeEscrever, podeDescontinuar, on
           <button role="tab" aria-selected={aba === 'detalhes'} className={aba === 'detalhes' ? 'ficha-tab active' : 'ficha-tab'} onClick={() => setAba('detalhes')}>Detalhes</button>
           <button role="tab" aria-selected={aba === 'evidencias'} className={aba === 'evidencias' ? 'ficha-tab active' : 'ficha-tab'} onClick={() => setAba('evidencias')}>Evidências <span className="nav-count">{ficha.evidencias.length}</span></button>
           <button role="tab" aria-selected={aba === 'relacoes'} className={aba === 'relacoes' ? 'ficha-tab active' : 'ficha-tab'} onClick={() => setAba('relacoes')}>Relações <span className="nav-count">{ficha.relacoes.length}</span></button>
+          <button role="tab" aria-selected={aba === 'historico'} className={aba === 'historico' ? 'ficha-tab active' : 'ficha-tab'} onClick={() => setAba('historico')}>Histórico <span className="nav-count">{ficha.revisaoAtual}</span></button>
         </div>
 
         <div className="ficha-body">
@@ -191,6 +216,10 @@ export function FichaDoAtivo({ ficha, ativos, podeEscrever, podeDescontinuar, on
               {podeDescontinuar && podeSerArquivado(ficha.status) && <CartaoDeArquivamento status={ficha.status} onArquivar={arquivar} />}
             </>
           )}
+
+          {aba === 'historico' && (historico
+            ? <Historico historico={historico} comparacao={comparacao} onComparar={() => void comparar()} />
+            : <div className="ficha-empty">Carregando o histórico...</div>)}
         </div>
       </div>
     </div>

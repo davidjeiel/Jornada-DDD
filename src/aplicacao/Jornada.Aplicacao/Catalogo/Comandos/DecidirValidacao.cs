@@ -15,6 +15,8 @@ public sealed class DecidirValidacao(
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    IRepositorioDeRevisoes revisoes,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     public async Task<Resultado<bool>> ExecutarAsync(
@@ -53,6 +55,14 @@ public sealed class DecidirValidacao(
             .ToArray();
 
         validacao.Decidir(cmd.Aprovada, ator.IdPessoa, cmd.Motivo);
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.Validar, ator.IdPessoa, relogio,
+            depois: new Dictionary<string, string>
+            {
+                ["revisao"] = validacao.Revisao.ToString(),
+                ["etapa"] = validacao.Etapa.ToString().ToLowerInvariant(),
+                ["decisao"] = cmd.Aprovada ? "aprovada" : "reprovada",
+                ["motivo"] = cmd.Motivo ?? "",
+            }), ct);
 
         if (!cmd.Aprovada)
         {
@@ -66,6 +76,12 @@ public sealed class DecidirValidacao(
         else if (daRevisao.All(v => v.Id == validacao.Id || v.Status == StatusDaValidacao.Aprovada))
         {
             ativo.Publicar(relogio);
+
+            // Revisão submetida antes do ADR-0017 não tem retrato: publica do mesmo jeito.
+            if (await revisoes.ObterAsync(ativo.Id, validacao.Revisao, ct) is { } retrato)
+                retrato.MarcarPublicada(relogio);
+            await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.Publicar, ator.IdPessoa, relogio,
+                depois: new Dictionary<string, string> { ["revisao"] = validacao.Revisao.ToString() }), ct);
         }
 
         await uow.ConfirmarAsync(ct);

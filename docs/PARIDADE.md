@@ -93,6 +93,12 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | 8 | Notificações | 0 | 1 | 5 |
 | 9 | Descobertas | 0 | 0 | 10 |
 
+A fase 1 também porta o que o painel faz sem teste próprio: o retrato de cada
+revisão com SHA-256 (`servicos._snapshot`), a comparação entre revisões
+(`comparar_revisoes`) e a trilha de auditoria (`auditar`), na aba Histórico da
+ficha. No Jornada estão cobertos por `HistoricoTestes`, pelo contrato de
+persistência e por `telas/Historico.test.tsx` (ADR-0017).
+
 ### Governança (regras de publicação) — `tests/test_governanca.py` (10)
 
 | Teste do painel | Fase | Situação | No Jornada |

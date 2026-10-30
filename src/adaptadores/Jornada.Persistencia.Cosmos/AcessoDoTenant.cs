@@ -39,12 +39,16 @@ internal sealed class AcessoDoTenant(BancoDoCatalogo banco, IContextoDeTenantAtu
 
     // ───────────────────────────────────────────────────────────── leitura
 
-    public async Task<T?> LerAsync<T>(IdDeAtivo particao, Guid id, CancellationToken ct)
+    public Task<T?> LerAsync<T>(IdDeAtivo particao, Guid id, CancellationToken ct)
+        where T : DocumentoDoCatalogo =>
+        LerAsync<T>(particao, Mapeamento.Texto(id), ct);
+
+    public async Task<T?> LerAsync<T>(IdDeAtivo particao, string id, CancellationToken ct)
         where T : DocumentoDoCatalogo
     {
         try
         {
-            var resposta = await _catalogo.ReadItemAsync<T>(Mapeamento.Texto(id), Chave(particao), cancellationToken: ct);
+            var resposta = await _catalogo.ReadItemAsync<T>(id, Chave(particao), cancellationToken: ct);
             return Conferido(resposta.Resource);
         }
         catch (CosmosException e) when (e.StatusCode == HttpStatusCode.NotFound)

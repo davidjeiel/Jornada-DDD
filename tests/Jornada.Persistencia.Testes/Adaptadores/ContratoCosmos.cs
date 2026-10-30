@@ -33,7 +33,7 @@ public sealed class ContratoCosmos : ContratoDePersistencia
             ?? throw new TestePulado($"defina {VariavelDeConexao} para rodar contra o Cosmos DB");
 
         var repositorio = new RepositorioCosmos(banco, ContextoDeTenantFixo.Para(empresa));
-        return new Sessao(repositorio, repositorio, repositorio, repositorio);
+        return new Sessao(repositorio, repositorio, repositorio, repositorio, repositorio, repositorio);
     }
 
     // ── além do contrato: o que só este adaptador garante (ADR-0016 §2 e §5) ──

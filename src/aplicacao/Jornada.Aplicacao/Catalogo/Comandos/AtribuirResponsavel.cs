@@ -20,6 +20,7 @@ public sealed class AtribuirResponsavel(
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     public async Task<Resultado<bool>> ExecutarAsync(
@@ -43,6 +44,8 @@ public sealed class AtribuirResponsavel(
             return Resultado<bool>.Recusado("ATIVO_NAO_EDITAVEL", ativo.MotivoDeNaoEditavel);
 
         ativo.AtribuirResponsavel(cmd.IdPessoa, cmd.Papel, relogio);
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.DefinirResponsavel, ator.IdPessoa, relogio,
+            depois: new Dictionary<string, string> { ["papel"] = cmd.Papel.ToString(), ["idPessoa"] = cmd.IdPessoa.ToString() }), ct);
         await uow.ConfirmarAsync(ct);
         return Resultado<bool>.Ok(true);
     }

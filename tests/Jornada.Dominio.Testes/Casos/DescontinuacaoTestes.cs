@@ -127,7 +127,7 @@ public sealed class DescontinuacaoTestes
         var dominio = m.Rascunho("dominio", "DOM-0001", "Crédito");
 
         // Capacidade é filha de contexto, não de domínio.
-        var r = new CadastrarAtivo(m.Repo, m.Metamodelo, m.Tenant, new AtorFixo(Mundo.Curador), m.Repo, Cenario.Relogio)
+        var r = new CadastrarAtivo(m.Repo, m.Metamodelo, m.Tenant, new AtorFixo(Mundo.Curador), m.Repo, m.Repo, Cenario.Relogio)
             .ExecutarAsync(new ComandoCadastrarAtivo("capacidade", "Capacidade solta", IdPai: dominio)).Result;
 
         Verificar.Falso(r.Sucesso);
@@ -172,11 +172,11 @@ public sealed class DescontinuacaoTestes
         public Aplicacao.Resultado<DescontinuarAtivo.Saida> Descontinuar(
             IdDeAtivo id, string motivo, string? confirmacao = null, Ator? quem = null) =>
             new DescontinuarAtivo(Repo, new AnalisarImpacto(Repo, Repo), Metamodelo, Tenant,
-                    new AtorFixo(quem ?? Curador), Repo, Cenario.Relogio)
+                    new AtorFixo(quem ?? Curador), Repo, Repo, Cenario.Relogio)
                 .ExecutarAsync(new ComandoDescontinuarAtivo(id, motivo, confirmacao)).Result;
 
         public Aplicacao.Resultado<bool> Arquivar(IdDeAtivo id) =>
-            new ArquivarAtivo(Repo, Metamodelo, Tenant, new AtorFixo(Curador), Repo, Cenario.Relogio)
+            new ArquivarAtivo(Repo, Metamodelo, Tenant, new AtorFixo(Curador), Repo, Repo, Cenario.Relogio)
                 .ExecutarAsync(new ComandoArquivarAtivo(id)).Result;
     }
 }

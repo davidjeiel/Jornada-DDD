@@ -99,6 +99,42 @@ internal static class Mapeamento
         OcorridoEm = evento.OcorridoEm,
     };
 
+    public static string IdDaRevisao(int numero) => $"revisao-{numero}";
+
+    public static DocumentoDeRevisao ParaDocumento(RevisaoDoAtivo r) => new()
+    {
+        Id = IdDaRevisao(r.Numero),
+        Empresa = Texto(r.Empresa.Valor),
+        IdAtivo = Texto(r.Ativo.Valor),
+        Numero = r.Numero,
+        Conteudo = r.Conteudo,
+        Hash = r.Hash,
+        Motivo = r.Motivo,
+        IdAutor = r.IdAutor,
+        CriadaEm = r.CriadaEm,
+        PublicadaEm = r.PublicadaEm,
+    };
+
+    public static RevisaoDoAtivo ParaDominio(DocumentoDeRevisao d) => RevisaoDoAtivo.Reidratar(
+        new IdDeAtivo(Guid.Parse(d.IdAtivo)), new IdDeEmpresa(Guid.Parse(d.Empresa)), d.Numero,
+        d.Conteudo, d.Hash, d.Motivo, d.IdAutor, d.CriadaEm, d.PublicadaEm);
+
+    public static DocumentoDeAuditoria ParaDocumento(RegistroDeAuditoria r) => new()
+    {
+        Id = Texto(r.Id),
+        Empresa = Texto(r.Empresa.Valor),
+        IdAtivo = Texto(r.Ativo.Valor),
+        Acao = r.Acao,
+        IdPessoa = r.IdPessoa,
+        Em = r.Em,
+        Antes = r.Antes is null ? null : new Dictionary<string, string>(r.Antes),
+        Depois = r.Depois is null ? null : new Dictionary<string, string>(r.Depois),
+    };
+
+    public static RegistroDeAuditoria ParaDominio(DocumentoDeAuditoria d) => new(
+        Guid.Parse(d.Id), new IdDeEmpresa(Guid.Parse(d.Empresa)), new IdDeAtivo(Guid.Parse(d.IdAtivo)),
+        d.Acao, d.IdPessoa, d.Em, d.Antes, d.Depois);
+
     /// <summary>O mesmo critério do adaptador em memória: sem diferenciar maiúsculas, inclusive acentuadas.</summary>
     public static string Normalizar(string nome) => nome.Trim().ToLowerInvariant();
 
