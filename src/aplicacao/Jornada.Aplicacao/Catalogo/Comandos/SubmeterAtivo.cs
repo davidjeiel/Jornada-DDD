@@ -25,6 +25,9 @@ public sealed class SubmeterAtivo(
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
     IRepositorioDeValidacoes validacoes,
+    IRepositorioDeRelacoes relacoes,
+    IRepositorioDeRevisoes revisoes,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     public sealed record Saida(int Revisao, IReadOnlyList<EtapaValidacao> EtapasAbertas, int Score);
@@ -62,6 +65,20 @@ public sealed class SubmeterAtivo(
         }
 
         ativo.Submeter(cmd.Motivo, ator.IdPessoa, relogio);
+
+        // O retrato do que vai à validação, com hash (ADR-0017): é o que se
+        // compara na próxima revisão e o que prova o que foi aprovado.
+        var saidas = (await relacoes.ListarRelacoesAsync(ativo.Id, ct))
+            .Where(r => r.Origem == ativo.Id)
+            .Select(r => new RelacaoRetratada(r.Destino, r.Tipo, r.Criticidade));
+        var retrato = RevisaoDoAtivo.Retratar(ativo, saidas, cmd.Motivo, ator.IdPessoa, relogio);
+        await revisoes.AdicionarAsync(retrato, ct);
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.Submeter, ator.IdPessoa, relogio,
+            depois: new Dictionary<string, string>
+            {
+                ["revisao"] = retrato.Numero.ToString(), ["motivo"] = retrato.Motivo, ["hash"] = retrato.Hash,
+            }), ct);
+
         foreach (var etapa in checagem.Politica.Etapas)
         {
             await validacoes.AdicionarAsync(new ValidacaoEmProcesso(

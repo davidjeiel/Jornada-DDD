@@ -462,6 +462,107 @@ public abstract class ContratoDePersistencia
         return ativo;
     }
 
+    // ── revisões e auditoria (ADR-0017) ──────────────────────────────────────
+
+    [Teste("retrato da revisão volta igual, e a data de publicação é gravada depois")]
+    public async Task RetratoDaRevisao()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var ativo = Completo(empresa, "SIS-0001", "Core Bancário");
+        ativo.Submeter("v1", Guid.NewGuid(), Relogio);
+        await Gravar(empresa, ativo);
+
+        var autor = Guid.NewGuid();
+        var retrato = RevisaoDoAtivo.Retratar(ativo, [], "primeira versão", autor, Relogio);
+        await using (var s = Abrir(empresa))
+        {
+            await s.Revisoes.AdicionarAsync(retrato);
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using (var s = Abrir(empresa))
+        {
+            var lido = await s.Revisoes.ObterAsync(ativo.Id, 1) ?? throw Ausente("revisão");
+            Verificar.Igual(retrato.Conteudo, lido.Conteudo);
+            Verificar.Igual(retrato.Hash, lido.Hash);
+            Verificar.Verdadeiro(lido.Integra, "o hash confere depois da viagem ao banco");
+            Verificar.Igual("primeira versão", lido.Motivo);
+            Verificar.Igual(autor, lido.IdAutor);
+            Verificar.Igual(null, lido.PublicadaEm);
+
+            lido.MarcarPublicada(Relogio);
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using var nova = Abrir(empresa);
+        var publicada = (await nova.Revisoes.ListarAsync(ativo.Id)).Single();
+        Verificar.Igual(Relogio.Agora, publicada.PublicadaEm);
+        Verificar.Igual(retrato.Hash, publicada.Hash, "publicar não mexe no conteúdo");
+        Verificar.Igual(null, await nova.Revisoes.ObterAsync(ativo.Id, 2));
+    }
+
+    [Teste("o mesmo número de revisão não é gravado duas vezes")]
+    public async Task RevisaoNaoDuplica()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var ativo = Completo(empresa, "SIS-0001", "Core Bancário");
+        ativo.Submeter("v1", Guid.NewGuid(), Relogio);
+        await Gravar(empresa, ativo);
+
+        await using (var s = Abrir(empresa))
+        {
+            await s.Revisoes.AdicionarAsync(RevisaoDoAtivo.Retratar(ativo, [], "v1", Guid.NewGuid(), Relogio));
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        ErroDeDominio? erro = null;
+        try
+        {
+            await using var s = Abrir(empresa);
+            await s.Revisoes.AdicionarAsync(RevisaoDoAtivo.Retratar(ativo, [], "de novo", Guid.NewGuid(), Relogio));
+            await s.Unidade.ConfirmarAsync();
+        }
+        catch (ErroDeDominio e) { erro = e; }
+
+        Verificar.Igual("CONFLITO_DE_EDICAO", erro?.Codigo);
+        await using var nova = Abrir(empresa);
+        Verificar.Igual("v1", (await nova.Revisoes.ObterAsync(ativo.Id, 1))!.Motivo, "a primeira continua valendo");
+    }
+
+    [Teste("auditoria volta do mais recente para o mais antigo, com limite, por ativo e por empresa")]
+    public async Task TrilhaDeAuditoria()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var ativo = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0001", "Core"));
+        var outro = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0002", "Outro"));
+        var pessoa = Guid.NewGuid();
+
+        RegistroDeAuditoria Registro(IdDeAtivo id, string acao, int minutos) => new(
+            Guid.CreateVersion7(), empresa, id, acao, pessoa, Relogio.Agora.AddMinutes(minutos),
+            new Dictionary<string, string> { ["nome"] = "antes" }, new Dictionary<string, string> { ["nome"] = "depois" });
+
+        await using (var s = Abrir(empresa))
+        {
+            await s.Trilha.RegistrarAsync(Registro(ativo.Id, "criar", 0));
+            await s.Trilha.RegistrarAsync(Registro(ativo.Id, "alterar", 1));
+            await s.Trilha.RegistrarAsync(Registro(ativo.Id, "submeter", 2));
+            await s.Trilha.RegistrarAsync(Registro(outro.Id, "criar", 3));
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using var nova = Abrir(empresa);
+        var ultimos = await nova.Trilha.ListarAsync(ativo.Id, limite: 2);
+        Verificar.Igual("submeter,alterar", string.Join(",", ultimos.Select(r => r.Acao)));
+        Verificar.Igual(pessoa, ultimos[0].IdPessoa);
+        Verificar.Igual(Relogio.Agora.AddMinutes(2), ultimos[0].Em);
+        Verificar.Igual("antes", ultimos[0].Antes!["nome"]);
+        Verificar.Igual("depois", ultimos[0].Depois!["nome"]);
+        Verificar.Igual(3, (await nova.Trilha.ListarAsync(ativo.Id)).Count, "só os do ativo pedido");
+
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Vazio(await deFora.Trilha.ListarAsync(ativo.Id));
+    }
+
     private async Task<Ativo> Gravar(IdDeEmpresa empresa, Ativo ativo)
     {
         await using var s = Abrir(empresa);

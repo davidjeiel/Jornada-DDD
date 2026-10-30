@@ -56,6 +56,7 @@ public static class CodigosDeErro
 
         ["ATIVO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
         ["VALIDACAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
+        ["REVISAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
 
         ["TRANSICAO_INVALIDA"] = StatusCodes.Status409Conflict,
         ["VALIDACAO_JA_DECIDIDA"] = StatusCodes.Status409Conflict,

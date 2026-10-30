@@ -78,6 +78,29 @@ export type FichaDoAtivo = {
   relacoes: RelacaoDoAtivo[];
 };
 
+export type RevisaoRetratada = {
+  numero: number;
+  motivo: string;
+  autor: string;
+  criadaEm: string;
+  publicadaEm: string | null;
+  hash: string;
+  integra: boolean;
+};
+
+export type RegistroDeAuditoria = {
+  acao: string;
+  pessoa: string;
+  em: string;
+  antes: Record<string, string> | null;
+  depois: Record<string, string> | null;
+};
+
+/** Revisões submetidas (com hash) e trilha de auditoria (GET /ativos/{id}/historico). */
+export type Historico = { revisoes: RevisaoRetratada[]; auditoria: RegistroDeAuditoria[] };
+
+export type Comparacao = { a: number; b: number; diferencas: { campo: string; rotulo: string; antes: string; depois: string }[] };
+
 // ── Identidade de teste (ADR-0007 ainda não tem SSO real) ─────────────────
 // Trocar de usuário troca as três coisas que o middleware de tenant lê:
 // empresa, papel e pessoa — e, quando houver, a unidade. Nenhum caso de uso
@@ -175,6 +198,16 @@ export function descontinuarAtivo(id: string, motivo: string, confirmacao?: stri
     method: 'POST',
     body: JSON.stringify({ motivo, confirmacao }),
   });
+}
+
+export function consultarHistorico(id: string): Promise<Historico> {
+  return requisicao(`/v1/ativos/${id}/historico`);
+}
+
+// Sem a e b, a API compara a última revisão com a anterior.
+export function compararRevisoes(id: string, a?: number, b?: number): Promise<Comparacao> {
+  const parametros = a !== undefined && b !== undefined ? `?a=${a}&b=${b}` : '';
+  return requisicao(`/v1/ativos/${id}/revisoes/comparacao${parametros}`);
 }
 
 export function arquivarAtivo(id: string): Promise<void> {

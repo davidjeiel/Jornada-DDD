@@ -65,6 +65,8 @@ if (usaCosmos)
     builder.Services.AddScoped<IRepositorioDeRelacoes>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<IRepositorioDeValidacoes>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<IUnidadeDeTrabalho>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IRepositorioDeRevisoes>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<ITrilhaDeAuditoria>(sp => sp.GetRequiredService<RepositorioCosmos>());
 }
 else
 {
@@ -77,6 +79,8 @@ else
     builder.Services.AddScoped<IRepositorioDeRelacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
     builder.Services.AddScoped<IUnidadeDeTrabalho>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
     builder.Services.AddScoped<IRepositorioDeValidacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+    builder.Services.AddScoped<IRepositorioDeRevisoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+    builder.Services.AddScoped<ITrilhaDeAuditoria>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
 }
 
 builder.Services.AddSingleton<IMetamodelo, MetamodeloPadrao>();
@@ -94,6 +98,8 @@ builder.Services.AddScoped<DecidirValidacao>();
 builder.Services.AddScoped<DescontinuarAtivo>();
 builder.Services.AddScoped<ArquivarAtivo>();
 builder.Services.AddScoped<AnalisarImpacto>();
+builder.Services.AddScoped<ConsultarHistorico>();
+builder.Services.AddScoped<CompararRevisoes>();
 builder.Services.AddScoped<AvaliarPreCheck>();
 builder.Services.AddScoped<ObterVisaoDoAtivo>();
 
@@ -429,6 +435,30 @@ governanca.MapPost("/ativos/{id:guid}/arquivamento", async Task<Results<NoConten
     .WithSummary("Arquiva um rascunho ou um ativo descontinuado")
     .WithDescription("Estado terminal. Publicado precisa ser descontinuado antes; outro estado devolve 409 TRANSICAO_INVALIDA.")
     .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
+// O histórico de um ativo: retratos das revisões (com hash) e trilha de
+// auditoria. A aba Histórico da visão 360° do painel (ADR-0017).
+governanca.MapGet("/ativos/{id:guid}/historico", async Task<Results<Ok<HistoricoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, ConsultarHistorico caso, CancellationToken ct, int limite = 30) =>
+{
+    var r = await caso.ExecutarAsync(new IdDeAtivo(id), Math.Clamp(limite, 1, 200), ct);
+    return r.Sucesso ? TypedResults.Ok(HistoricoResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("consultarHistorico")
+    .WithSummary("Revisões submetidas e trilha de auditoria do ativo")
+    .WithDescription("Revisões da mais recente para a mais antiga, cada uma com o hash SHA-256 do retrato e se ele ainda confere (integra). Auditoria da mais recente para a mais antiga, até limite registros (padrão 30, máximo 200).")
+    .ComErros(StatusCodes.Status404NotFound);
+
+governanca.MapGet("/ativos/{id:guid}/revisoes/comparacao", async Task<Results<Ok<ComparacaoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, CompararRevisoes caso, CancellationToken ct, int? a = null, int? b = null) =>
+{
+    var r = await caso.ExecutarAsync(new IdDeAtivo(id), a, b, ct);
+    return r.Sucesso ? TypedResults.Ok(ComparacaoResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("compararRevisoes")
+    .WithSummary("Compara duas revisões do ativo")
+    .WithDescription("Campos que mudaram da revisão a para a revisão b, já resumidos em texto. Sem parâmetros, compara a última revisão com a anterior. Revisão sem retrato devolve 404 REVISAO_NAO_ENCONTRADA.")
+    .ComErros(StatusCodes.Status404NotFound);
 
 governanca.MapGet("/validacoes", async (IRepositorioDeValidacoes repo, Guid? ativo, CancellationToken ct) =>
 {

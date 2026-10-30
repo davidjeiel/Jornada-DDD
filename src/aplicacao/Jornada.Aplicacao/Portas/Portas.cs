@@ -155,3 +155,28 @@ public interface IPublicadorDeEventos
 {
     public Task PublicarAsync(IEnumerable<EventoDeDominio> eventos, CancellationToken ct = default);
 }
+
+/// <summary>
+/// Os retratos das revisões submetidas (ADR-0017). Gravados na mesma unidade de
+/// trabalho do ativo, na partição dele: a submissão e o retrato entram juntos.
+/// </summary>
+public interface IRepositorioDeRevisoes
+{
+    public Task AdicionarAsync(RevisaoDoAtivo revisao, CancellationToken ct = default);
+    public Task<RevisaoDoAtivo?> ObterAsync(IdDeAtivo ativo, int numero, CancellationToken ct = default);
+
+    /// <summary>Da mais recente para a mais antiga.</summary>
+    public Task<IReadOnlyList<RevisaoDoAtivo>> ListarAsync(IdDeAtivo ativo, CancellationToken ct = default);
+}
+
+/// <summary>
+/// A trilha de auditoria por ativo (<c>auditoria_evento</c>). Só acrescenta.
+/// O registro vai na mesma unidade de trabalho do fato que ele descreve.
+/// </summary>
+public interface ITrilhaDeAuditoria
+{
+    public Task RegistrarAsync(RegistroDeAuditoria registro, CancellationToken ct = default);
+
+    /// <summary>Do mais recente para o mais antigo, até <paramref name="limite"/> registros.</summary>
+    public Task<IReadOnlyList<RegistroDeAuditoria>> ListarAsync(IdDeAtivo ativo, int limite = 30, CancellationToken ct = default);
+}

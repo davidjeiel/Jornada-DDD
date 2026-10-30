@@ -21,11 +21,15 @@ namespace Jornada.Persistencia.Cosmos;
 /// consequências negativas).
 /// </summary>
 public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRelacoes,
-    IRepositorioDeValidacoes, IUnidadeDeTrabalho
+    IRepositorioDeValidacoes, IUnidadeDeTrabalho, IRepositorioDeRevisoes, ITrilhaDeAuditoria
 {
     private readonly AcessoDoTenant _acesso;
     private readonly Dictionary<IdDeAtivo, Rastreado<Ativo>> _ativos = [];
     private readonly Dictionary<Guid, Rastreado<ValidacaoEmProcesso>> _validacoes = [];
+    private readonly Dictionary<(IdDeAtivo, int), Rastreado<RevisaoDoAtivo>> _revisoes = [];
+
+    /// <summary>Registros de auditoria desta sessão ainda não gravados. Só criação: a trilha não se edita.</summary>
+    private readonly List<RegistroDeAuditoria> _auditoriaPendente = [];
 
     public RepositorioCosmos(BancoDoCatalogo banco, IContextoDeTenantAtual tenant) =>
         _acesso = new AcessoDoTenant(banco, tenant);
@@ -203,6 +207,52 @@ public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRela
         return documentos.Select(Rastrear).OrderBy(v => v.Status).ThenBy(v => v.Etapa).ToArray();
     }
 
+    // ─────────────────────────────────────────────── IRepositorioDeRevisoes
+
+    public Task AdicionarAsync(RevisaoDoAtivo revisao, CancellationToken ct = default)
+    {
+        if (revisao.Empresa != _acesso.Empresa)
+            throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de gravar revisão de outra empresa.");
+        _revisoes[(revisao.Ativo, revisao.Numero)] = Rastreado<RevisaoDoAtivo>.Novo(revisao);
+        return Task.CompletedTask;
+    }
+
+    public async Task<RevisaoDoAtivo?> ObterAsync(IdDeAtivo ativo, int numero, CancellationToken ct = default)
+    {
+        if (_revisoes.TryGetValue((ativo, numero), out var rastreada)) return rastreada.Entidade;
+        var documento = await _acesso.LerAsync<DocumentoDeRevisao>(ativo, Mapeamento.IdDaRevisao(numero), ct);
+        return documento is null ? null : Rastrear(documento);
+    }
+
+    async Task<IReadOnlyList<RevisaoDoAtivo>> IRepositorioDeRevisoes.ListarAsync(IdDeAtivo ativo, CancellationToken ct)
+    {
+        var documentos = await _acesso.ConsultarAsync<DocumentoDeRevisao>(TiposDeDocumento.Revisao,
+            "c.idAtivo = @id", parametros: new Dictionary<string, object?> { ["@id"] = Mapeamento.Texto(ativo.Valor) }, ct: ct);
+        return documentos.Select(Rastrear)
+            .Concat(_revisoes.Values.Where(r => r.EhNovo && r.Entidade.Ativo == ativo).Select(r => r.Entidade))
+            .DistinctBy(r => r.Numero)
+            .OrderByDescending(r => r.Numero)
+            .ToArray();
+    }
+
+    // ──────────────────────────────────────────────────── ITrilhaDeAuditoria
+
+    public Task RegistrarAsync(RegistroDeAuditoria registro, CancellationToken ct = default)
+    {
+        if (registro.Empresa != _acesso.Empresa)
+            throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de auditar ativo de outra empresa.");
+        _auditoriaPendente.Add(registro);
+        return Task.CompletedTask;
+    }
+
+    async Task<IReadOnlyList<RegistroDeAuditoria>> ITrilhaDeAuditoria.ListarAsync(IdDeAtivo ativo, int limite, CancellationToken ct)
+    {
+        var documentos = await _acesso.ConsultarAsync<DocumentoDeAuditoria>(TiposDeDocumento.Auditoria,
+            "c.idAtivo = @id", $"ORDER BY c.em DESC OFFSET 0 LIMIT {Math.Max(limite, 0)}",
+            new Dictionary<string, object?> { ["@id"] = Mapeamento.Texto(ativo.Valor) }, ct);
+        return documentos.Select(Mapeamento.ParaDominio).ToArray();
+    }
+
     // ───────────────────────────────────────────────────── IUnidadeDeTrabalho
 
     public async Task<int> ConfirmarAsync(CancellationToken ct = default)
@@ -229,8 +279,15 @@ public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRela
         foreach (var rastreada in _validacoes.Values)
             Agendar(LoteDe(rastreada.Entidade.Ativo), rastreada, Mapeamento.ParaDocumento(rastreada.Entidade));
 
+        foreach (var rastreada in _revisoes.Values)
+            Agendar(LoteDe(rastreada.Entidade.Ativo), rastreada, Mapeamento.ParaDocumento(rastreada.Entidade));
+
+        foreach (var registro in _auditoriaPendente)
+            LoteDe(registro.Ativo).Criar(Mapeamento.ParaDocumento(registro));
+
         foreach (var lote in lotes.Values)
             await lote.ExecutarAsync(ct);
+        _auditoriaPendente.Clear();
 
         foreach (var (ativo, _) in eventos)
             ativo.DrenarEventos();
@@ -275,6 +332,17 @@ public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRela
         _validacoes[id] = Rastreado<ValidacaoEmProcesso>.Lido(
             validacao, documento.ETag, Retrato(Mapeamento.ParaDocumento(validacao)));
         return validacao;
+    }
+
+    private RevisaoDoAtivo Rastrear(DocumentoDeRevisao documento)
+    {
+        var chave = (new IdDeAtivo(Guid.Parse(documento.IdAtivo)), documento.Numero);
+        if (_revisoes.TryGetValue(chave, out var existente)) return existente.Entidade;
+
+        var revisao = Mapeamento.ParaDominio(documento);
+        _revisoes[chave] = Rastreado<RevisaoDoAtivo>.Lido(
+            revisao, documento.ETag, Retrato(Mapeamento.ParaDocumento(revisao)));
+        return revisao;
     }
 
     private static string Retrato<T>(T documento) => JsonSerializer.Serialize(documento, BancoDoCatalogo.Json);

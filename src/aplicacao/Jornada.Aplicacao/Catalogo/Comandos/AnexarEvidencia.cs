@@ -18,6 +18,7 @@ public sealed class AnexarEvidencia(
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     public async Task<Resultado<bool>> ExecutarAsync(ComandoAnexarEvidencia cmd, CancellationToken ct = default)
@@ -41,6 +42,8 @@ public sealed class AnexarEvidencia(
             return Resultado<bool>.Recusado("ATIVO_NAO_EDITAVEL", ativo.MotivoDeNaoEditavel);
 
         ativo.AnexarEvidencia(cmd.Tipo, cmd.Titulo, cmd.Url, relogio);
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.AnexarEvidencia, ator.IdPessoa, relogio,
+            depois: new Dictionary<string, string> { ["tipo"] = cmd.Tipo, ["titulo"] = cmd.Titulo }), ct);
         await uow.ConfirmarAsync(ct);
         return Resultado<bool>.Ok(true);
     }

@@ -19,6 +19,6 @@ public sealed class ContratoEmMemoria : ContratoDePersistencia
     protected override Sessao Abrir(IdDeEmpresa empresa)
     {
         var repositorio = new RepositorioDeAtivosEmMemoria(_armazem, ContextoDeTenantFixo.Para(empresa));
-        return new Sessao(repositorio, repositorio, repositorio, repositorio);
+        return new Sessao(repositorio, repositorio, repositorio, repositorio, repositorio, repositorio);
     }
 }

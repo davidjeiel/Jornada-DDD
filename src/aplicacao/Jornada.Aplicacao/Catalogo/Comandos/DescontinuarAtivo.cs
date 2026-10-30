@@ -35,6 +35,7 @@ public sealed class DescontinuarAtivo(
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     /// <summary>Descontinuado, com quantos consumidores foram afetados.</summary>
@@ -72,6 +73,11 @@ public sealed class DescontinuarAtivo(
         }
 
         ativo.Descontinuar(cmd.Motivo.Trim(), relogio);
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.Descontinuar, ator.IdPessoa, relogio,
+            depois: new Dictionary<string, string>
+            {
+                ["motivo"] = cmd.Motivo.Trim(), ["impactados"] = analise.Total.ToString(),
+            }), ct);
         await uow.ConfirmarAsync(ct);
         return Resultado<Saida>.Ok(new Saida(analise.Total));
     }

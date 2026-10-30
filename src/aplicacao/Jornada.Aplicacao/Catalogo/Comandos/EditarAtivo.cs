@@ -23,6 +23,7 @@ public sealed class EditarAtivo(
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     public async Task<Resultado<bool>> ExecutarAsync(ComandoEditarAtivo cmd, CancellationToken ct = default)
@@ -42,6 +43,8 @@ public sealed class EditarAtivo(
         if (!ativo.Editavel)
             return Resultado<bool>.Recusado("ATIVO_NAO_EDITAVEL", ativo.MotivoDeNaoEditavel);
 
+        var antes = Campos(ativo, cmd.Atributos?.Keys);
+
         ativo.Renomear(cmd.Nome, relogio);
         ativo.Descrever(cmd.Descricao, relogio);
         ativo.ReclassificarCriticidade(cmd.Criticidade, relogio);
@@ -50,7 +53,30 @@ public sealed class EditarAtivo(
             foreach (var (chave, valor) in cmd.Atributos)
                 ativo.DefinirAtributo(chave, valor, relogio);
 
+        // Só o que mudou, nos dois lados, como o "antes/depois" do painel.
+        var depois = Campos(ativo, cmd.Atributos?.Keys);
+        var mudou = depois.Keys.Where(k => antes.GetValueOrDefault(k) != depois[k]).ToArray();
+        if (mudou.Length > 0)
+        {
+            await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.Alterar, ator.IdPessoa, relogio,
+                mudou.ToDictionary(k => k, k => antes.GetValueOrDefault(k) ?? ""),
+                mudou.ToDictionary(k => k, k => depois[k])), ct);
+        }
+
         await uow.ConfirmarAsync(ct);
         return Resultado<bool>.Ok(true);
+    }
+
+    private static Dictionary<string, string> Campos(Ativo ativo, IEnumerable<string>? atributos)
+    {
+        var campos = new Dictionary<string, string>
+        {
+            ["nome"] = ativo.Nome,
+            ["descricao"] = ativo.Descricao,
+            ["criticidade"] = ativo.Criticidade.Chave(),
+        };
+        foreach (var chave in atributos ?? [])
+            campos[$"atributo:{chave}"] = ativo.Atributos.GetValueOrDefault(chave) ?? "";
+        return campos;
     }
 }

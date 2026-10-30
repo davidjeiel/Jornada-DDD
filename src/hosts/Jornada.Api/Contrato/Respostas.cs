@@ -109,6 +109,49 @@ public sealed record ImpactoResponse(
 /// <param name="Afetados">Consumidores em vigor no momento da descontinuação.</param>
 public sealed record DescontinuacaoResponse(int Afetados);
 
+/// <summary>Retrato de uma revisão submetida (ADR-0017).</summary>
+/// <param name="Numero">Número da revisão.</param>
+/// <param name="Motivo">O motivo informado na submissão.</param>
+/// <param name="Autor">Quem submeteu.</param>
+/// <param name="CriadaEm">Quando foi submetida.</param>
+/// <param name="PublicadaEm">Quando foi publicada; nulo enquanto em validação ou se foi reprovada.</param>
+/// <param name="Hash">SHA-256 do retrato, em hexadecimal.</param>
+/// <param name="Integra">O hash ainda confere com o conteúdo gravado. Falso indica adulteração.</param>
+public sealed record RevisaoResponse(
+    int Numero, string Motivo, Guid Autor, DateTimeOffset CriadaEm, DateTimeOffset? PublicadaEm, string Hash, bool Integra);
+
+/// <summary>Uma linha da trilha de auditoria.</summary>
+/// <param name="Acao">criar, alterar, definir_responsavel, relacionar, anexar_evidencia, submeter, validar, publicar, abrir_revisao, descontinuar ou arquivar.</param>
+/// <param name="Pessoa">Quem agiu.</param>
+/// <param name="Em">Quando.</param>
+/// <param name="Antes">Valores anteriores, quando a ação altera algo.</param>
+/// <param name="Depois">Valores novos ou detalhes da ação.</param>
+public sealed record AuditoriaResponse(
+    string Acao, Guid Pessoa, DateTimeOffset Em,
+    IReadOnlyDictionary<string, string>? Antes, IReadOnlyDictionary<string, string>? Depois);
+
+/// <summary>Histórico do ativo: revisões e auditoria, das mais recentes para as mais antigas.</summary>
+public sealed record HistoricoResponse(IReadOnlyList<RevisaoResponse> Revisoes, IReadOnlyList<AuditoriaResponse> Auditoria)
+{
+    public static HistoricoResponse De(ConsultarHistorico.Saida s) => new(
+        s.Revisoes.Select(r => new RevisaoResponse(r.Numero, r.Motivo, r.IdAutor, r.CriadaEm, r.PublicadaEm, r.Hash, r.Integra)).ToArray(),
+        s.Auditoria.Select(a => new AuditoriaResponse(a.Acao, a.IdPessoa, a.Em, a.Antes, a.Depois)).ToArray());
+}
+
+/// <summary>Um campo que mudou entre as duas revisões.</summary>
+/// <param name="Campo">Chave do retrato (nome, descricao, atributos, responsaveis, relacoes...).</param>
+/// <param name="Rotulo">Nome do campo para pessoas.</param>
+/// <param name="Antes">Valor na revisão a, resumido.</param>
+/// <param name="Depois">Valor na revisão b, resumido.</param>
+public sealed record DiferencaResponse(string Campo, string Rotulo, string Antes, string Depois);
+
+/// <summary>Revisão a contra revisão b.</summary>
+public sealed record ComparacaoResponse(int A, int B, IReadOnlyList<DiferencaResponse> Diferencas)
+{
+    public static ComparacaoResponse De(CompararRevisoes.Saida s) => new(
+        s.A, s.B, s.Diferencas.Select(d => new DiferencaResponse(d.Campo, d.Rotulo, d.Antes, d.Depois)).ToArray());
+}
+
 /// <summary>As cinco dimensões do score de qualidade, de 0 a 100.</summary>
 public sealed record DimensoesDoScoreResponse(
     int Completude, int Consistencia, int Ownership, int Evidencia, int Temporalidade);

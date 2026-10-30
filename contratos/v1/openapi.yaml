@@ -1378,6 +1378,196 @@ paths:
         - X-Empresa: [ ]
           X-Papel: [ ]
           X-Pessoa: [ ]
+  '/v1/ativos/{id}/historico':
+    get:
+      tags:
+        - Governança
+      summary: Revisões submetidas e trilha de auditoria do ativo
+      description: 'Revisões da mais recente para a mais antiga, cada uma com o hash SHA-256 do retrato e se ele ainda confere (integra). Auditoria da mais recente para a mais antiga, até limite registros (padrão 30, máximo 200).'
+      operationId: consultarHistorico
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limite
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 30
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoricoResponse'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/revisoes/comparacao':
+    get:
+      tags:
+        - Governança
+      summary: Compara duas revisões do ativo
+      description: 'Campos que mudaram da revisão a para a revisão b, já resumidos em texto. Sem parâmetros, compara a última revisão com a anterior. Revisão sem retrato devolve 404 REVISAO_NAO_ENCONTRADA.'
+      operationId: compararRevisoes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: a
+          in: query
+          schema:
+            type: integer
+            format: int32
+        - name: b
+          in: query
+          schema:
+            type: integer
+            format: int32
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComparacaoResponse'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Papel: [ ]
+          X-Pessoa: [ ]
   /v1/validacoes:
     get:
       tags:
@@ -1741,6 +1931,38 @@ components:
           example: OwnerTecnico
       additionalProperties: false
       description: Define quem responde pelo ativo.
+    AuditoriaResponse:
+      required:
+        - acao
+        - pessoa
+        - em
+      type: object
+      properties:
+        acao:
+          type: string
+          description: 'criar, alterar, definir_responsavel, relacionar, anexar_evidencia, submeter, validar, publicar, abrir_revisao, descontinuar ou arquivar.'
+        pessoa:
+          type: string
+          description: Quem agiu.
+          format: uuid
+        em:
+          type: string
+          description: Quando.
+          format: date-time
+        antes:
+          type: object
+          additionalProperties:
+            type: string
+          description: 'Valores anteriores, quando a ação altera algo.'
+          nullable: true
+        depois:
+          type: object
+          additionalProperties:
+            type: string
+          description: Valores novos ou detalhes da ação.
+          nullable: true
+      additionalProperties: false
+      description: Uma linha da trilha de auditoria.
     BloqueioResponse:
       required:
         - codigo
@@ -1794,6 +2016,25 @@ components:
             plataforma: mainframe
       additionalProperties: false
       description: Cadastro de um ativo novo. Ele nasce em rascunho.
+    ComparacaoResponse:
+      required:
+        - a
+        - b
+        - diferencas
+      type: object
+      properties:
+        a:
+          type: integer
+          format: int32
+        b:
+          type: integer
+          format: int32
+        diferencas:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiferencaResponse'
+      additionalProperties: false
+      description: Revisão a contra revisão b.
     ConsumidorResponse:
       required:
         - id
@@ -1866,6 +2107,28 @@ components:
           example: CAP-0001
       additionalProperties: false
       description: Pedido para tirar o ativo de vigência.
+    DiferencaResponse:
+      required:
+        - campo
+        - rotulo
+        - antes
+        - depois
+      type: object
+      properties:
+        campo:
+          type: string
+          description: 'Chave do retrato (nome, descricao, atributos, responsaveis, relacoes...).'
+        rotulo:
+          type: string
+          description: Nome do campo para pessoas.
+        antes:
+          type: string
+          description: 'Valor na revisão a, resumido.'
+        depois:
+          type: string
+          description: 'Valor na revisão b, resumido.'
+      additionalProperties: false
+      description: Um campo que mudou entre as duas revisões.
     DimensoesDoScoreResponse:
       required:
         - completude
@@ -2018,6 +2281,22 @@ components:
             fimVigencia: null
             vigente: true
         relacoes: [ ]
+    HistoricoResponse:
+      required:
+        - revisoes
+        - auditoria
+      type: object
+      properties:
+        revisoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RevisaoResponse'
+        auditoria:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditoriaResponse'
+      additionalProperties: false
+      description: 'Histórico do ativo: revisões e auditoria, das mais recentes para as mais antigas.'
     ImpactoResponse:
       required:
         - id
@@ -2274,6 +2553,44 @@ components:
         vigente:
           type: boolean
       additionalProperties: false
+    RevisaoResponse:
+      required:
+        - numero
+        - motivo
+        - autor
+        - criadaEm
+        - hash
+        - integra
+      type: object
+      properties:
+        numero:
+          type: integer
+          description: Número da revisão.
+          format: int32
+        motivo:
+          type: string
+          description: O motivo informado na submissão.
+        autor:
+          type: string
+          description: Quem submeteu.
+          format: uuid
+        criadaEm:
+          type: string
+          description: Quando foi submetida.
+          format: date-time
+        publicadaEm:
+          type: string
+          description: Quando foi publicada; nulo enquanto em validação ou se foi reprovada.
+          format: date-time
+          nullable: true
+        hash:
+          type: string
+          description: 'SHA-256 do retrato, em hexadecimal.'
+        integra:
+          type: boolean
+          description: O hash ainda confere com o conteúdo gravado. Falso indica adulteração.
+      additionalProperties: false
+      description: Retrato de uma revisão submetida (ADR-0017).
     SaudeResponse:
       required:
         - situacao

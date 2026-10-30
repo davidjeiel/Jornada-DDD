@@ -21,6 +21,7 @@ public sealed class ArquivarAtivo(
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     public async Task<Resultado<bool>> ExecutarAsync(ComandoArquivarAtivo cmd, CancellationToken ct = default)
@@ -42,7 +43,11 @@ public sealed class ArquivarAtivo(
                 $"Só rascunho ou ativo descontinuado pode ser arquivado; este está em '{MaquinaDeCicloDeVida.Rotulo(ativo.Status)}'.");
         }
 
+        var anterior = MaquinaDeCicloDeVida.Rotulo(ativo.Status);
         ativo.Arquivar(relogio);
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.Arquivar, ator.IdPessoa, relogio,
+            new Dictionary<string, string> { ["status"] = anterior },
+            new Dictionary<string, string> { ["status"] = "arquivado" }), ct);
         await uow.ConfirmarAsync(ct);
         return Resultado<bool>.Ok(true);
     }

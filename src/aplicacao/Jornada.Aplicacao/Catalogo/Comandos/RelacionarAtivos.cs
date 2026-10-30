@@ -24,6 +24,8 @@ public sealed class RelacionarAtivos(
     IMetamodelo metamodelo,
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
+    IUnidadeDeTrabalho uow,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     public async Task<Resultado<bool>> ExecutarAsync(ComandoRelacionarAtivos cmd, CancellationToken ct = default)
@@ -54,7 +56,17 @@ public sealed class RelacionarAtivos(
         // busca em profundidade sobre "depende_de" — uma aresta na direção
         // errada nunca aparece nessa busca. Registrar só o sentido pedido é
         // suficiente e é o que os testes do domínio já esperam.
-        await relacoes.RelacionarAsync(cmd.Origem, cmd.Destino, cmd.Tipo.Trim().ToLowerInvariant(), cmd.Criticidade, ct);
+        var tipo = cmd.Tipo.Trim().ToLowerInvariant();
+        await relacoes.RelacionarAsync(cmd.Origem, cmd.Destino, tipo, cmd.Criticidade, ct);
+
+        // A aresta é gravada na hora (a porta não passa pela unidade de
+        // trabalho); o registro de auditoria vai logo depois, na partição da origem.
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(origem, AcoesAuditadas.Relacionar, ator.IdPessoa, relogio,
+            depois: new Dictionary<string, string>
+            {
+                ["destino"] = destino.Codigo.Valor, ["tipo"] = tipo, ["criticidade"] = cmd.Criticidade.Chave(),
+            }), ct);
+        await uow.ConfirmarAsync(ct);
         return Resultado<bool>.Ok(true);
     }
 }

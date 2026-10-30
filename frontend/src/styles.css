@@ -517,6 +517,24 @@ fieldset.atributos legend { padding: 0 6px; color: var(--muted); font-size: 12.5
 .danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; border: 1px solid var(--danger-border); border-radius: 7px; background: var(--paper); color: var(--danger); font-weight: 600; }
 .danger-button:hover:not(:disabled) { filter: brightness(1.07); }
 .danger-button:disabled { opacity: .6; cursor: not-allowed; }
+/* Tabelas, como as do painel (table, th, td). */
+.rolagem { overflow-x: auto; }
+.tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabela th { padding: 8px 10px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; font-weight: 600; text-align: left; }
+.tabela td { padding: 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.tabela tr:last-child td { border-bottom: none; }
+.tabela tbody tr:hover { background: var(--surface-hover-soft); }
+.tabela.diff { font-size: 13px; }
+.tabela.diff td:first-child { color: var(--muted); white-space: nowrap; }
+.tabela.diff td.antes { color: var(--muted); text-decoration: line-through; overflow-wrap: anywhere; }
+.tabela.diff td.depois { color: var(--success); overflow-wrap: anywhere; }
+.mono { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 12.5px; }
+.vazio { padding: 26px; color: var(--muted); text-align: center; }
+.discreto { color: var(--muted); font-size: 13px; }
+.sem-quebra { white-space: nowrap; }
+.alerta-integridade { color: var(--danger); font-size: 12px; font-weight: 600; }
+.comparacao { margin-top: 14px; }
+.comparacao h4 { margin: 0 0 6px; font-size: 14px; }
 .readonly-note { padding: 20px; color: var(--muted); font-size: 14px; text-align: center; }
 
 /* ── Seu perfil ────────────────────────────────────────────────────────────── */

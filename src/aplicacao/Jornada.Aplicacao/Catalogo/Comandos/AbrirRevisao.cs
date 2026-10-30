@@ -22,6 +22,7 @@ public sealed class AbrirRevisao(
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     public async Task<Resultado<bool>> ExecutarAsync(ComandoAbrirRevisao cmd, CancellationToken ct = default)
@@ -46,6 +47,7 @@ public sealed class AbrirRevisao(
         }
 
         ativo.AbrirRevisao(relogio);
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.AbrirRevisao, ator.IdPessoa, relogio), ct);
         await uow.ConfirmarAsync(ct);
         return Resultado<bool>.Ok(true);
     }

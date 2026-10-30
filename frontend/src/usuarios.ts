@@ -71,6 +71,11 @@ export function unidadeDe(usuario: UsuarioDeTeste): Unidade {
   return unidades.find((u) => u.id === usuario.unidadeId)!;
 }
 
+/** Nome de quem agiu, para a trilha. Até a fase 2 só os usuários de teste têm nome. */
+export function nomeDaPessoa(id: string): string {
+  return usuariosDeTeste.find((u) => u.id === id)?.nome ?? `pessoa ${id.slice(0, 8)}`;
+}
+
 export function iniciaisDe(nome: string): string {
   const partes = nome.trim().split(/\s+/);
   return ((partes[0]?.[0] ?? '') + (partes[partes.length - 1]?.[0] ?? '')).toUpperCase();

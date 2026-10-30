@@ -47,6 +47,7 @@ já pontua (`qualidade.py`, dimensão *evidência*) — dogfooding.
 | [0014](0014-contrato-openapi-padrao-caixa.md) | Contrato OpenAPI no padrão CAIXA (substitui parcialmente o 0009) | proposto |
 | [0015](0015-revisao-de-ativo-publicado.md) | Completar o ciclo de revisão de ativo publicado | proposto |
 | [0016](0016-cosmos-db-como-sistema-de-registro.md) | Cosmos DB (API NoSQL) como único sistema de registro; Postgres removido | proposto |
+| [0017](0017-retrato-da-revisao-e-auditoria.md) | Retratar cada revisão com hash e auditar na partição do ativo | proposto |
 
 ## Modelo
 

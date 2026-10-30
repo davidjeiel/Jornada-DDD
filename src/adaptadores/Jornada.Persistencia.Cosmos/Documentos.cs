@@ -30,6 +30,8 @@ internal static class TiposDeDocumento
     public const string Validacao = "validacao";
     public const string Relacao = "relacao";
     public const string Evento = "evento";
+    public const string Revisao = "revisao";
+    public const string Auditoria = "auditoria";
 }
 
 internal sealed class DocumentoDeAtivo : DocumentoDoCatalogo
@@ -104,6 +106,36 @@ internal sealed class DocumentoDeEvento : DocumentoDoCatalogo
     public required string ChaveDeIdempotencia { get; init; }
     public DateTimeOffset OcorridoEm { get; init; }
     public DateTimeOffset? DespachadoEm { get; init; }
+}
+
+/// <summary>
+/// O retrato de uma revisão submetida (ADR-0017). O id é o número da revisão:
+/// duas submissões simultâneas da mesma revisão colidem no lote, em vez de
+/// gravar dois retratos.
+/// </summary>
+internal sealed class DocumentoDeRevisao : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Revisao;
+
+    public int Numero { get; init; }
+    public required string Conteudo { get; init; }
+    public required string Hash { get; init; }
+    public required string Motivo { get; init; }
+    public Guid IdAutor { get; init; }
+    public DateTimeOffset CriadaEm { get; init; }
+    public DateTimeOffset? PublicadaEm { get; init; }
+}
+
+/// <summary>Uma linha da trilha de auditoria do ativo. Só é criada, nunca substituída.</summary>
+internal sealed class DocumentoDeAuditoria : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Auditoria;
+
+    public required string Acao { get; init; }
+    public Guid IdPessoa { get; init; }
+    public DateTimeOffset Em { get; init; }
+    public Dictionary<string, string>? Antes { get; init; }
+    public Dictionary<string, string>? Depois { get; init; }
 }
 
 /// <summary>Sequencial do código por (empresa, tipo). Container <c>contadores</c>, partição <c>/empresa</c>.</summary>

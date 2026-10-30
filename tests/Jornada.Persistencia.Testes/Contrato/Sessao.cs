@@ -13,12 +13,16 @@ public sealed class Sessao(
     IRepositorioDeRelacoes relacoes,
     IRepositorioDeValidacoes validacoes,
     IUnidadeDeTrabalho unidade,
+    IRepositorioDeRevisoes revisoes,
+    ITrilhaDeAuditoria trilha,
     IAsyncDisposable? recursos = null) : IAsyncDisposable
 {
     public IRepositorioDeAtivos Ativos { get; } = ativos;
     public IRepositorioDeRelacoes Relacoes { get; } = relacoes;
     public IRepositorioDeValidacoes Validacoes { get; } = validacoes;
     public IUnidadeDeTrabalho Unidade { get; } = unidade;
+    public IRepositorioDeRevisoes Revisoes { get; } = revisoes;
+    public ITrilhaDeAuditoria Trilha { get; } = trilha;
 
     public ValueTask DisposeAsync() => recursos?.DisposeAsync() ?? ValueTask.CompletedTask;
 }

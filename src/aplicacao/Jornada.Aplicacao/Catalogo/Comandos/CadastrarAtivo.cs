@@ -28,6 +28,7 @@ public sealed class CadastrarAtivo(
     IContextoDeTenantAtual tenant,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    ITrilhaDeAuditoria trilha,
     IRelogio relogio)
 {
     public async Task<Resultado<IdDeAtivo>> ExecutarAsync(
@@ -72,6 +73,8 @@ public sealed class CadastrarAtivo(
             cmd.Descricao, cmd.Criticidade, cmd.IdPai, contexto.Unidade, cmd.Atributos);
 
         await ativos.AdicionarAsync(ativo, ct);
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.Criar, ator.IdPessoa, relogio,
+            depois: new Dictionary<string, string> { ["codigo"] = codigo.Valor, ["nome"] = ativo.Nome }), ct);
         await uow.ConfirmarAsync(ct);
 
         return Resultado<IdDeAtivo>.Ok(ativo.Id);
