@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Jornada.Aplicacao.Portas;
+using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Tenancy;
@@ -25,9 +26,13 @@ public sealed class ArmazemEmMemoria
     internal ConcurrentDictionary<Guid, ValidacaoEmProcesso> Validacoes { get; } = new();
     internal ConcurrentDictionary<(IdDeAtivo Ativo, int Numero), RevisaoDoAtivo> Revisoes { get; } = new();
     internal ConcurrentQueue<RegistroDeAuditoria> Auditoria { get; } = new();
+    internal ConcurrentDictionary<Guid, Pessoa> Pessoas { get; } = new();
+    internal ConcurrentDictionary<Guid, PleitoDeAcesso> Pleitos { get; } = new();
 
     public void Limpar()
     {
+        Pessoas.Clear();
+        Pleitos.Clear();
         Revisoes.Clear();
         Auditoria.Clear();
         Ativos.Clear();
@@ -271,5 +276,60 @@ public sealed class RepositorioDeAtivosEmMemoria(
             .OrderByDescending(x => x.registro.Em).ThenByDescending(x => x.ordem)
             .Take(Math.Max(limite, 0))
             .Select(x => x.registro)
+            .ToArray());
+}
+
+/// <summary>
+/// Pessoas e pleitos em memória, filtrados por empresa como o resto. Classe à
+/// parte porque as portas repetem assinaturas das de validação
+/// (<c>ObterAsync(Guid)</c>); a unidade de trabalho em memória não tem nada a
+/// fazer com eles, que já são gravados ao adicionar.
+/// </summary>
+public sealed class RepositorioDeAcessoEmMemoria(ArmazemEmMemoria armazem, IContextoDeTenantAtual tenant)
+    : IRepositorioDePessoas, IRepositorioDePleitos
+{
+    private IdDeEmpresa Empresa => tenant.Atual.Empresa;
+
+    public Task<Pessoa?> ObterAsync(Guid id, CancellationToken ct = default) =>
+        Task.FromResult(armazem.Pessoas.TryGetValue(id, out var p) && p.Empresa == Empresa ? p : null);
+
+    public Task<Pessoa?> ObterPorMatriculaAsync(Matricula matricula, CancellationToken ct = default) =>
+        Task.FromResult(armazem.Pessoas.Values.FirstOrDefault(p => p.Empresa == Empresa && p.Matricula == matricula));
+
+    public Task<IReadOnlyList<Pessoa>> ListarAsync(bool incluirInativas = false, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<Pessoa>>(armazem.Pessoas.Values
+            .Where(p => p.Empresa == Empresa && (incluirInativas || p.Ativa))
+            .OrderBy(p => p.Nome, StringComparer.CurrentCulture)
+            .ToArray());
+
+    public Task AdicionarAsync(Pessoa pessoa, CancellationToken ct = default)
+    {
+        if (pessoa.Empresa != Empresa)
+            throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de gravar pessoa de outra empresa.");
+        lock (armazem.Pessoas)
+        {
+            if (armazem.Pessoas.Values.Any(p => p.Empresa == Empresa && p.Matricula == pessoa.Matricula && p.Id != pessoa.Id))
+                throw new ErroDeDominio("CONFLITO_DE_EDICAO", $"Já existe uma pessoa com a matrícula {pessoa.Matricula}.");
+            armazem.Pessoas[pessoa.Id] = pessoa;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task AdicionarAsync(PleitoDeAcesso pleito, CancellationToken ct = default)
+    {
+        if (pleito.Empresa != Empresa)
+            throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de gravar pleito de outra empresa.");
+        armazem.Pleitos[pleito.Id] = pleito;
+        return Task.CompletedTask;
+    }
+
+    Task<PleitoDeAcesso?> IRepositorioDePleitos.ObterAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(armazem.Pleitos.TryGetValue(id, out var p) && p.Empresa == Empresa ? p : null);
+
+    public Task<IReadOnlyList<PleitoDeAcesso>> ListarAsync(
+        StatusDoPleito? status = null, Guid? idPessoa = null, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<PleitoDeAcesso>>(armazem.Pleitos.Values
+            .Where(p => p.Empresa == Empresa && (status is null || p.Status == status) && (idPessoa is null || p.IdPessoa == idPessoa))
+            .OrderBy(p => p.Status == StatusDoPleito.Pendente ? 0 : 1).ThenBy(p => p.CriadoEm).ThenBy(p => p.Id)
             .ToArray());
 }

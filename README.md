@@ -16,35 +16,43 @@ imposto pelo banco.
 ```bash
 dotnet build Jornada-sem-nuget.slnx          # compila sem precisar de NuGet
 dotnet run --project tests/Jornada.Arquitetura.Testes   # guardas do ADR-0001
-dotnet run --project tests/Jornada.Dominio.Testes       # 49 testes de regra
+dotnet run --project tests/Jornada.Dominio.Testes       # testes de regra e de caso de uso
 dotnet run --project tests/Jornada.Persistencia.Testes  # contrato das portas (Cosmos: ver abaixo)
-dotnet run --project src/hosts/Jornada.Api              # API em memória
+Acesso__ModoDemonstracao=true dotnet run --project src/hosts/Jornada.Api   # API em memória
 ```
 
 A API sobe sem infraestrutura nenhuma. Toda rota `/v1` exige o cabeçalho
-`X-Empresa`; `GET /demo` mostra os cabeçalhos prontos.
+`X-Empresa`; `GET /demo` mostra os cabeçalhos prontos. O papel é o
+**concedido** à pessoa do `X-Pessoa` (ADR-0018): sem pessoa, a API só consulta.
+Para experimentar sem cadastrar ninguém, `Acesso__ModoDemonstracao=true` deixa
+escolher o papel pelo `X-Papel`, como abaixo. Isso só vale no ambiente local.
 
 ```bash
 A=11111111-1111-1111-1111-111111111111
+QUEM=(-H "X-Empresa: $A" -H 'X-Pessoa: 20000000-0000-0000-0000-000000000001' -H 'X-Papel: curador')
 
 # 1. cadastrar — repare que o corpo NÃO tem "usuario" nem "tenant_id"
-ID=$(curl -s -H 'Content-Type: application/json' -H "X-Empresa: $A" -H 'X-Papel: curador' \
+ID=$(curl -s -H 'Content-Type: application/json' "${QUEM[@]}" \
   -X POST http://localhost:5080/v1/ativos \
   -d '{"tipo":"sistema","nome":"Core Bancario","descricao":"Sistema central",
        "atributos":{"plataforma":"mainframe"}}' | jq -r .id)
 
 # 2. submeter sem owner → 422, o pré-check bloqueia
-curl -s -X POST http://localhost:5080/v1/ativos/$ID/submissoes -H "X-Empresa: $A" -d '{}'
+curl -s -X POST http://localhost:5080/v1/ativos/$ID/submissoes "${QUEM[@]}" -d '{}'
 
 # 3. definir o owner técnico
 curl -s -X POST http://localhost:5080/v1/ativos/$ID/responsaveis \
-  -H 'Content-Type: application/json' -H "X-Empresa: $A" \
+  -H 'Content-Type: application/json' "${QUEM[@]}" \
   -d '{"idPessoa":"44444444-4444-4444-4444-444444444444","papel":"OwnerTecnico"}'
 
 # 4. agora passa → 201, score 97, etapa técnica aberta
 curl -s -X POST http://localhost:5080/v1/ativos/$ID/submissoes \
-  -H 'Content-Type: application/json' -H "X-Empresa: $A" -d '{"motivo":"primeira versao"}'
+  -H 'Content-Type: application/json' "${QUEM[@]}" -d '{"motivo":"primeira versao"}'
 ```
+
+O rito de acesso sem o modo demonstração: `POST /v1/pleitos` cadastra a pessoa
+e pede o papel; um curador ou admin decide em `POST /v1/pleitos/{id}/decisoes`.
+O primeiro admin de cada empresa sai de `Acesso:AdministradoresIniciais`.
 
 Ambiente local completo (emulador do Cosmos DB + Service Bus + Keycloak sobre
 Podman): [`docs/AMBIENTE-LOCAL.md`](docs/AMBIENTE-LOCAL.md).

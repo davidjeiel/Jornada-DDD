@@ -2,14 +2,12 @@
 // para que as duas ferramentas tenham as mesmas portas de entrada. Telas que
 // ainda não chegaram respondem com o aviso da fase que as entrega
 // (docs/PARIDADE.md), em vez de sumirem do menu.
-import type { Papel } from './usuarios';
-
 export type Secao =
   | 'painel' | 'catalogo' | 'mapas'
   | 'mesa' | 'novo' | 'descobertas' | 'validacoes'
   | 'notificacoes' | 'perfil'
   | 'pleitos' | 'squads' | 'gestao-acessos' | 'politicas'
-  | 'cartilha' | 'nao-encontrada';
+  | 'cartilha' | 'solicitar-acesso' | 'nao-encontrada';
 
 export type Grupo = 'Trabalhar' | 'Você' | 'Administração';
 
@@ -40,7 +38,7 @@ export const MENU: ItemDeMenu[] = [
   { secao: 'notificacoes', caminho: '/notificacoes', rotulo: 'Notificações', inicial: 'NT', grupo: 'Você', fase: 8, descricao: 'Caixa de avisos de submissão, decisão e SLA.' },
   { secao: 'perfil', caminho: '/perfil', rotulo: 'Seu perfil', inicial: 'PF', grupo: 'Você', descricao: 'Quem você é na ferramenta e o que o seu papel permite.' },
 
-  { secao: 'pleitos', caminho: '/pleitos', rotulo: 'Pleitos de acesso', inicial: 'PA', grupo: 'Administração', exige: 'conceder', fase: 2, descricao: 'Fila de pedidos de papel para quem concede acesso.' },
+  { secao: 'pleitos', caminho: '/pleitos', rotulo: 'Pleitos de acesso', inicial: 'PA', grupo: 'Administração', exige: 'conceder', descricao: 'Fila de pedidos de papel para quem concede acesso.' },
   { secao: 'squads', caminho: '/squads', rotulo: 'Squads', inicial: 'SQ', grupo: 'Administração', exige: 'conceder', fase: 2, descricao: 'Times e o escopo de papel por squad.' },
   { secao: 'gestao-acessos', caminho: '/gestao-acessos', rotulo: 'Gestão de acessos', inicial: 'GA', grupo: 'Administração', exige: 'administrar', fase: 2, descricao: 'Concessões e revogações de papel em toda a empresa.' },
   { secao: 'politicas', caminho: '/politicas', rotulo: 'Políticas', inicial: 'PO', grupo: 'Administração', fase: 4, descricao: 'Rito de validação por tipo e criticidade: etapas, evidência, score e SLA.' },
@@ -50,15 +48,20 @@ export const CARTILHA: ItemDeMenu = {
   secao: 'cartilha', caminho: '/cartilha', rotulo: 'Cartilha', inicial: '?', descricao: 'O que cada papel faz na ferramenta.',
 };
 
-// Portado de acesso.PERMISSOES (ações "conceder" e "administrar"). Fonte de
-// verdade continua no servidor: esconder o item é conforto, não autorização.
-const QUEM_CONCEDE: Papel[] = ['admin', 'curador'];
-const QUEM_ADMINISTRA: Papel[] = ['admin'];
+/** Fora do menu, como no painel: é o link de quem ainda não tem papel. */
+export const SOLICITAR_ACESSO: ItemDeMenu = {
+  secao: 'solicitar-acesso', caminho: '/acesso/solicitar', rotulo: 'Solicitar acesso', inicial: 'SA', descricao: 'Cadastro e pedido de papel.',
+};
 
-export function itensVisiveis(papel: Papel): ItemDeMenu[] {
+/** O que a API diz que a pessoa pode (GET /v1/perfil). */
+export type Alcadas = { podeConceder: boolean; podeAdministrar: boolean };
+
+// A decisão é do servidor (acesso.PERMISSOES, com os papéis concedidos e o
+// modo de leitura): esconder o item é conforto, não autorização.
+export function itensVisiveis(alcadas: Alcadas): ItemDeMenu[] {
   return MENU.filter((item) =>
-    item.exige === 'conceder' ? QUEM_CONCEDE.includes(papel)
-      : item.exige === 'administrar' ? QUEM_ADMINISTRA.includes(papel)
+    item.exige === 'conceder' ? alcadas.podeConceder
+      : item.exige === 'administrar' ? alcadas.podeAdministrar
         : true);
 }
 
@@ -70,9 +73,12 @@ export function secaoDoCaminho(caminho: string): Secao {
   const limpo = caminho.replace(/\/+$/, '') || '/';
   if (limpo.startsWith('/ativos/')) return 'catalogo';
   if (limpo === CARTILHA.caminho) return 'cartilha';
+  if (limpo === SOLICITAR_ACESSO.caminho) return 'solicitar-acesso';
   return MENU.find((item) => item.caminho === limpo)?.secao ?? 'nao-encontrada';
 }
 
 export function itemDaSecao(secao: Secao): ItemDeMenu | undefined {
-  return secao === 'cartilha' ? CARTILHA : MENU.find((item) => item.secao === secao);
+  if (secao === 'cartilha') return CARTILHA;
+  if (secao === 'solicitar-acesso') return SOLICITAR_ACESSO;
+  return MENU.find((item) => item.secao === secao);
 }

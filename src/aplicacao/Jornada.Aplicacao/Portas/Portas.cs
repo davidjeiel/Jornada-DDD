@@ -180,3 +180,29 @@ public interface ITrilhaDeAuditoria
     /// <summary>Do mais recente para o mais antigo, até <paramref name="limite"/> registros.</summary>
     public Task<IReadOnlyList<RegistroDeAuditoria>> ListarAsync(IdDeAtivo ativo, int limite = 30, CancellationToken ct = default);
 }
+
+/// <summary>
+/// As pessoas cadastradas na empresa, com os papéis concedidos. Gravadas pela
+/// unidade de trabalho, como o resto. A matrícula é única por empresa.
+/// </summary>
+public interface IRepositorioDePessoas
+{
+    public Task<Pessoa?> ObterAsync(Guid id, CancellationToken ct = default);
+    public Task<Pessoa?> ObterPorMatriculaAsync(Matricula matricula, CancellationToken ct = default);
+
+    /// <summary>Por nome. Sem <paramref name="incluirInativas"/>, só as ativas (<c>pessoas_ativas</c>).</summary>
+    public Task<IReadOnlyList<Pessoa>> ListarAsync(bool incluirInativas = false, CancellationToken ct = default);
+
+    public Task AdicionarAsync(Pessoa pessoa, CancellationToken ct = default);
+}
+
+/// <summary>Os pleitos de acesso da empresa (<c>solicitacao_acesso</c>).</summary>
+public interface IRepositorioDePleitos
+{
+    public Task AdicionarAsync(PleitoDeAcesso pleito, CancellationToken ct = default);
+    public Task<PleitoDeAcesso?> ObterAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Pendentes primeiro e, dentro de cada grupo, quem espera há mais tempo primeiro.</summary>
+    public Task<IReadOnlyList<PleitoDeAcesso>> ListarAsync(
+        StatusDoPleito? status = null, Guid? idPessoa = null, CancellationToken ct = default);
+}

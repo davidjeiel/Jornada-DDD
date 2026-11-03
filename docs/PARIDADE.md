@@ -28,9 +28,17 @@ original no título, para facilitar a busca.
   O painel atende uma só.
 - **Cosmos DB** como banco (ADR-0016), no lugar do SQLite/SQL Server do painel.
 - **Identidade.** Enquanto não houver identidade corporativa (ADR-0007), a
-  pessoa e o papel chegam por cabeçalho. Na fase 2 o papel passa a ser
-  **concedido** como no painel, e a escolha livre de papel fica atrás de
-  `ModoDemonstracao`, ligado só no ambiente local.
+  pessoa chega pelo cabeçalho `X-Pessoa`, escolhida em Seu perfil, como o
+  seletor do painel. O papel é o **concedido** a ela (ADR-0018). A escolha
+  livre de papel pelo `X-Papel` fica atrás de `Acesso:ModoDemonstracao`, ligado
+  só no ambiente local.
+- **Primeiro administrador.** O painel cria o primeiro admin pela linha de
+  comando (`flask conceder`). No Jornada ele sai da configuração
+  `Acesso:AdministradoresIniciais`: a matrícula listada que pleitear admin numa
+  empresa sem admin é aprovada na hora (ADR-0018).
+- **Escopo de concessão.** O painel concede em `global`, `dominio` ou `squad`.
+  No Jornada, por enquanto, em `empresa` (o antigo global) ou `dominio`; squad
+  chega com o cadastro de squads (2b).
 - **Visual.** O tema segue o do painel (paleta, tipografia, menu lateral escuro,
   cartões e etiquetas, em `frontend/src/styles.css`). A disposição de cada tela
   acompanha a fase que a porta: até lá, ela pode diferir da do painel.
@@ -71,9 +79,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 37 |
-| 🟡 parcial | 17 |
-| ⬜ pendente | 98 |
+| ✅ coberto | 67 |
+| 🟡 parcial | 13 |
+| ⬜ pendente | 72 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -84,13 +92,13 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 |---|---|---|---|---|
 | 0 | Fundação, mais o que o domínio já cobria | 29 | 0 | 0 |
 | 1 | Ciclo de vida | 4 | 0 | 0 |
-| 2 | Pessoas e acesso | 4 | 7 | 34 |
+| 2 | Pessoas e acesso | 34 | 3 | 7 |
 | 3 | Ficha e cadastro | 0 | 8 | 14 |
 | 4 | Validação e mesa | 0 | 0 | 9 |
 | 5 | Catálogo e busca | 0 | 1 | 11 |
 | 6 | Mapas e grafo | 0 | 0 | 12 |
 | 7 | Visão executiva | 0 | 0 | 3 |
-| 8 | Notificações | 0 | 1 | 5 |
+| 8 | Notificações | 0 | 1 | 6 |
 | 9 | Descobertas | 0 | 0 | 10 |
 
 A fase 1 também porta o que o painel faz sem teste próprio: o retrato de cada
@@ -98,6 +106,13 @@ revisão com SHA-256 (`servicos._snapshot`), a comparação entre revisões
 (`comparar_revisoes`) e a trilha de auditoria (`auditar`), na aba Histórico da
 ficha. No Jornada estão cobertos por `HistoricoTestes`, pelo contrato de
 persistência e por `telas/Historico.test.tsx` (ADR-0017).
+
+A fase 2 foi dividida em dois PRs. O primeiro (2a) traz o cadastro de pessoa,
+o pleito e a concessão, os papéis concedidos no lugar do `X-Papel`, o escopo de
+domínio nos casos de uso, o modo leitura e as telas Seu perfil, Solicitar acesso
+e Pleitos de acesso (ADR-0018). O segundo (2b) traz a gestão de pessoas, os
+squads e a cartilha com a matriz derivada das permissões. Os avisos de pleito
+aberto e decidido entram com as notificações, na fase 8.
 
 ### Governança (regras de publicação) — `tests/test_governanca.py` (10)
 
@@ -119,14 +134,14 @@ persistência e por `telas/Historico.test.tsx` (ADR-0017).
 | Teste do painel | Fase | Situação | No Jornada |
 |---|---|---|---|
 | `test_papel_global_vale_em_qualquer_item` | 0 | ✅ | `CuradorCadastraEmQualquerBloco` (papel de empresa) |
-| `test_papel_de_dominio_nao_vale_em_outro_dominio` | 2 | 🟡 | `EscopoDeDominioLimita` cobre a política; os casos de uso ainda não resolvem o domínio do ativo. |
+| `test_papel_de_dominio_nao_vale_em_outro_dominio` | 2 | ✅ | `PapelDeDominioNaoValeEmOutroDominio` (AcessoTestes): o caso de uso sobe a hierarquia até o domínio (`AlvoDoAtivo`) |
 | `test_etapa_negocial_exige_papel_de_negocio` | 0 | ✅ | `EtapaTecnicaExigeTechLead` (mesma tabela `PapelPorEtapa`) |
 | `test_segregacao_de_funcao_quem_submete_nao_aprova` | 0 | ✅ | `QuemSubmeteuNaoDecide` |
 | `test_servico_recusa_decisao_sem_papel` | 0 | ✅ | `EtapaTecnicaExigeTechLead`, `AtorSemPapelNaoFazNada` |
 | `test_rota_de_escrita_recusa_mesmo_sem_passar_pela_tela` — O formulário enviado direto tem de ser recusado igual. | 0 | ✅ | Autorização no caso de uso, não na tela: `ConsultaNaoEscreve` |
-| `test_sessao_sem_pessoa_e_mandada_ao_perfil` | 2 | ⬜ |  |
-| `test_modo_leitura_esconde_os_formularios` | 2 | ⬜ |  |
-| `test_modo_leitura_tambem_recusa_na_rota` | 2 | ⬜ |  |
+| `test_sessao_sem_pessoa_e_mandada_ao_perfil` | 2 | ✅ | `SessaoSemPessoaEMandadaAoPerfil`: 401 `PESSOA_NAO_IDENTIFICADA`, e a tela vai para /perfil |
+| `test_modo_leitura_esconde_os_formularios` | 2 | ✅ | Em modo leitura `blocosQueEscreve` vem vazio e nada que escreve aparece: `Layout.test.tsx` (modo no cabeçalho), `telas/Acesso.test.tsx` |
+| `test_modo_leitura_tambem_recusa_na_rota` | 2 | ✅ | `ModoLeituraTambemRecusaNaRota`: 403 `MODO_LEITURA` (cabeçalho `X-Modo`) |
 | `test_descontinuar_com_consumidor_critico_exige_o_codigo` | 1 | ✅ | `ConfirmacaoErradaNaoDescontinua` e `telas/Impacto.test.tsx` |
 | `test_acessibilidade_do_esqueleto` | 0 | ✅ | `Layout.test.tsx` e `estilos.test.ts` (frontend/src) |
 | `test_criticidade_media_e_baixa_tem_estilos_proprios` | 0 | ✅ | `estilos.test.ts` |
@@ -152,39 +167,39 @@ persistência e por `telas/Historico.test.tsx` (ADR-0017).
 
 | Teste do painel | Fase | Situação | No Jornada |
 |---|---|---|---|
-| `test_matricula_fora_do_formato_e_recusada` | 2 | 🟡 | `Matricula.De` existe no domínio; falta o cadastro de pessoa |
-| `test_matricula_valida_em_qualquer_letra_inicial` | 2 | 🟡 | Idem |
-| `test_matricula_e_normalizada_para_maiuscula` | 2 | 🟡 | Idem |
-| `test_unidade_exige_quatro_numeros` | 2 | ⬜ |  |
-| `test_nome_e_email_sao_conferidos` | 2 | ⬜ |  |
-| `test_cadastro_nao_concede_papel_nenhum` — O ponto do rito: cadastrar-se não é ganhar acesso. | 2 | ⬜ |  |
-| `test_quem_se_cadastra_consulta_o_catalogo` — Sem papel, tudo é leitura — e leitura tem de funcionar. | 2 | ⬜ |  |
-| `test_pleito_nasce_pendente_com_os_dados_informados` | 2 | ⬜ |  |
-| `test_segundo_pleito_pendente_e_recusado` | 2 | ⬜ |  |
-| `test_recadastro_atualiza_a_pessoa_sem_duplicar` | 2 | ⬜ |  |
-| `test_quem_concede_e_avisado_do_pleito` | 2 | ⬜ |  |
-| `test_aprovacao_concede_o_papel_e_responde` | 2 | ⬜ |  |
-| `test_negativa_exige_motivo_e_nao_concede_nada` | 2 | ⬜ |  |
-| `test_papel_diferente_do_pleiteado_exige_explicacao` | 2 | ⬜ |  |
-| `test_concessao_com_escopo_de_dominio_nao_vale_fora_dele` | 2 | ⬜ |  |
-| `test_pleito_ja_decidido_nao_se_decide_de_novo` | 2 | ⬜ |  |
-| `test_ninguem_concede_acesso_a_si_mesmo` — Segregação de função também no acesso, não só na validação. | 2 | ⬜ |  |
-| `test_curador_concede_tudo_menos_admin` | 2 | ⬜ |  |
-| `test_quem_nao_concede_nao_entra_na_fila` | 2 | ⬜ |  |
-| `test_curador_que_tenta_conceder_admin_pela_rota_e_recusado` | 2 | ⬜ |  |
+| `test_matricula_fora_do_formato_e_recusada` | 2 | ✅ | `MatriculaForaDoFormatoERecusada` (AcessoTestes) |
+| `test_matricula_valida_em_qualquer_letra_inicial` | 2 | ✅ | `MatriculaValidaEmQualquerLetraInicial` |
+| `test_matricula_e_normalizada_para_maiuscula` | 2 | ✅ | `MatriculaENormalizadaParaMaiuscula` |
+| `test_unidade_exige_quatro_numeros` | 2 | ✅ | `UnidadeExigeQuatroNumeros` |
+| `test_nome_e_email_sao_conferidos` | 2 | ✅ | `NomeEEmailSaoConferidos` |
+| `test_cadastro_nao_concede_papel_nenhum` — O ponto do rito: cadastrar-se não é ganhar acesso. | 2 | ✅ | `CadastroNaoConcedePapelNenhum` |
+| `test_quem_se_cadastra_consulta_o_catalogo` — Sem papel, tudo é leitura — e leitura tem de funcionar. | 2 | ✅ | `QuemSeCadastraConsultaOCatalogo` |
+| `test_pleito_nasce_pendente_com_os_dados_informados` | 2 | ✅ | `PleitoNascePendenteComOsDadosInformados` |
+| `test_segundo_pleito_pendente_e_recusado` | 2 | ✅ | `SegundoPleitoPendenteERecusado` (409 `PLEITO_PENDENTE`) |
+| `test_recadastro_atualiza_a_pessoa_sem_duplicar` | 2 | ✅ | `RecadastroAtualizaAPessoaSemDuplicar`; no Cosmos, a reserva da matrícula impede a duplicata (contrato de persistência) |
+| `test_quem_concede_e_avisado_do_pleito` | 8 | ⬜ | A fila já mostra o pleito a quem concede; o aviso na caixa chega com as notificações. |
+| `test_aprovacao_concede_o_papel_e_responde` | 2 | 🟡 | `AprovacaoConcedeOPapelEResponde`: o papel vale e a resposta fica no pleito e no perfil; o aviso na caixa chega na fase 8. |
+| `test_negativa_exige_motivo_e_nao_concede_nada` | 2 | 🟡 | `NegativaExigeMotivoENaoConcedeNada`; o aviso na caixa chega na fase 8. |
+| `test_papel_diferente_do_pleiteado_exige_explicacao` | 2 | ✅ | `PapelDiferenteDoPleiteadoExigeExplicacao` |
+| `test_concessao_com_escopo_de_dominio_nao_vale_fora_dele` | 2 | ✅ | `ConcessaoComEscopoDeDominioNaoValeForaDele` |
+| `test_pleito_ja_decidido_nao_se_decide_de_novo` | 2 | ✅ | `PleitoJaDecididoNaoSeDecideDeNovo` (409 `PLEITO_JA_DECIDIDO`) |
+| `test_ninguem_concede_acesso_a_si_mesmo` — Segregação de função também no acesso, não só na validação. | 2 | ✅ | `NinguemConcedeAcessoASiMesmo` (403 `SEGREGACAO_DE_FUNCAO`) |
+| `test_curador_concede_tudo_menos_admin` | 2 | ✅ | `CuradorConcedeTudoMenosAdmin` |
+| `test_quem_nao_concede_nao_entra_na_fila` | 2 | ✅ | `QuemNaoConcedeNaoEntraNaFila` |
+| `test_curador_que_tenta_conceder_admin_pela_rota_e_recusado` | 2 | ✅ | `CuradorQueTentaConcederAdminERecusado` (403) |
 | `test_negocio_nao_cadastra_ativo_tecnico` — O papel autoriza a ação e também o objeto: era o furo antigo. | 2 | ✅ | `NegocioNaoCadastraAtivoTecnico` |
 | `test_tech_lead_nao_redesenha_a_hierarquia_de_negocio` | 2 | ✅ | `TechLeadNaoMexeEmDominio` |
 | `test_arquiteto_e_curador_atravessam_os_dois_blocos` | 2 | ✅ | `CuradorCadastraEmQualquerBloco`, `BlocosQueEscreve` |
-| `test_edicao_de_ativo_existente_respeita_o_bloco` | 2 | 🟡 | `EditarAtivo` usa o bloco do tipo; falta teste de caso de uso |
+| `test_edicao_de_ativo_existente_respeita_o_bloco` | 2 | ✅ | `EdicaoDeAtivoExistenteRespeitaOBloco` |
 | `test_rota_de_cadastro_recusa_tipo_fora_do_papel` | 2 | ✅ | `CadastrarAtivo` recusa com SEM_PERMISSAO (403) |
-| `test_wizard_so_oferece_os_blocos_do_papel` | 2 | ⬜ |  |
-| `test_sem_papel_o_wizard_manda_pleitear` | 2 | ⬜ |  |
-| `test_tela_de_cadastro_abre_sem_identificacao` | 2 | ⬜ |  |
-| `test_cadastro_pela_tela_identifica_a_pessoa_na_hora` | 2 | ⬜ |  |
-| `test_fila_mostra_o_pleito_a_quem_concede` | 2 | ⬜ |  |
-| `test_fila_nao_oferece_admin_a_curador` | 2 | ⬜ |  |
-| `test_decisao_pela_tela_concede_e_aparece_no_perfil` | 2 | ⬜ |  |
-| `test_menu_so_mostra_a_fila_para_quem_concede` | 2 | 🟡 | `navegacao.test.ts` e `Layout.test.tsx`; hoje o menu olha o papel do usuário de teste, não o papel concedido. |
+| `test_wizard_so_oferece_os_blocos_do_papel` | 2 | ✅ | `telas/Acesso.test.tsx`: o Novo ativo agrupa os tipos por bloco e mostra só os do papel |
+| `test_sem_papel_o_wizard_manda_pleitear` | 2 | ✅ | `telas/Acesso.test.tsx` |
+| `test_tela_de_cadastro_abre_sem_identificacao` | 2 | ✅ | `telas/Acesso.test.tsx`; `POST /v1/pleitos` não exige `X-Pessoa` |
+| `test_cadastro_pela_tela_identifica_a_pessoa_na_hora` | 2 | ✅ | O App passa a usar a pessoa devolvida pelo cadastro; `telas/Acesso.test.tsx` cobre o perfil com o pleito aguardando decisão |
+| `test_fila_mostra_o_pleito_a_quem_concede` | 2 | ✅ | `telas/Acesso.test.tsx`, `QuemNaoConcedeNaoEntraNaFila` |
+| `test_fila_nao_oferece_admin_a_curador` | 2 | ✅ | `telas/Acesso.test.tsx` (a API devolve `podeConcederAdmin`) |
+| `test_decisao_pela_tela_concede_e_aparece_no_perfil` | 2 | ✅ | `DecisaoApareceNoPerfil` e `telas/Acesso.test.tsx` |
+| `test_menu_so_mostra_a_fila_para_quem_concede` | 2 | ✅ | `navegacao.test.ts` e `Layout.test.tsx`: o menu segue as alçadas que a API devolve em `GET /v1/perfil` |
 
 ### Fluxo de trabalho — `tests/test_fluxo.py` (22)
 

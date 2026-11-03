@@ -408,6 +408,10 @@ kbd { padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; backg
 .status-rascunho { background: var(--neutral-bg-2); }
 .status-em_revisao { background: var(--info-weak); color: var(--info); border-color: var(--info-border); }
 .status-descontinuado, .status-arquivado { background: var(--retired-weak); color: var(--retired-ink); border-color: var(--retired-weak); }
+/* Pleitos de acesso: as mesmas pílulas do ciclo de vida. */
+.status-pleito-pendente { background: var(--pending-weak); color: var(--pending-ink); border-color: var(--pending-border); }
+.status-pleito-aprovado { background: var(--success-weak); color: var(--success-ink); border-color: var(--success-border); }
+.status-pleito-negado { background: var(--retired-weak); color: var(--retired-ink); border-color: var(--retired-weak); }
 
 /* Cada criticidade com estilo próprio, nos três temas (todas por token). */
 .critical { display: inline-block; padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 11.5px; text-align: center; white-space: nowrap; }
@@ -554,6 +558,20 @@ fieldset.atributos legend { padding: 0 6px; color: var(--muted); font-size: 12.5
 .switch-user strong { display: block; font-size: 14px; font-weight: 600; }
 .switch-user small { display: block; margin-top: 1px; color: var(--muted); font-size: 12.5px; }
 .switch-user .switch-check { margin-left: auto; flex-shrink: 0; color: var(--brand); }
+.troca-grade-unica { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 4px 16px; margin-top: 12px; }
+.ajuda { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; font-weight: 400; }
+.modos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.modo-leitura { color: var(--pending-ink); font-weight: 600; }
+
+/* Fila de pleitos: um cartão por pedido, com a decisão embaixo. */
+.pleito { padding: 14px 0; border-top: 1px solid var(--line); }
+.pleito:first-of-type { border-top: 0; }
+.pleito header h3 { margin: 0; font-size: 15px; }
+.pleito header .discreto { font-size: 12.5px; }
+.pleito > p { margin: 6px 0 10px; }
+.decisao-pleito { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 14px; align-items: end; }
+.decisao-pleito .largo { grid-column: 1 / -1; }
+.decisao-pleito .modal-actions { grid-column: 1 / -1; margin-top: 0; }
 
 /* ── Cartilha: menu fixo de seções + painel de conteúdo ────────────────────── */
 .cartilha-shell { display: flex; gap: 20px; }

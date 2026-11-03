@@ -48,6 +48,7 @@ já pontua (`qualidade.py`, dimensão *evidência*) — dogfooding.
 | [0015](0015-revisao-de-ativo-publicado.md) | Completar o ciclo de revisão de ativo publicado | proposto |
 | [0016](0016-cosmos-db-como-sistema-de-registro.md) | Cosmos DB (API NoSQL) como único sistema de registro; Postgres removido | proposto |
 | [0017](0017-retrato-da-revisao-e-auditoria.md) | Retratar cada revisão com hash e auditar na partição do ativo | proposto |
+| [0018](0018-papel-concedido-e-rito-de-acesso.md) | Papel concedido por pleito, pessoas na partição de acesso | proposto |
 
 ## Modelo
 

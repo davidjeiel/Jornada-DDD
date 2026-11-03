@@ -5,15 +5,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Layout } from './Layout';
 import { MENU, type Secao } from './navegacao';
 import { Cartilha } from './telas/Cartilha';
-import { usuariosDeTeste, type UsuarioDeTeste } from './usuarios';
+import { perfilDe } from './testes/perfis';
+import type { Perfil } from './api';
 
-const curadora = usuariosDeTeste.find((u) => u.papel === 'curador')!;
+const curadora = perfilDe('curador');
 
-function pagina(secao: Secao, opcoes: { usuario?: UsuarioDeTeste; compacto?: boolean } = {}) {
+function pagina(secao: Secao, opcoes: { perfil?: Perfil | null; compacto?: boolean } = {}) {
   return renderToStaticMarkup(
     <Layout
       secao={secao}
-      usuario={opcoes.usuario ?? curadora}
+      perfil={opcoes.perfil === undefined ? curadora : opcoes.perfil}
+      nomeDaEmpresa="Horizonte Seguros"
       tema="sistema"
       onAlternarTema={() => {}}
       menuCompacto={opcoes.compacto ?? false}
@@ -86,14 +88,25 @@ describe('esqueleto da página', () => {
     const html = pagina('painel');
     expect(temTag(html, 'a', 'class="sino"', 'href="/notificacoes"')).toBe(true);
     expect(temTag(html, 'a', 'class="quem"', 'href="/perfil"')).toBe(true);
-    expect(html).toContain(curadora.nome);
+    expect(html).toContain(curadora.pessoa!.nome);
   });
 
-  it('o menu de administração depende do papel (test_menu_so_mostra_a_fila_para_quem_concede)', () => {
-    const negocio = usuariosDeTeste.find((u) => u.papel === 'negocio')!;
+  it('o menu de administração depende do papel concedido (test_menu_so_mostra_a_fila_para_quem_concede)', () => {
+    const negocio = perfilDe('negocio');
     expect(pagina('painel')).toContain('Pleitos de acesso');
-    expect(pagina('painel', { usuario: negocio })).not.toContain('Pleitos de acesso');
-    expect(pagina('painel', { usuario: negocio })).toContain('Políticas');
+    expect(pagina('painel', { perfil: negocio })).not.toContain('Pleitos de acesso');
+    expect(pagina('painel', { perfil: negocio })).toContain('Políticas');
+  });
+
+  it('o cabeçalho mostra o modo leitura (test_modo_leitura_esconde_os_formularios)', () => {
+    expect(pagina('painel', { perfil: { ...perfilDe('admin'), modoLeitura: true } })).toContain('modo leitura');
+    expect(pagina('painel')).not.toContain('modo leitura');
+  });
+
+  it('sem pessoa, o cabeçalho pergunta quem é você e esconde a administração', () => {
+    const html = pagina('painel', { perfil: null });
+    expect(html).toContain('Quem é você?');
+    expect(html).not.toContain('Pleitos de acesso');
   });
 });
 

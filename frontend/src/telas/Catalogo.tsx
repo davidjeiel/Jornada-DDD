@@ -6,7 +6,6 @@ import {
 } from '../api';
 import { Cabecalho, Criticidade, Status } from '../componentes';
 import { Link, navegar } from '../roteador';
-import type { UsuarioDeTeste } from '../usuarios';
 import { FichaDoAtivo } from './FichaDoAtivo';
 import { podeDescontinuar } from './Impacto';
 
@@ -20,11 +19,11 @@ const NIVEIS = [
   { tipo: 'capacidade', nota: 'resultados esperados' },
 ];
 
-// Papel RBAC (X-Papel) → papel de OWNERSHIP mais provável para quem assume o
+// Papel concedido → papel de OWNERSHIP mais provável para quem assume o
 // ativo. É só uma sugestão de UX; o servidor decide de verdade (ADR-0007).
-function papelDeOwnershipSugerido(papel: UsuarioDeTeste['papel']): string {
-  if (papel === 'negocio') return 'OwnerNegocial';
-  if (papel === 'arquiteto') return 'Arquiteto';
+function papelDeOwnershipSugerido(papeis: string[]): string {
+  if (papeis.includes('negocio')) return 'OwnerNegocial';
+  if (papeis.includes('arquiteto')) return 'Arquiteto';
   return 'OwnerTecnico';
 }
 
@@ -33,13 +32,15 @@ type Props = {
   carregando: boolean;
   termo: string;
   idSelecionado: string | null;
-  usuario: UsuarioDeTeste;
+  /** Chaves dos papéis concedidos que valem agora (GET /v1/perfil). */
+  papeis: string[];
+  idPessoa: string | null;
   podeEscrever: boolean;
   onAlterado: () => Promise<void>;
   onErro: (mensagem: string) => void;
 };
 
-export function Catalogo({ ativos, carregando, termo, idSelecionado, usuario, podeEscrever, onAlterado, onErro }: Props) {
+export function Catalogo({ ativos, carregando, termo, idSelecionado, papeis, idPessoa, podeEscrever, onAlterado, onErro }: Props) {
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [preCheck, setPreCheck] = useState<PreCheck | null>(null);
   const [ficha, setFicha] = useState<Ficha | null>(null);
@@ -93,7 +94,7 @@ export function Catalogo({ ativos, carregando, termo, idSelecionado, usuario, po
     setAcao(tipo);
     onErro('');
     try {
-      if (tipo === 'owner') await atribuirResponsavel(selecionado.id, papelDeOwnershipSugerido(usuario.papel));
+      if (tipo === 'owner' && idPessoa) await atribuirResponsavel(selecionado.id, idPessoa, papelDeOwnershipSugerido(papeis));
       else if (tipo === 'revisao') await abrirRevisao(selecionado.id);
       else await submeterAtivo(selecionado.id, 'Enviado pelo catálogo');
       await recarregarTudo();
@@ -205,7 +206,7 @@ export function Catalogo({ ativos, carregando, termo, idSelecionado, usuario, po
           ficha={ficha}
           ativos={ativos}
           podeEscrever={podeEscrever}
-          podeDescontinuar={podeDescontinuar(usuario.papel)}
+          podeDescontinuar={podeEscrever && podeDescontinuar(papeis)}
           onFechar={() => setFichaAberta(false)}
           onAlterado={recarregarTudo}
           onErro={onErro}

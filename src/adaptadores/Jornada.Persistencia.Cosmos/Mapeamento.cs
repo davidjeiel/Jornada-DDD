@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Jornada.Aplicacao.Portas;
+using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Governanca;
@@ -134,6 +135,67 @@ internal static class Mapeamento
     public static RegistroDeAuditoria ParaDominio(DocumentoDeAuditoria d) => new(
         Guid.Parse(d.Id), new IdDeEmpresa(Guid.Parse(d.Empresa)), new IdDeAtivo(Guid.Parse(d.IdAtivo)),
         d.Acao, d.IdPessoa, d.Em, d.Antes, d.Depois);
+
+    public static string IdDaMatricula(Matricula matricula) => $"matricula-{matricula.Valor}";
+
+    public static DocumentoDePessoa ParaDocumento(Pessoa p) => new()
+    {
+        Id = Texto(p.Id),
+        Empresa = Texto(p.Empresa.Valor),
+        IdAtivo = AcessoDoTenant.ParticaoDeAcesso,
+        Matricula = p.Matricula.Valor,
+        Nome = p.Nome,
+        Email = p.Email,
+        Unidade = p.Unidade.Valor,
+        Ativa = p.Ativa,
+        CadastradaEm = p.CadastradaEm,
+        Atribuicoes = [.. p.Atribuicoes.Select(a => new AtribuicaoEmbutida(
+            a.Papel.Chave(), a.EscopoTipo.ToString().ToLowerInvariant(), a.EscopoId, a.InicioVigencia, a.FimVigencia, a.ConcedidoPor))],
+    };
+
+    public static Pessoa ParaDominio(DocumentoDePessoa d) => Pessoa.Reidratar(
+        Guid.Parse(d.Id), new IdDeEmpresa(Guid.Parse(d.Empresa)),
+        new DadosDeCadastro(Matricula.De(d.Matricula), d.Nome, d.Email, CodigoDeUnidade.De(d.Unidade)),
+        d.Ativa, d.CadastradaEm,
+        d.Atribuicoes.Select(a => new AtribuicaoDePapel(
+            PapelDe(a.Papel), Enum.Parse<TipoDeEscopo>(a.EscopoTipo, ignoreCase: true), a.EscopoId,
+            a.InicioVigencia, a.FimVigencia, a.ConcedidoPor)));
+
+    public static DocumentoDeMatricula Reserva(Pessoa p) => new()
+    {
+        Id = IdDaMatricula(p.Matricula),
+        Empresa = Texto(p.Empresa.Valor),
+        IdAtivo = AcessoDoTenant.ParticaoDeAcesso,
+        IdPessoa = Texto(p.Id),
+    };
+
+    public static DocumentoDePleito ParaDocumento(PleitoDeAcesso p) => new()
+    {
+        Id = Texto(p.Id),
+        Empresa = Texto(p.Empresa.Valor),
+        IdAtivo = AcessoDoTenant.ParticaoDeAcesso,
+        IdPessoa = Texto(p.IdPessoa),
+        PapelPleiteado = p.PapelPleiteado.Chave(),
+        Justificativa = p.Justificativa,
+        CriadoEm = p.CriadoEm,
+        Status = p.Status.ToString().ToLowerInvariant(),
+        DecididoPor = p.DecididoPor,
+        DecididoEm = p.DecididoEm,
+        PapelConcedido = p.PapelConcedido?.Chave(),
+        EscopoTipo = p.EscopoTipo?.ToString().ToLowerInvariant(),
+        EscopoId = p.EscopoId,
+        Resposta = p.Resposta,
+    };
+
+    public static PleitoDeAcesso ParaDominio(DocumentoDePleito d) => PleitoDeAcesso.Reidratar(
+        Guid.Parse(d.Id), new IdDeEmpresa(Guid.Parse(d.Empresa)), Guid.Parse(d.IdPessoa), PapelDe(d.PapelPleiteado),
+        d.Justificativa, d.CriadoEm, Enum.Parse<StatusDoPleito>(d.Status, ignoreCase: true), d.DecididoPor, d.DecididoEm,
+        d.PapelConcedido is { } pc ? PapelDe(pc) : null,
+        d.EscopoTipo is { } et ? Enum.Parse<TipoDeEscopo>(et, ignoreCase: true) : null,
+        d.EscopoId, d.Resposta);
+
+    private static Papel PapelDe(string chave) =>
+        PapelExtensoes.TentarDe(chave, out var papel) ? papel : throw new InvalidOperationException($"Papel gravado desconhecido: {chave}.");
 
     /// <summary>O mesmo critério do adaptador em memória: sem diferenciar maiúsculas, inclusive acentuadas.</summary>
     public static string Normalizar(string nome) => nome.Trim().ToLowerInvariant();

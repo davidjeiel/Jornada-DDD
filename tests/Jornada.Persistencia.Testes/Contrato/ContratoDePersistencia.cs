@@ -1,4 +1,5 @@
 using Jornada.Aplicacao.Portas;
+using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Governanca;
@@ -561,6 +562,146 @@ public abstract class ContratoDePersistencia
 
         await using var deFora = Abrir(IdDeEmpresa.Novo());
         Verificar.Vazio(await deFora.Trilha.ListarAsync(ativo.Id));
+    }
+
+    // ── pessoas e pleitos (ADR-0018) ─────────────────────────────────────────
+
+    [Teste("pessoa volta com o cadastro e os papéis, por id e por matrícula")]
+    public async Task PessoaVoltaCompleta()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var dominio = Guid.NewGuid();
+        var quemConcedeu = Guid.NewGuid();
+        var pessoa = Pessoa.Cadastrar(empresa, DadosDeCadastro.Conferir("c123456", "Davi Souza", "davi@empresa.com", "0427"), Relogio);
+        pessoa.Conceder(AtribuicaoDePapel.NaEmpresa(Papel.TechLead, Relogio.Hoje));
+        pessoa.Conceder(new AtribuicaoDePapel(Papel.Negocio, TipoDeEscopo.Dominio, dominio, Relogio.Hoje,
+            Relogio.Hoje.AddDays(30), quemConcedeu));
+        await using (var s = Abrir(empresa))
+        {
+            await s.Pessoas.AdicionarAsync(pessoa);
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using var nova = Abrir(empresa);
+        var lida = await nova.Pessoas.ObterAsync(pessoa.Id) ?? throw Ausente("pessoa");
+        Verificar.Igual("C123456", lida.Matricula.Valor);
+        Verificar.Igual("Davi Souza", lida.Nome);
+        Verificar.Igual("davi@empresa.com", lida.Email);
+        Verificar.Igual("0427", lida.Unidade.Valor);
+        Verificar.Verdadeiro(lida.Ativa);
+        Verificar.Igual(pessoa.CadastradaEm, lida.CadastradaEm);
+        Verificar.Igual(2, lida.Atribuicoes.Count);
+        var escopada = lida.Atribuicoes.Single(a => a.EscopoTipo == TipoDeEscopo.Dominio);
+        Verificar.Igual(Papel.Negocio, escopada.Papel);
+        Verificar.Igual<Guid?>(dominio, escopada.EscopoId);
+        Verificar.Igual<DateOnly?>(Relogio.Hoje.AddDays(30), escopada.FimVigencia);
+        Verificar.Igual<Guid?>(quemConcedeu, escopada.ConcedidoPor);
+
+        Verificar.Igual(pessoa.Id, (await nova.Pessoas.ObterPorMatriculaAsync(Matricula.De("C123456")))?.Id, "pela matrícula");
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Igual(null, await deFora.Pessoas.ObterAsync(pessoa.Id), "outra empresa não enxerga a pessoa");
+        Verificar.Igual(null, await deFora.Pessoas.ObterPorMatriculaAsync(Matricula.De("C123456")));
+    }
+
+    [Teste("a matrícula é única na empresa, e só nela")]
+    public async Task MatriculaUnicaPorEmpresa()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        Pessoa Nova(IdDeEmpresa e, string nome) =>
+            Pessoa.Cadastrar(e, DadosDeCadastro.Conferir("C654321", nome, "x@empresa.com", "0001"), Relogio);
+
+        await using (var s = Abrir(empresa))
+        {
+            await s.Pessoas.AdicionarAsync(Nova(empresa, "Eva Lima"));
+            await s.Unidade.ConfirmarAsync();
+        }
+        await using (var s = Abrir(empresa))
+        {
+            Verificar.Verdadeiro(await Falha(async () =>
+            {
+                await s.Pessoas.AdicionarAsync(Nova(empresa, "Eva Lima Duplicada"));
+                await s.Unidade.ConfirmarAsync();
+            }), "a mesma matrícula duas vezes na mesma empresa");
+        }
+
+        var outra = IdDeEmpresa.Novo();
+        await using (var s = Abrir(outra))
+        {
+            await s.Pessoas.AdicionarAsync(Nova(outra, "Eva Lima"));
+            await s.Unidade.ConfirmarAsync();
+        }
+        await using var nova = Abrir(empresa);
+        Verificar.Igual("Eva Lima", (await nova.Pessoas.ListarAsync()).Single().Nome, "a da outra empresa não aparece");
+    }
+
+    [Teste("pessoas são listadas por nome, e as inativas só quando pedidas")]
+    public async Task PessoasPorNome()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        await using (var s = Abrir(empresa))
+        {
+            foreach (var (m, nome, ativa) in new[] { ("C000003", "Carla Dias", true), ("C000001", "Ana Ferreira", true), ("C000002", "Bruno Alves", false) })
+                await s.Pessoas.AdicionarAsync(Pessoa.Reidratar(Guid.CreateVersion7(), empresa,
+                    DadosDeCadastro.Conferir(m, nome, "x@empresa.com", "0001"), ativa, Relogio.Agora, []));
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using var nova = Abrir(empresa);
+        Verificar.Igual("Ana Ferreira,Carla Dias", string.Join(",", (await nova.Pessoas.ListarAsync()).Select(p => p.Nome)));
+        Verificar.Igual(3, (await nova.Pessoas.ListarAsync(incluirInativas: true)).Count);
+    }
+
+    [Teste("pleito volta completo; a fila põe pendentes primeiro, do mais antigo ao mais novo")]
+    public async Task PleitosVoltamEmOrdem()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var relogio = RelogioFixo.Em(2026, 10, 21);
+        var decisor = new Ator(Guid.NewGuid(), empresa, [AtribuicaoDePapel.NaEmpresa(Papel.Admin, relogio.Hoje)]);
+        var ana = Pessoa.Cadastrar(empresa, DadosDeCadastro.Conferir("C000001", "Ana Ferreira", "ana@empresa.com", "0001"), relogio);
+        var beto = Pessoa.Cadastrar(empresa, DadosDeCadastro.Conferir("C000002", "Beto Alves", "beto@empresa.com", "0001"), relogio);
+
+        PleitoDeAcesso primeiro, segundo, terceiro;
+        await using (var s = Abrir(empresa))
+        {
+            await s.Pessoas.AdicionarAsync(ana);
+            await s.Pessoas.AdicionarAsync(beto);
+            primeiro = PleitoDeAcesso.Abrir(ana, Papel.Negocio, "Respondo por Crédito.", relogio);
+            relogio.Avancar(TimeSpan.FromMinutes(1));
+            segundo = PleitoDeAcesso.Abrir(beto, Papel.TechLead, "", relogio);
+            relogio.Avancar(TimeSpan.FromMinutes(1));
+            terceiro = PleitoDeAcesso.Abrir(beto, Papel.Arquiteto, "", relogio);
+            foreach (var p in new[] { terceiro, primeiro, segundo })
+                await s.Pleitos.AdicionarAsync(p);
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        // Decidir numa sessão nova grava o pleito e a pessoa com o papel, juntos.
+        await using (var s = Abrir(empresa))
+        {
+            var lido = await s.Pleitos.ObterAsync(primeiro.Id) ?? throw Ausente("pleito");
+            var pessoa = await s.Pessoas.ObterAsync(ana.Id) ?? throw Ausente("pessoa");
+            pessoa.Conceder(lido.Decidir(decisor, true, "Bem-vinda.", relogio, escopoTipo: TipoDeEscopo.Dominio, escopoId: Guid.NewGuid())!);
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using var nova = Abrir(empresa);
+        var fila = await nova.Pleitos.ListarAsync();
+        Verificar.Igual($"{segundo.Id},{terceiro.Id},{primeiro.Id}", string.Join(",", fila.Select(p => p.Id)),
+            "pendentes primeiro, quem espera há mais tempo na frente");
+
+        var decidido = fila.Last();
+        Verificar.Igual(StatusDoPleito.Aprovado, decidido.Status);
+        Verificar.Igual("Respondo por Crédito.", decidido.Justificativa);
+        Verificar.Igual<Papel?>(Papel.Negocio, decidido.PapelConcedido);
+        Verificar.Igual<TipoDeEscopo?>(TipoDeEscopo.Dominio, decidido.EscopoTipo);
+        Verificar.Igual<Guid?>(decisor.IdPessoa, decidido.DecididoPor);
+        Verificar.Igual("Bem-vinda.", decidido.Resposta);
+        Verificar.Igual(Papel.Negocio, (await nova.Pessoas.ObterAsync(ana.Id))!.Atribuicoes.Single().Papel, "a concessão foi junto");
+
+        Verificar.Igual(2, (await nova.Pleitos.ListarAsync(StatusDoPleito.Pendente)).Count);
+        Verificar.Igual(2, (await nova.Pleitos.ListarAsync(idPessoa: beto.Id)).Count);
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Vazio(await deFora.Pleitos.ListarAsync(), "outra empresa não enxerga os pleitos");
     }
 
     private async Task<Ativo> Gravar(IdDeEmpresa empresa, Ativo ativo)

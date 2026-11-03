@@ -1,4 +1,5 @@
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -49,10 +50,10 @@ public sealed class DescontinuarAtivo(
 
         var tipo = (await metamodelo.ObterAsync(ct)).Obter(ativo.TipoItem);
         var ator = await atorAtual.ObterAsync(ct);
-        var alvo = new AlvoDaAcao(tenant.Atual.Empresa, tipo.Chave, tipo.Bloco, Unidade: tenant.Atual.Unidade);
+        var alvo = await AlvoDoAtivo.ResolverAsync(ativos, tenant.Atual, ativo, tipo, ct);
 
         if (!PoliticaDeAutorizacao.Pode(ator, Acao.Descontinuar, alvo, relogio.Hoje))
-            return Resultado<Saida>.Recusado("SEM_PERMISSAO", "Sem permissão para descontinuar este ativo.");
+            return Recusa.Para<Saida>(ator, "Sem permissão para descontinuar este ativo.");
 
         if (!MaquinaDeCicloDeVida.Permite(ativo.Status, StatusCicloVida.Descontinuado))
         {

@@ -1,3 +1,4 @@
+using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -41,11 +42,11 @@ public sealed class DecidirValidacao(
         var tipo = (await metamodelo.ObterAsync(ct)).Obter(ativo.TipoItem);
         var ator = await atorAtual.ObterAsync(ct);
         var contexto = tenant.Atual;
-        var alvo = new AlvoDaAcao(contexto.Empresa, tipo.Chave, tipo.Bloco, Unidade: contexto.Unidade);
+        var alvo = await AlvoDoAtivo.ResolverAsync(ativos, contexto, ativo, tipo, ct);
         var autorizacao = PoliticaDeAutorizacao.PodeDecidir(
             ator, validacao.Etapa, validacao.IdSubmissor, ativo, alvo, relogio.Hoje);
         if (!autorizacao.Permitido)
-            return Resultado<bool>.Recusado("SEM_PERMISSAO", autorizacao.Motivo);
+            return Recusa.Para<bool>(ator, autorizacao.Motivo);
 
         // Só as etapas DESTA revisão contam. Antes, a busca trazia também as de
         // revisões anteriores — e uma reprovação antiga impedia para sempre a

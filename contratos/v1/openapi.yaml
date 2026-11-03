@@ -12,6 +12,451 @@ info:
   x-timeout-gateway: a definir com a governança
   x-timeout-backend: a definir com a governança
 paths:
+  /v1/perfil:
+    get:
+      tags:
+        - Acesso
+      summary: Quem é você para a API e o que pode fazer
+      description: 'A pessoa do X-Pessoa, os papéis que valem agora (com escopo e blocos de tipos), os pleitos dela e o que ela pode fazer. Sem pessoa, identificado é false e tudo é consulta.'
+      operationId: consultarPerfil
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerfilResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/pessoas:
+    get:
+      tags:
+        - Acesso
+      summary: Lista as pessoas ativas da empresa
+      description: Por nome. É o "quem é você" do perfil enquanto não há identidade corporativa (ADR-0007).
+      operationId: listarPessoas
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaDePessoasResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/pleitos:
+    post:
+      tags:
+        - Acesso
+      summary: Cadastra a pessoa e pede um papel
+      description: 'Aberta a quem ainda não tem papel: não exige X-Pessoa. O cadastro não concede nada; a pessoa consulta o catálogo até um curador ou admin decidir. Matrícula já cadastrada atualiza o cadastro, sem duplicar; com pleito pendente, devolve 409 PLEITO_PENDENTE.'
+      operationId: solicitarAcesso
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitarAcessoRequest'
+        required: true
+      responses:
+        '201':
+          description: Recurso criado.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PleitoAbertoResponse'
+        '409':
+          description: Conflito com o estado atual do recurso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+    get:
+      tags:
+        - Acesso
+      summary: Fila de pleitos de acesso
+      description: 'Só para quem concede (curador ou admin). Pendentes primeiro e, entre eles, quem espera há mais tempo. O parâmetro status filtra: pendente, aprovado ou negado.'
+      operationId: listarPleitos
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilaDePleitosResponse'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  '/v1/pleitos/{id}/decisoes':
+    post:
+      tags:
+        - Acesso
+      summary: Concede ou nega um pleito de acesso
+      description: 'Curador concede todo papel menos admin; só admin concede admin. Ninguém decide o próprio pleito (403 SEGREGACAO_DE_FUNCAO). Negar, ou conceder papel diferente do pleiteado, exige resposta (422 RESPOSTA_OBRIGATORIA). Pleito já decidido devolve 409 PLEITO_JA_DECIDIDO.'
+      operationId: decidirPleito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecidirPleitoRequest'
+        required: true
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PleitoResponse'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   /v1/ativos:
     get:
       tags:
@@ -83,7 +528,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
     post:
       tags:
@@ -119,7 +563,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AtivoCriadoResponse'
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -181,7 +625,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}':
     get:
@@ -268,7 +711,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
     put:
       tags:
@@ -306,7 +748,7 @@ paths:
                 type: string
                 format: uuid
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -392,7 +834,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/responsaveis':
     post:
@@ -431,7 +872,7 @@ paths:
                 type: string
                 format: uuid
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -505,7 +946,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/evidencias':
     post:
@@ -544,7 +984,7 @@ paths:
                 type: string
                 format: uuid
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -618,7 +1058,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/relacoes':
     post:
@@ -657,7 +1096,7 @@ paths:
                 type: string
                 format: uuid
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -731,7 +1170,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/pre-check':
     get:
@@ -818,7 +1256,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/revisoes':
     post:
@@ -851,7 +1288,7 @@ paths:
                 type: string
                 format: uuid
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -925,7 +1362,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/submissoes':
     post:
@@ -967,7 +1403,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubmissaoResponse'
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -1053,7 +1489,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/impacto':
     get:
@@ -1140,7 +1575,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/descontinuacao':
     post:
@@ -1195,7 +1629,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -1269,7 +1703,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/arquivamento':
     post:
@@ -1302,7 +1735,7 @@ paths:
                 type: string
                 format: uuid
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -1376,7 +1809,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/historico':
     get:
@@ -1469,7 +1901,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/ativos/{id}/revisoes/comparacao':
     get:
@@ -1566,7 +1997,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   /v1/validacoes:
     get:
@@ -1640,7 +2070,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   '/v1/validacoes/{id}/decisoes':
     post:
@@ -1679,7 +2108,7 @@ paths:
                 type: string
                 format: uuid
         '403':
-          description: O papel da pessoa não permite esta ação neste ativo.
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
@@ -1753,7 +2182,6 @@ paths:
       security:
         - Bearer: [ ]
         - X-Empresa: [ ]
-          X-Papel: [ ]
           X-Pessoa: [ ]
   /saude:
     get:
@@ -2066,6 +2494,37 @@ components:
           description: 'Criticidade da dependência: baixa, media, alta ou critica.'
       additionalProperties: false
       description: Ativo que aponta para o analisado e ainda vale como referência (publicado ou em revisão).
+    DecidirPleitoRequest:
+      required:
+        - aprovar
+      type: object
+      properties:
+        aprovar:
+          type: boolean
+          description: 'true concede; false nega, e então a resposta é obrigatória.'
+          example: true
+        resposta:
+          type: string
+          description: Resposta a quem pediu. Obrigatória ao negar e ao conceder papel diferente do pleiteado.
+          nullable: true
+          example: Bem-vindo.
+        papelConcedido:
+          type: string
+          description: 'O papel concedido, quando diferente do pleiteado. Só admin concede admin.'
+          nullable: true
+          example: techlead
+        escopoTipo:
+          type: string
+          description: empresa (padrão) ou dominio.
+          nullable: true
+          example: empresa
+        escopoId:
+          type: string
+          description: 'Id do domínio, quando o escopo é dominio.'
+          format: uuid
+          nullable: true
+      additionalProperties: false
+      description: Decisão sobre um pleito de acesso.
     DecidirValidacaoRequest:
       required:
         - aprovada
@@ -2281,6 +2740,32 @@ components:
             fimVigencia: null
             vigente: true
         relacoes: [ ]
+    FilaDePleitosResponse:
+      required:
+        - total
+        - pendentes
+        - podeConcederAdmin
+        - pleitos
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Pleitos na lista.
+          format: int32
+        pendentes:
+          type: integer
+          description: Quantos aguardam decisão.
+          format: int32
+        podeConcederAdmin:
+          type: boolean
+          description: Quem consulta pode conceder o papel de admin (só outro admin).
+        pleitos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PleitoResponse'
+          description: Os pleitos.
+      additionalProperties: false
+      description: 'A fila de pleitos, pendentes primeiro e, entre eles, quem espera há mais tempo.'
     HistoricoResponse:
       required:
         - revisoes
@@ -2361,6 +2846,21 @@ components:
             $ref: '#/components/schemas/AtivoResumoResponse'
       additionalProperties: false
       description: Listagem do catálogo da empresa.
+    ListaDePessoasResponse:
+      required:
+        - total
+        - pessoas
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int32
+        pessoas:
+          type: array
+          items:
+            $ref: '#/components/schemas/PessoaResponse'
+      additionalProperties: false
+      description: 'As pessoas ativas da empresa, por nome.'
     ListaDeValidacoesResponse:
       required:
         - total
@@ -2376,6 +2876,44 @@ components:
             $ref: '#/components/schemas/ValidacaoResponse'
       additionalProperties: false
       description: Fila de validações da empresa.
+    PapelResponse:
+      required:
+        - papel
+        - rotulo
+        - escopoTipo
+        - escopoRotulo
+        - blocos
+        - desde
+      type: object
+      properties:
+        papel:
+          type: string
+          description: 'admin, curador, arquiteto, techlead, negocio ou consulta.'
+        rotulo:
+          type: string
+          description: Nome do papel para pessoas.
+        escopoTipo:
+          type: string
+          description: empresa ou dominio.
+        escopoId:
+          type: string
+          description: 'Id do domínio, quando o escopo é dominio.'
+          format: uuid
+          nullable: true
+        escopoRotulo:
+          type: string
+          description: '"todo o catálogo" ou "domínio Crédito".'
+        blocos:
+          type: array
+          items:
+            type: string
+          description: 'Blocos de tipos em que o papel escreve. Vazio: só consulta.'
+        desde:
+          type: string
+          description: Início da vigência.
+          format: date
+      additionalProperties: false
+      description: 'Um papel que vale agora, como o perfil mostra.'
     PassoResponse:
       required:
         - passo
@@ -2396,6 +2934,171 @@ components:
             type: string
       additionalProperties: false
       description: Passo do caminho até a publicação.
+    PerfilResponse:
+      required:
+        - identificado
+        - modoLeitura
+        - modoDemonstracao
+        - pessoa
+        - papeis
+        - pleitos
+        - blocosQueEscreve
+        - podeConceder
+        - podeConcederAdmin
+        - podeAdministrar
+      type: object
+      properties:
+        identificado:
+          type: boolean
+          description: 'Há pessoa na requisição. Sem pessoa, tudo é consulta.'
+        modoLeitura:
+          type: boolean
+          description: 'A requisição veio com X-Modo: leitura.'
+        modoDemonstracao:
+          type: boolean
+          description: A API aceita X-Papel no lugar dos papéis concedidos.
+        pessoa:
+          $ref: '#/components/schemas/PessoaResponse'
+        papeis:
+          type: array
+          items:
+            $ref: '#/components/schemas/PapelResponse'
+          description: Os papéis que valem agora.
+        pleitos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PleitoResponse'
+          description: 'Os pleitos da pessoa, do mais recente ao mais antigo.'
+        blocosQueEscreve:
+          type: array
+          items:
+            type: string
+          description: 'Blocos de tipos em que a pessoa cadastra agora. Vazio: só consulta.'
+        podeConceder:
+          type: boolean
+          description: Despacha pleitos (curador ou admin).
+        podeConcederAdmin:
+          type: boolean
+          description: Concede o papel de admin (só admin).
+        podeAdministrar:
+          type: boolean
+          description: Administra a ferramenta (admin).
+      additionalProperties: false
+      description: 'Seu perfil: quem você é para a API nesta requisição, e o que pode fazer.'
+    PessoaResponse:
+      required:
+        - id
+        - matricula
+        - nome
+        - email
+        - unidade
+        - ativa
+        - papeis
+      type: object
+      properties:
+        id:
+          type: string
+          description: 'Identificador da pessoa: é o que vai no cabeçalho X-Pessoa.'
+          format: uuid
+        matricula:
+          type: string
+          description: Uma letra seguida de seis números.
+        nome:
+          type: string
+          description: Nome completo.
+        email:
+          type: string
+          description: E-mail informado no cadastro.
+        unidade:
+          type: string
+          description: Código de quatro números da unidade.
+        ativa:
+          type: boolean
+          description: Cadastro inativo não tem papel nenhum.
+        papeis:
+          type: array
+          items:
+            type: string
+          description: 'Chaves dos papéis vigentes, em qualquer escopo.'
+      additionalProperties: false
+      description: Uma pessoa cadastrada.
+    PleitoAbertoResponse:
+      required:
+        - idPessoa
+        - idPleito
+        - status
+      type: object
+      properties:
+        idPessoa:
+          type: string
+          description: 'Quem se cadastrou: vai no cabeçalho X-Pessoa daqui em diante.'
+          format: uuid
+        idPleito:
+          type: string
+          description: O pleito aberto.
+          format: uuid
+        status:
+          type: string
+          description: pendente; aprovado só no primeiro administrador da empresa.
+      additionalProperties: false
+      description: Cadastro registrado e pleito aberto.
+    PleitoResponse:
+      required:
+        - id
+        - status
+        - papelPleiteado
+        - justificativa
+        - criadoEm
+        - pessoa
+        - resposta
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador do pleito.
+          format: uuid
+        status:
+          type: string
+          description: 'pendente, aprovado ou negado.'
+        papelPleiteado:
+          type: string
+          description: O papel pedido.
+        justificativa:
+          type: string
+          description: Por que a pessoa pediu.
+        criadoEm:
+          type: string
+          description: Quando pediu.
+          format: date-time
+        pessoa:
+          $ref: '#/components/schemas/PessoaResponse'
+        papelConcedido:
+          type: string
+          description: 'O papel concedido, quando aprovado.'
+          nullable: true
+        escopoTipo:
+          type: string
+          description: 'empresa ou dominio, quando aprovado.'
+          nullable: true
+        escopoRotulo:
+          type: string
+          description: 'O escopo pelo nome, quando aprovado.'
+          nullable: true
+        decididoPor:
+          type: string
+          description: 'Quem decidiu. Nulo no primeiro administrador, concedido pela configuração.'
+          format: uuid
+          nullable: true
+        decididoEm:
+          type: string
+          description: Quando foi decidido.
+          format: date-time
+          nullable: true
+        resposta:
+          type: string
+          description: A resposta a quem pediu.
+      additionalProperties: false
+      description: Um pleito de acesso.
     PoliticaResponse:
       required:
         - scoreMinimo
@@ -2602,6 +3305,40 @@ components:
       description: Resposta da verificação de vida do processo.
       example:
         situacao: ok
+    SolicitarAcessoRequest:
+      required:
+        - email
+        - matricula
+        - nome
+        - papelPleiteado
+        - unidade
+      type: object
+      properties:
+        matricula:
+          type: string
+          description: Uma letra seguida de seis números. Minúscula vira maiúscula.
+          example: C123456
+        nome:
+          type: string
+          description: 'Nome completo: pelo menos nome e sobrenome.'
+          example: Davi Souza
+        email:
+          type: string
+          example: davi@empresa.com
+        unidade:
+          type: string
+          description: 'Código da unidade, com quatro números.'
+          example: '0427'
+        papelPleiteado:
+          type: string
+          description: 'admin, curador, arquiteto, techlead, negocio ou consulta.'
+          example: techlead
+        justificativa:
+          type: string
+          nullable: true
+          example: Vou cadastrar as APIs do meu time.
+      additionalProperties: false
+      description: Cadastro da pessoa e pedido de papel. Aberto a quem ainda não tem papel nenhum.
     SubmeterAtivoRequest:
       type: object
       properties:
@@ -2698,15 +3435,20 @@ components:
       description: SOMENTE DESENVOLVIMENTO. Id da empresa (UUID). Em produção vem do token.
       name: X-Empresa
       in: header
-    X-Papel:
-      type: apiKey
-      description: 'SOMENTE DESENVOLVIMENTO. admin, curador, arquiteto, techlead, negocio ou consulta.'
-      name: X-Papel
-      in: header
     X-Pessoa:
       type: apiKey
-      description: SOMENTE DESENVOLVIMENTO. Id da pessoa que age (UUID).
+      description: 'SOMENTE DESENVOLVIMENTO. Id da pessoa cadastrada que age (UUID); os papéis são os concedidos a ela. Ausente ou desconhecida, a requisição só consulta.'
       name: X-Pessoa
+      in: header
+    X-Papel:
+      type: apiKey
+      description: 'SOMENTE MODO DEMONSTRAÇÃO (Acesso:ModoDemonstracao). admin, curador, arquiteto, techlead, negocio ou consulta; substitui os papéis concedidos. Fora desse modo é ignorado.'
+      name: X-Papel
+      in: header
+    X-Modo:
+      type: apiKey
+      description: 'SOMENTE DESENVOLVIMENTO. leitura recusa toda escrita (MODO_LEITURA), mesmo para quem tem papel. Ausente vale edição.'
+      name: X-Modo
       in: header
     X-Unidade:
       type: apiKey
@@ -2718,5 +3460,7 @@ tags:
     description: 'Cadastro e consulta de ativos, responsáveis, evidências e relações.'
   - name: Governança
     description: 'Pré-check, submissão e decisão das etapas de validação.'
+  - name: Acesso
+    description: 'Cadastro de pessoa, pleito de papel, concessão e perfil.'
   - name: Operação
     description: Verificações de saúde para o orquestrador.

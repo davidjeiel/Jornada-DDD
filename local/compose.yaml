@@ -161,6 +161,9 @@ services:
       # O cenário piloto do painel-ddd nas duas empresas de teste. Só carrega em
       # empresa vazia: reiniciar não duplica (o volume do emulador guarda os dados).
       Demonstracao__Carregar: "true"
+      # Papel escolhido pelo cabeçalho X-Papel, para testes com curl e
+      # apresentações. Só aqui: fora do ambiente local o papel é o concedido (ADR-0018).
+      Acesso__ModoDemonstracao: "true"
     depends_on:
       cosmos:
         condition: service_healthy

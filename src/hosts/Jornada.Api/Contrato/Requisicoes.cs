@@ -117,3 +117,52 @@ public sealed record DecidirValidacaoRequest
     /// <example>Owner e evidência conferidos.</example>
     public string? Motivo { get; init; }
 }
+
+/// <summary>Cadastro da pessoa e pedido de papel. Aberto a quem ainda não tem papel nenhum.</summary>
+public sealed record SolicitarAcessoRequest
+{
+    /// <summary>Uma letra seguida de seis números. Minúscula vira maiúscula.</summary>
+    /// <example>C123456</example>
+    public required string Matricula { get; init; }
+
+    /// <summary>Nome completo: pelo menos nome e sobrenome.</summary>
+    /// <example>Davi Souza</example>
+    public required string Nome { get; init; }
+
+    /// <example>davi@empresa.com</example>
+    public required string Email { get; init; }
+
+    /// <summary>Código da unidade, com quatro números.</summary>
+    /// <example>0427</example>
+    public required string Unidade { get; init; }
+
+    /// <summary>admin, curador, arquiteto, techlead, negocio ou consulta.</summary>
+    /// <example>techlead</example>
+    public required string PapelPleiteado { get; init; }
+
+    /// <example>Vou cadastrar as APIs do meu time.</example>
+    public string? Justificativa { get; init; }
+}
+
+/// <summary>Decisão sobre um pleito de acesso.</summary>
+public sealed record DecidirPleitoRequest
+{
+    /// <summary>true concede; false nega, e então a resposta é obrigatória.</summary>
+    /// <example>true</example>
+    public required bool Aprovar { get; init; }
+
+    /// <summary>Resposta a quem pediu. Obrigatória ao negar e ao conceder papel diferente do pleiteado.</summary>
+    /// <example>Bem-vindo.</example>
+    public string? Resposta { get; init; }
+
+    /// <summary>O papel concedido, quando diferente do pleiteado. Só admin concede admin.</summary>
+    /// <example>techlead</example>
+    public string? PapelConcedido { get; init; }
+
+    /// <summary>empresa (padrão) ou dominio.</summary>
+    /// <example>empresa</example>
+    public string? EscopoTipo { get; init; }
+
+    /// <summary>Id do domínio, quando o escopo é dominio.</summary>
+    public Guid? EscopoId { get; init; }
+}

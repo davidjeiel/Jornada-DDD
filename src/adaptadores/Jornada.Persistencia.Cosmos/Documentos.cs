@@ -32,6 +32,9 @@ internal static class TiposDeDocumento
     public const string Evento = "evento";
     public const string Revisao = "revisao";
     public const string Auditoria = "auditoria";
+    public const string Pessoa = "pessoa";
+    public const string Matricula = "matricula";
+    public const string Pleito = "pleito";
 }
 
 internal sealed class DocumentoDeAtivo : DocumentoDoCatalogo
@@ -136,6 +139,55 @@ internal sealed class DocumentoDeAuditoria : DocumentoDoCatalogo
     public DateTimeOffset Em { get; init; }
     public Dictionary<string, string>? Antes { get; init; }
     public Dictionary<string, string>? Depois { get; init; }
+}
+
+/// <summary>
+/// Uma pessoa da empresa, com os papéis concedidos embutidos: são lidos juntos
+/// a cada requisição, numa leitura pontual. Partição <c>[empresa, "acesso"]</c>.
+/// </summary>
+internal sealed class DocumentoDePessoa : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Pessoa;
+
+    public required string Matricula { get; init; }
+    public required string Nome { get; init; }
+    public required string Email { get; init; }
+    public required string Unidade { get; init; }
+    public bool Ativa { get; init; }
+    public DateTimeOffset CadastradaEm { get; init; }
+    public List<AtribuicaoEmbutida> Atribuicoes { get; init; } = [];
+}
+
+internal sealed record AtribuicaoEmbutida(
+    string Papel, string EscopoTipo, Guid? EscopoId, DateOnly InicioVigencia, DateOnly? FimVigencia, Guid? ConcedidoPor);
+
+/// <summary>
+/// A reserva da matrícula: id <c>matricula-C123456</c>, criada no mesmo lote da
+/// pessoa. Dois cadastros simultâneos da mesma matrícula colidem no id, em vez
+/// de criar duas pessoas.
+/// </summary>
+internal sealed class DocumentoDeMatricula : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Matricula;
+
+    public required string IdPessoa { get; init; }
+}
+
+internal sealed class DocumentoDePleito : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Pleito;
+
+    public required string IdPessoa { get; init; }
+    public required string PapelPleiteado { get; init; }
+    public required string Justificativa { get; init; }
+    public DateTimeOffset CriadoEm { get; init; }
+    public required string Status { get; init; }
+    public Guid? DecididoPor { get; init; }
+    public DateTimeOffset? DecididoEm { get; init; }
+    public string? PapelConcedido { get; init; }
+    public string? EscopoTipo { get; init; }
+    public Guid? EscopoId { get; init; }
+    public string Resposta { get; init; } = "";
 }
 
 /// <summary>Sequencial do código por (empresa, tipo). Container <c>contadores</c>, partição <c>/empresa</c>.</summary>
