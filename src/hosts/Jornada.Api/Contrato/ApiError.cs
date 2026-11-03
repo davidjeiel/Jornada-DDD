@@ -50,19 +50,30 @@ public static class CodigosDeErro
         ["PAPEL_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["MATRICULA_INVALIDA"] = StatusCodes.Status400BadRequest,
         ["UNIDADE_INVALIDA"] = StatusCodes.Status400BadRequest,
+        ["NOME_INCOMPLETO"] = StatusCodes.Status400BadRequest,
+        ["EMAIL_INVALIDO"] = StatusCodes.Status400BadRequest,
+        ["ESCOPO_INVALIDO"] = StatusCodes.Status400BadRequest,
+        ["ESCOPO_SEM_ALVO"] = StatusCodes.Status400BadRequest,
 
         [EmpresaNaoIdentificada] = StatusCodes.Status401Unauthorized,
+        // Sem pessoa, a pergunta é "quem é você?": 401, e a tela manda ao perfil.
+        ["PESSOA_NAO_IDENTIFICADA"] = StatusCodes.Status401Unauthorized,
         [SemPermissao] = StatusCodes.Status403Forbidden,
+        ["MODO_LEITURA"] = StatusCodes.Status403Forbidden,
+        ["SEGREGACAO_DE_FUNCAO"] = StatusCodes.Status403Forbidden,
 
         ["ATIVO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
         ["VALIDACAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["REVISAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
+        ["PLEITO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
 
         ["TRANSICAO_INVALIDA"] = StatusCodes.Status409Conflict,
         ["VALIDACAO_JA_DECIDIDA"] = StatusCodes.Status409Conflict,
         ["VALIDACAO_OBSOLETA"] = StatusCodes.Status409Conflict,
         ["ATIVO_NAO_EDITAVEL"] = StatusCodes.Status409Conflict,
         ["CONFLITO_DE_EDICAO"] = StatusCodes.Status409Conflict,
+        ["PLEITO_JA_DECIDIDO"] = StatusCodes.Status409Conflict,
+        ["PLEITO_PENDENTE"] = StatusCodes.Status409Conflict,
 
         [ErroInterno] = StatusCodes.Status500InternalServerError,
     };

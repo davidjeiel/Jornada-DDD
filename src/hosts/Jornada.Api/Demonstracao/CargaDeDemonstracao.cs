@@ -20,39 +20,52 @@ namespace Jornada.Api.Demonstracao;
 ///
 /// Só roda com <c>Demonstracao:Carregar=true</c> e só numa empresa sem nenhum
 /// ativo: reiniciar a API com o Cosmos não duplica o catálogo.
+///
+/// As pessoas de teste são a exceção ao "tudo pelos casos de uso": o rito de
+/// acesso precisa de alguém que conceda, e é a carga que faz esse papel. Elas
+/// entram já com o papel concedido, numa empresa sem nenhuma pessoa, mesmo que
+/// o catálogo já exista (ADR-0018).
 /// </summary>
 public sealed class CargaDeDemonstracao(
     IServiceScopeFactory escopos, IRelogio relogio, ILogger<CargaDeDemonstracao> log)
 {
-    /// <summary>Uma pessoa de teste. Os ids são os de <c>frontend/src/usuarios.ts</c>.</summary>
-    private sealed record Pessoa(Guid Id, Papel Papel);
+    /// <summary>Uma pessoa de teste. Os ids e nomes são os de <c>frontend/src/usuarios.ts</c>.</summary>
+    private sealed record PessoaDeTeste(Guid Id, Papel Papel, string Nome, string Matricula, string Unidade);
 
     private sealed record EmpresaDeTeste(
-        IdDeEmpresa Id, IdDeUnidade Unidade,
-        Pessoa Admin, Pessoa Curador, Pessoa Arquiteto, Pessoa TechLead, Pessoa Negocio);
+        IdDeEmpresa Id, IdDeUnidade Unidade, string Dominio,
+        PessoaDeTeste Admin, PessoaDeTeste Curador, PessoaDeTeste Arquiteto, PessoaDeTeste TechLead,
+        PessoaDeTeste Negocio, PessoaDeTeste Consulta)
+    {
+        public PessoaDeTeste[] Pessoas => [Admin, Curador, Arquiteto, TechLead, Negocio, Consulta];
+    }
 
     private static readonly EmpresaDeTeste[] Empresas =
     [
         new(new IdDeEmpresa(Guid.Parse("11111111-1111-1111-1111-111111111111")),
-            new IdDeUnidade(Guid.Parse("a0000000-0000-0000-0000-000000000001")),
-            Admin:     new(Guid.Parse("10000000-0000-0000-0000-000000000001"), Papel.Admin),
-            Curador:   new(Guid.Parse("20000000-0000-0000-0000-000000000001"), Papel.Curador),
-            Arquiteto: new(Guid.Parse("30000000-0000-0000-0000-000000000001"), Papel.Arquiteto),
-            TechLead:  new(Guid.Parse("40000000-0000-0000-0000-000000000001"), Papel.TechLead),
-            Negocio:   new(Guid.Parse("50000000-0000-0000-0000-000000000001"), Papel.Negocio)),
+            new IdDeUnidade(Guid.Parse("a0000000-0000-0000-0000-000000000001")), "horizonte.exemplo",
+            Admin:     new(Guid.Parse("10000000-0000-0000-0000-000000000001"), Papel.Admin, "Ana Ferreira", "C100001", "0001"),
+            Curador:   new(Guid.Parse("20000000-0000-0000-0000-000000000001"), Papel.Curador, "Marina Costa", "C200001", "0001"),
+            Arquiteto: new(Guid.Parse("30000000-0000-0000-0000-000000000001"), Papel.Arquiteto, "Rafael Souza", "C300001", "0002"),
+            TechLead:  new(Guid.Parse("40000000-0000-0000-0000-000000000001"), Papel.TechLead, "Thiago Lima", "C400001", "0002"),
+            Negocio:   new(Guid.Parse("50000000-0000-0000-0000-000000000001"), Papel.Negocio, "Eduardo Melo", "C500001", "0001"),
+            Consulta:  new(Guid.Parse("60000000-0000-0000-0000-000000000001"), Papel.Consulta, "Gustavo Pires", "C600001", "0001")),
         new(new IdDeEmpresa(Guid.Parse("22222222-2222-2222-2222-222222222222")),
-            new IdDeUnidade(Guid.Parse("b0000000-0000-0000-0000-000000000002")),
-            Admin:     new(Guid.Parse("10000000-0000-0000-0000-000000000002"), Papel.Admin),
-            Curador:   new(Guid.Parse("20000000-0000-0000-0000-000000000002"), Papel.Curador),
-            Arquiteto: new(Guid.Parse("30000000-0000-0000-0000-000000000002"), Papel.Arquiteto),
-            TechLead:  new(Guid.Parse("40000000-0000-0000-0000-000000000002"), Papel.TechLead),
-            Negocio:   new(Guid.Parse("50000000-0000-0000-0000-000000000002"), Papel.Negocio)),
+            new IdDeUnidade(Guid.Parse("b0000000-0000-0000-0000-000000000002")), "meridian.exemplo",
+            Admin:     new(Guid.Parse("10000000-0000-0000-0000-000000000002"), Papel.Admin, "Bruno Alves", "C100002", "0101"),
+            Curador:   new(Guid.Parse("20000000-0000-0000-0000-000000000002"), Papel.Curador, "Carla Dias", "C200002", "0102"),
+            Arquiteto: new(Guid.Parse("30000000-0000-0000-0000-000000000002"), Papel.Arquiteto, "Priscila Nunes", "C300002", "0102"),
+            TechLead:  new(Guid.Parse("40000000-0000-0000-0000-000000000002"), Papel.TechLead, "Juliana Ramos", "C400002", "0102"),
+            Negocio:   new(Guid.Parse("50000000-0000-0000-0000-000000000002"), Papel.Negocio, "Fernanda Rocha", "C500002", "0101"),
+            Consulta:  new(Guid.Parse("60000000-0000-0000-0000-000000000002"), Papel.Consulta, "Helena Cardoso", "C600002", "0101")),
     ];
 
     public async Task CarregarAsync(CancellationToken ct = default)
     {
         foreach (var empresa in Empresas)
         {
+            await CarregarPessoasAsync(empresa, ct);
+
             var vazia = await ComoAsync(empresa, empresa.Curador, async sp =>
                 (await sp.GetRequiredService<IRepositorioDeAtivos>().ListarAsync(limite: 1, ct: ct)).Count == 0);
 
@@ -70,6 +83,29 @@ public sealed class CargaDeDemonstracao(
     }
 
     private sealed record Resumo(int Ativos, int Publicados, int NaFila);
+
+    /// <summary>As seis pessoas de teste, cada uma com o seu papel na empresa inteira. Só numa empresa sem pessoas.</summary>
+    private async Task CarregarPessoasAsync(EmpresaDeTeste e, CancellationToken ct)
+    {
+        var cadastradas = await ComoAsync(e, e.Admin, async sp =>
+        {
+            var pessoas = sp.GetRequiredService<IRepositorioDePessoas>();
+            if ((await pessoas.ListarAsync(incluirInativas: true, ct)).Count > 0) return 0;
+
+            foreach (var t in e.Pessoas)
+            {
+                var email = $"{string.Join('.', t.Nome.ToLowerInvariant().Split(' '))}@{e.Dominio}";
+                var pessoa = Pessoa.Cadastrar(e.Id, DadosDeCadastro.Conferir(t.Matricula, t.Nome, email, t.Unidade), relogio, t.Id);
+                pessoa.Conceder(AtribuicaoDePapel.NaEmpresa(t.Papel, relogio.Hoje.AddYears(-1)));
+                await pessoas.AdicionarAsync(pessoa, ct);
+            }
+            await sp.GetRequiredService<IUnidadeDeTrabalho>().ConfirmarAsync(ct);
+            return e.Pessoas.Length;
+        });
+
+        if (cadastradas > 0)
+            log.LogInformation("Carga de demonstração: empresa {Empresa} com {Pessoas} pessoas de teste.", e.Id.Valor, cadastradas);
+    }
 
     private async Task<Resumo> CarregarEmpresaAsync(EmpresaDeTeste e, CancellationToken ct)
     {
@@ -175,7 +211,7 @@ public sealed class CargaDeDemonstracao(
         // tech lead; aqui há uma pessoa por papel em cada empresa de teste.
         var negocial = PapelDeOwnership.OwnerNegocial;
         var tecnico = PapelDeOwnership.OwnerTecnico;
-        (IdDeAtivo Ativo, Pessoa Pessoa, PapelDeOwnership Papel)[] responsaveis =
+        (IdDeAtivo Ativo, PessoaDeTeste Pessoa, PapelDeOwnership Papel)[] responsaveis =
         [
             (domCtr, e.Negocio, negocial), (subOrig, e.Negocio, negocial), (subManut, e.Negocio, negocial),
             (ctxSim, e.Negocio, negocial), (ctxSim, e.TechLead, tecnico),
@@ -284,7 +320,7 @@ public sealed class CargaDeDemonstracao(
     /// Roda <paramref name="acao"/> num escopo novo, como se fosse uma requisição
     /// daquela pessoa naquela empresa: mesmo contexto de tenant, mesmo ator.
     /// </summary>
-    private async Task<T> ComoAsync<T>(EmpresaDeTeste e, Pessoa pessoa, Func<IServiceProvider, Task<T>> acao)
+    private async Task<T> ComoAsync<T>(EmpresaDeTeste e, PessoaDeTeste pessoa, Func<IServiceProvider, Task<T>> acao)
     {
         await using var escopo = escopos.CreateAsyncScope();
         var contexto = escopo.ServiceProvider.GetRequiredService<ContextoDaRequisicao>();

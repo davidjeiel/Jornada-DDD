@@ -49,9 +49,11 @@ describe('quem depende deste ativo', () => {
 
 describe('quem e o quê se descontinua', () => {
   it('segue a permissão e a máquina de estados da API', () => {
-    expect(['admin', 'curador', 'arquiteto'].every((p) => podeDescontinuar(p as never))).toBe(true);
-    expect(podeDescontinuar('negocio')).toBe(false);
-    expect(podeDescontinuar('techlead')).toBe(false);
+    expect(['admin', 'curador', 'arquiteto'].every((p) => podeDescontinuar([p]))).toBe(true);
+    expect(podeDescontinuar(['negocio'])).toBe(false);
+    expect(podeDescontinuar(['techlead', 'negocio'])).toBe(false);
+    expect(podeDescontinuar(['negocio', 'arquiteto'])).toBe(true);
+    expect(podeDescontinuar([])).toBe(false);
     expect(podeSerDescontinuado('publicado') && podeSerDescontinuado('em_revisao')).toBe(true);
     expect(podeSerDescontinuado('rascunho')).toBe(false);
     expect(podeSerArquivado('rascunho') && podeSerArquivado('descontinuado')).toBe(true);

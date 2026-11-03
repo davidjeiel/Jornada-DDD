@@ -1,3 +1,4 @@
+using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -45,12 +46,10 @@ public sealed class CadastrarAtivo(
 
         // Autorização ANTES de qualquer escrita. O alvo carrega o bloco do tipo,
         // que é o que impede alguém de negócio cadastrar um endpoint.
-        var alvo = new AlvoDaAcao(contexto.Empresa, tipo.Chave, tipo.Bloco,
-                                  Unidade: contexto.Unidade);
+        var alvo = await AlvoDoAtivo.DoCadastroAsync(ativos, contexto, tipo, cmd.IdPai, ct);
 
         if (!PoliticaDeAutorizacao.Pode(ator, Acao.Cadastrar, alvo, relogio.Hoje))
-            return Resultado<IdDeAtivo>.Recusado("SEM_PERMISSAO",
-                $"Sem permissão para cadastrar ativos do bloco '{tipo.Bloco}'.");
+            return Recusa.Para<IdDeAtivo>(ator, $"Sem permissão para cadastrar ativos do bloco '{tipo.Bloco}'.");
 
         // Hierarquia: regra de aplicação, não constraint de banco (docs/MODELO.md).
         if (tipo.Pai is not null && cmd.IdPai is { } idPai)

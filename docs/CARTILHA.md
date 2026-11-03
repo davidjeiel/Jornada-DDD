@@ -34,13 +34,20 @@ Vale para qualquer papel. Faça isto uma vez e o resto da cartilha faz sentido.
 
 ### 1. Escolha quem você é
 
-Esta primeira versão ainda não tem identidade real (Entra External ID/Keycloak entram no
-roteiro — ver [ADR-0007](adr/0007-identidade-autenticacao-autorizacao.md)). Em vez de
-login, a tela tem um **seletor de usuários de teste**: clique no nome da empresa ou no seu
-avatar, no rodapé do menu lateral. São doze pessoas — duas para cada papel —, espalhadas em
-duas empresas (**Horizonte Seguros** e **Meridian Logística**) e quatro unidades. Trocar de
-usuário troca empresa, papel e unidade de uma vez, e recarrega o catálogo inteiro: é assim
-que se testa isolamento entre empresas e segregação de função sem abrir uma segunda aba.
+Esta versão ainda não tem identidade real (Entra External ID/Keycloak entram no roteiro —
+ver [ADR-0007](adr/0007-identidade-autenticacao-autorizacao.md)). Em vez de login, abra
+**Seu perfil** (o seu nome, ou "Quem é você?", no alto da tela) e escolha, em **Quem é
+você**, a pessoa cadastrada que você é. No ambiente local há doze pessoas de teste, uma por
+papel em cada uma das duas empresas (**Horizonte Seguros** e **Meridian Logística**); os
+botões das empresas trocam o catálogo inteiro.
+
+O papel **não se escolhe**: é o concedido à pessoa ([ADR-0018](adr/0018-papel-concedido-e-rito-de-acesso.md)).
+Sem cadastro, use **Solicitar acesso**: informe matrícula, nome, e-mail e unidade e diga de
+que papel precisa. O cadastro não concede nada; até um curador ou administrador decidir,
+você consulta o catálogo inteiro e acompanha o pedido em Seu perfil.
+
+Em Seu perfil também fica o **modo de trabalho**: em **Leitura**, nada que escreve
+aparece, e a API recusa toda escrita, mesmo que o seu papel permita.
 
 A escolha fica salva no seu navegador — ao voltar, você continua como a mesma pessoa.
 
@@ -213,8 +220,9 @@ alguém resolver.
 
 **O que o `painel-ddd` já dava ao curador, e esta versão ainda não tem**
 
-- **Conceder papéis pleiteados** — hoje não existe fluxo de solicitação de acesso; a
-  identidade é o seletor de usuários de teste (ver [Os primeiros minutos](#os-primeiros-minutos))
+- **Conceder papéis pleiteados** — já existe: **Pleitos de acesso**, no grupo
+  Administração do menu. Você concede todo papel menos o de administrador, e não decide o
+  próprio pleito; negar, ou conceder papel diferente do pedido, exige resposta
 - **Importar descobertas e triar bandeja** — ADR-0012 lista descoberta automática como
   item do roteiro, não desta fase
 
@@ -279,7 +287,7 @@ direto.
   `publicado` e `em_revisao` são consumíveis; `rascunho` não é promessa de nada.
 - *"Quantos ativos a empresa tem, e como estão distribuídos?"* — **Indicadores**.
 
-> **Trocando para um usuário de outra empresa** no seletor, o catálogo muda por completo —
+> **Trocando de empresa** em Seu perfil, o catálogo muda por completo —
 > é a prova mais direta de que o isolamento é de banco, não de tela.
 
 ---
@@ -350,12 +358,13 @@ As confusões mais prováveis com a versão atual, e o que fazer com cada uma.
 **"O botão que eu usava sumiu"**
 Duas causas, nesta ordem: o seu **papel** não permite aquela ação (veja a tabela acima);
 ou o ativo é de um **bloco que o seu papel não escreve** — negócio não mexe em ativo
-técnico e vice-versa. Confira quem você é no rodapé do menu lateral.
+técnico e vice-versa. Confira quem você é, e se está em modo de leitura, em Seu perfil.
 
 **"Não consigo decidir esta validação"**
-Ou a **etapa exige um papel** que você não tem — troque para um usuário de teste com o
-papel certo —, ou **você mesmo submeteu** essa revisão. No segundo caso não há o que
-ajustar: escolha outro usuário de teste (de empresa e papel compatíveis) para decidir.
+Ou a **etapa exige um papel** que você não tem — peça o papel em Solicitar acesso, ou, no
+ambiente de teste, entre como uma pessoa que o tenha —, ou **você mesmo submeteu** essa
+revisão. No segundo caso não há o que ajustar: outra pessoa tem de decidir. Confira também
+se você não está em modo de leitura.
 
 **"Meu ativo não publica"**
 Abra a **ficha completa** e olhe o **pré-check**, no painel de detalhe: score, dimensões
@@ -364,13 +373,12 @@ anexe uma evidência ou assuma o ativo, e o score sobe.
 
 **"Cadastrei em uma empresa e não vejo em outra"**
 Esperado, não é bug: cada empresa é isolada pela chave de partição no Cosmos DB
-([ADR-0016](adr/0016-cosmos-db-como-sistema-de-registro.md)). Troque de usuário para uma pessoa da
-outra empresa no seletor — o catálogo é outro, de propósito.
+([ADR-0016](adr/0016-cosmos-db-como-sistema-de-registro.md)). Troque de empresa em Seu perfil — o
+catálogo é outro, de propósito.
 
 **Recursos do `painel-ddd` que esta cartilha não promete ainda**
 Busca global, "Minha mesa", notificações (sino), grafo navegável de relações, painel
-executivo clicável, descoberta automática por OpenAPI/Git, e o fluxo de solicitação de
-papel — todos estão no roteiro (ver [ADR-0012](adr/0012-estrategia-de-migracao.md) e o
+executivo clicável e descoberta automática por OpenAPI/Git — todos estão no roteiro (ver [ADR-0012](adr/0012-estrategia-de-migracao.md) e o
 README, seção "O que ainda não existe"), nenhum está construído nesta fase. Se você
 esperava um desses e não achou, não é engano seu.
 

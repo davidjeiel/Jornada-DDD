@@ -1,3 +1,4 @@
+using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -46,11 +47,10 @@ public sealed class RelacionarAtivos(
 
         var tipoDaOrigem = (await metamodelo.ObterAsync(ct)).Obter(origem.TipoItem);
         var ator = await atorAtual.ObterAsync(ct);
-        var alvo = new AlvoDaAcao(tenant.Atual.Empresa, tipoDaOrigem.Chave, tipoDaOrigem.Bloco,
-                                  Unidade: tenant.Atual.Unidade);
+        var alvo = await AlvoDoAtivo.ResolverAsync(ativos, tenant.Atual, origem, tipoDaOrigem, ct);
 
         if (!PoliticaDeAutorizacao.Pode(ator, Acao.Relacionar, alvo, relogio.Hoje))
-            return Resultado<bool>.Recusado("SEM_PERMISSAO", "Sem permissão para relacionar este ativo.");
+            return Recusa.Para<bool>(ator, "Sem permissão para relacionar este ativo.");
 
         // Ida E volta: TemDependenciaCircularAsync (avaliada no pré-check) faz
         // busca em profundidade sobre "depende_de" — uma aresta na direção

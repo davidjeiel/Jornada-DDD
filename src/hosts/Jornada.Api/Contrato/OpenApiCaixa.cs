@@ -57,10 +57,11 @@ public static class OpenApiCaixa
     public const string TagCatalogo = "Catálogo";
     public const string TagGovernanca = "Governança";
     public const string TagOperacao = "Operação";
+    public const string TagAcesso = "Acesso";
 
     // Esquemas de segurança.
     public const string EsquemaBearer = "Bearer";
-    public static readonly string[] CabecalhosDeDesenvolvimento = ["X-Empresa", "X-Papel", "X-Pessoa", "X-Unidade"];
+    public static readonly string[] CabecalhosDeDesenvolvimento = ["X-Empresa", "X-Pessoa", "X-Papel", "X-Modo", "X-Unidade"];
 
     public static IServiceCollection AdicionarContratoOpenApi(
         this IServiceCollection servicos, MetadadosDoContrato meta)
@@ -123,8 +124,9 @@ public static class OpenApiCaixa
     private static string DescricaoDoCabecalho(string cabecalho) => cabecalho switch
     {
         "X-Empresa" => "SOMENTE DESENVOLVIMENTO. Id da empresa (UUID). Em produção vem do token.",
-        "X-Papel" => "SOMENTE DESENVOLVIMENTO. admin, curador, arquiteto, techlead, negocio ou consulta.",
-        "X-Pessoa" => "SOMENTE DESENVOLVIMENTO. Id da pessoa que age (UUID).",
+        "X-Papel" => "SOMENTE MODO DEMONSTRAÇÃO (Acesso:ModoDemonstracao). admin, curador, arquiteto, techlead, negocio ou consulta; substitui os papéis concedidos. Fora desse modo é ignorado.",
+        "X-Pessoa" => "SOMENTE DESENVOLVIMENTO. Id da pessoa cadastrada que age (UUID); os papéis são os concedidos a ela. Ausente ou desconhecida, a requisição só consulta.",
+        "X-Modo" => "SOMENTE DESENVOLVIMENTO. leitura recusa toda escrita (MODO_LEITURA), mesmo para quem tem papel. Ausente vale edição.",
         "X-Unidade" => "SOMENTE DESENVOLVIMENTO. Id da unidade da pessoa (UUID), escopo de autorização.",
         _ => "SOMENTE DESENVOLVIMENTO.",
     };
@@ -150,6 +152,7 @@ internal sealed class FiltroDoDocumento(MetadadosDoContrato meta) : IDocumentFil
         {
             new() { Name = OpenApiCaixa.TagCatalogo, Description = "Cadastro e consulta de ativos, responsáveis, evidências e relações." },
             new() { Name = OpenApiCaixa.TagGovernanca, Description = "Pré-check, submissão e decisão das etapas de validação." },
+            new() { Name = OpenApiCaixa.TagAcesso, Description = "Cadastro de pessoa, pleito de papel, concessão e perfil." },
             new() { Name = OpenApiCaixa.TagOperacao, Description = "Verificações de saúde para o orquestrador." },
         };
     }
@@ -227,7 +230,7 @@ internal sealed class FiltroDeOperacao : IOperationFilter
         ["204"] = "Operação concluída, sem conteúdo de resposta.",
         ["400"] = "Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.",
         ["401"] = "Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).",
-        ["403"] = "O papel da pessoa não permite esta ação neste ativo.",
+        ["403"] = "O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).",
         ["404"] = "Recurso não encontrado nesta empresa.",
         ["409"] = "Conflito com o estado atual do recurso.",
         ["422"] = "Regra de negócio não atendida.",
@@ -252,7 +255,7 @@ internal sealed class FiltroDeOperacao : IOperationFilter
         if (!ehOperacao)
         {
             // Duas alternativas (OU): o token de produção, ou os cabeçalhos de
-            // desenvolvimento juntos (E). X-Unidade fica fora: é opcional.
+            // desenvolvimento juntos (E). X-Papel, X-Modo e X-Unidade ficam fora: são opcionais.
             operacao.Security =
             [
                 new OpenApiSecurityRequirement
@@ -262,7 +265,6 @@ internal sealed class FiltroDeOperacao : IOperationFilter
                 new OpenApiSecurityRequirement
                 {
                     [new OpenApiSecuritySchemeReference("X-Empresa", contexto.Document)] = [],
-                    [new OpenApiSecuritySchemeReference("X-Papel", contexto.Document)] = [],
                     [new OpenApiSecuritySchemeReference("X-Pessoa", contexto.Document)] = [],
                 },
             ];

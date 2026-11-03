@@ -1,3 +1,4 @@
+using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -32,10 +33,10 @@ public sealed class ArquivarAtivo(
 
         var tipo = (await metamodelo.ObterAsync(ct)).Obter(ativo.TipoItem);
         var ator = await atorAtual.ObterAsync(ct);
-        var alvo = new AlvoDaAcao(tenant.Atual.Empresa, tipo.Chave, tipo.Bloco, Unidade: tenant.Atual.Unidade);
+        var alvo = await AlvoDoAtivo.ResolverAsync(ativos, tenant.Atual, ativo, tipo, ct);
 
         if (!PoliticaDeAutorizacao.Pode(ator, Acao.Descontinuar, alvo, relogio.Hoje))
-            return Resultado<bool>.Recusado("SEM_PERMISSAO", "Sem permissão para arquivar este ativo.");
+            return Recusa.Para<bool>(ator, "Sem permissão para arquivar este ativo.");
 
         if (!MaquinaDeCicloDeVida.Permite(ativo.Status, StatusCicloVida.Arquivado))
         {

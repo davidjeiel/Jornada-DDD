@@ -4,15 +4,15 @@
 import { useState, type FormEvent } from 'react';
 import { Archive, CircleOff } from 'lucide-react';
 import type { Impacto } from '../api';
-import type { Papel } from '../usuarios';
 import { Criticidade } from '../componentes';
 
 // Espelho de PERMISSOES[descontinuar] (PoliticaDeAutorizacao). A API decide;
 // isto só evita oferecer um botão que vai ser recusado.
-const PAPEIS_QUE_DESCONTINUAM: Papel[] = ['admin', 'curador', 'arquiteto'];
+const PAPEIS_QUE_DESCONTINUAM = ['admin', 'curador', 'arquiteto'];
 
-export function podeDescontinuar(papel: Papel): boolean {
-  return PAPEIS_QUE_DESCONTINUAM.includes(papel);
+/** Algum dos papéis concedidos descontinua? */
+export function podeDescontinuar(papeis: string[]): boolean {
+  return papeis.some((papel) => PAPEIS_QUE_DESCONTINUAM.includes(papel));
 }
 
 export function podeSerDescontinuado(status: string): boolean {

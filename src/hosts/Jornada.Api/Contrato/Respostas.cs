@@ -1,5 +1,7 @@
+using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Consultas;
 using Jornada.Aplicacao.Portas;
+using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Governanca;
 
@@ -218,3 +220,114 @@ public sealed record ListaDeValidacoesResponse(int Total, IReadOnlyList<Validaca
 /// <summary>Resposta da verificação de vida do processo.</summary>
 /// <example>ok</example>
 public sealed record SaudeResponse(string Situacao);
+
+/// <summary>Uma pessoa cadastrada.</summary>
+/// <param name="Id">Identificador da pessoa: é o que vai no cabeçalho X-Pessoa.</param>
+/// <param name="Matricula">Uma letra seguida de seis números.</param>
+/// <param name="Nome">Nome completo.</param>
+/// <param name="Email">E-mail informado no cadastro.</param>
+/// <param name="Unidade">Código de quatro números da unidade.</param>
+/// <param name="Ativa">Cadastro inativo não tem papel nenhum.</param>
+/// <param name="Papeis">Chaves dos papéis vigentes, em qualquer escopo.</param>
+public sealed record PessoaResponse(
+    Guid Id, string Matricula, string Nome, string Email, string Unidade, bool Ativa, IReadOnlyList<string> Papeis)
+{
+    public static PessoaResponse De(Pessoa p, DateOnly hoje) => new(
+        p.Id, p.Matricula.Valor, p.Nome, p.Email, p.Unidade.Valor, p.Ativa,
+        p.Vigentes(hoje).Select(a => a.Papel.Chave()).Distinct().Order().ToArray());
+}
+
+/// <summary>As pessoas ativas da empresa, por nome.</summary>
+public sealed record ListaDePessoasResponse(int Total, IReadOnlyList<PessoaResponse> Pessoas);
+
+/// <summary>Um papel que vale agora, como o perfil mostra.</summary>
+/// <param name="Papel">admin, curador, arquiteto, techlead, negocio ou consulta.</param>
+/// <param name="Rotulo">Nome do papel para pessoas.</param>
+/// <param name="EscopoTipo">empresa ou dominio.</param>
+/// <param name="EscopoId">Id do domínio, quando o escopo é dominio.</param>
+/// <param name="EscopoRotulo">"todo o catálogo" ou "domínio Crédito".</param>
+/// <param name="Blocos">Blocos de tipos em que o papel escreve. Vazio: só consulta.</param>
+/// <param name="Desde">Início da vigência.</param>
+public sealed record PapelResponse(
+    string Papel, string Rotulo, string EscopoTipo, Guid? EscopoId, string EscopoRotulo,
+    IReadOnlyList<string> Blocos, DateOnly Desde)
+{
+    public static PapelResponse De(PapelLegivel p) => new(
+        p.Atribuicao.Papel.Chave(), p.Atribuicao.Papel.Rotulo(), p.Atribuicao.EscopoTipo.ToString().ToLowerInvariant(),
+        p.Atribuicao.EscopoId, p.EscopoRotulo, p.Blocos, p.Atribuicao.InicioVigencia);
+}
+
+/// <summary>Um pleito de acesso.</summary>
+/// <param name="Id">Identificador do pleito.</param>
+/// <param name="Status">pendente, aprovado ou negado.</param>
+/// <param name="PapelPleiteado">O papel pedido.</param>
+/// <param name="Justificativa">Por que a pessoa pediu.</param>
+/// <param name="CriadoEm">Quando pediu.</param>
+/// <param name="Pessoa">Quem pediu.</param>
+/// <param name="PapelConcedido">O papel concedido, quando aprovado.</param>
+/// <param name="EscopoTipo">empresa ou dominio, quando aprovado.</param>
+/// <param name="EscopoRotulo">O escopo pelo nome, quando aprovado.</param>
+/// <param name="DecididoPor">Quem decidiu. Nulo no primeiro administrador, concedido pela configuração.</param>
+/// <param name="DecididoEm">Quando foi decidido.</param>
+/// <param name="Resposta">A resposta a quem pediu.</param>
+public sealed record PleitoResponse(
+    Guid Id, string Status, string PapelPleiteado, string Justificativa, DateTimeOffset CriadoEm, PessoaResponse? Pessoa,
+    string? PapelConcedido, string? EscopoTipo, string? EscopoRotulo, Guid? DecididoPor, DateTimeOffset? DecididoEm, string Resposta)
+{
+    public static PleitoResponse De(PleitoLegivel l, DateOnly hoje) => new(
+        l.Pleito.Id, Rotulo(l.Pleito.Status), l.Pleito.PapelPleiteado.Chave(), l.Pleito.Justificativa, l.Pleito.CriadoEm,
+        l.Pessoa is { } p ? PessoaResponse.De(p, hoje) : null,
+        l.Pleito.PapelConcedido?.Chave(), l.Pleito.EscopoTipo?.ToString().ToLowerInvariant(), l.EscopoRotulo,
+        l.Pleito.DecididoPor, l.Pleito.DecididoEm, l.Pleito.Resposta);
+
+    public static string Rotulo(StatusDoPleito s) => s switch
+    {
+        StatusDoPleito.Aprovado => "aprovado",
+        StatusDoPleito.Negado => "negado",
+        _ => "pendente",
+    };
+}
+
+/// <summary>A fila de pleitos, pendentes primeiro e, entre eles, quem espera há mais tempo.</summary>
+/// <param name="Total">Pleitos na lista.</param>
+/// <param name="Pendentes">Quantos aguardam decisão.</param>
+/// <param name="PodeConcederAdmin">Quem consulta pode conceder o papel de admin (só outro admin).</param>
+/// <param name="Pleitos">Os pleitos.</param>
+public sealed record FilaDePleitosResponse(int Total, int Pendentes, bool PodeConcederAdmin, IReadOnlyList<PleitoResponse> Pleitos)
+{
+    public static FilaDePleitosResponse De(ListarPleitos.Saida s, DateOnly hoje) => new(
+        s.Pleitos.Count, s.Pendentes, s.PodeConcederAdmin, s.Pleitos.Select(p => PleitoResponse.De(p, hoje)).ToArray());
+}
+
+/// <summary>Cadastro registrado e pleito aberto.</summary>
+/// <param name="IdPessoa">Quem se cadastrou: vai no cabeçalho X-Pessoa daqui em diante.</param>
+/// <param name="IdPleito">O pleito aberto.</param>
+/// <param name="Status">pendente; aprovado só no primeiro administrador da empresa.</param>
+public sealed record PleitoAbertoResponse(Guid IdPessoa, Guid IdPleito, string Status);
+
+/// <summary>
+/// Seu perfil: quem você é para a API nesta requisição, e o que pode fazer.
+/// </summary>
+/// <param name="Identificado">Há pessoa na requisição. Sem pessoa, tudo é consulta.</param>
+/// <param name="ModoLeitura">A requisição veio com X-Modo: leitura.</param>
+/// <param name="ModoDemonstracao">A API aceita X-Papel no lugar dos papéis concedidos.</param>
+/// <param name="Pessoa">O cadastro, quando a pessoa existe.</param>
+/// <param name="Papeis">Os papéis que valem agora.</param>
+/// <param name="Pleitos">Os pleitos da pessoa, do mais recente ao mais antigo.</param>
+/// <param name="BlocosQueEscreve">Blocos de tipos em que a pessoa cadastra agora. Vazio: só consulta.</param>
+/// <param name="PodeConceder">Despacha pleitos (curador ou admin).</param>
+/// <param name="PodeConcederAdmin">Concede o papel de admin (só admin).</param>
+/// <param name="PodeAdministrar">Administra a ferramenta (admin).</param>
+public sealed record PerfilResponse(
+    bool Identificado, bool ModoLeitura, bool ModoDemonstracao, PessoaResponse? Pessoa,
+    IReadOnlyList<PapelResponse> Papeis, IReadOnlyList<PleitoResponse> Pleitos, IReadOnlyList<string> BlocosQueEscreve,
+    bool PodeConceder, bool PodeConcederAdmin, bool PodeAdministrar)
+{
+    public static PerfilResponse De(ConsultarPerfil.Saida s, bool modoDemonstracao, DateOnly hoje) => new(
+        s.Ator.Identificado, s.Ator.ModoLeitura, modoDemonstracao,
+        s.Pessoa is { } p ? PessoaResponse.De(p, hoje) : null,
+        s.Papeis.Select(PapelResponse.De).ToArray(),
+        s.Pleitos.Select(l => PleitoResponse.De(l, hoje)).ToArray(),
+        s.BlocosQueEscreve.Order().ToArray(),
+        s.PodeConceder, s.PodeConcederAdmin, s.PodeAdministrar);
+}

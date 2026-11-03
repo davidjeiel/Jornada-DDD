@@ -20,7 +20,7 @@ namespace Jornada.Persistencia.Cosmos;
 /// falhar depois do primeiro. Hoje nenhum caso de uso faz isso (ADR-0016,
 /// consequências negativas).
 /// </summary>
-public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRelacoes,
+public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRelacoes,
     IRepositorioDeValidacoes, IUnidadeDeTrabalho, IRepositorioDeRevisoes, ITrilhaDeAuditoria
 {
     private readonly AcessoDoTenant _acesso;
@@ -257,9 +257,10 @@ public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRela
 
     public async Task<int> ConfirmarAsync(CancellationToken ct = default)
     {
-        var lotes = new Dictionary<IdDeAtivo, AcessoDoTenant.Lote>();
-        AcessoDoTenant.Lote LoteDe(IdDeAtivo particao) =>
+        var lotes = new Dictionary<string, AcessoDoTenant.Lote>();
+        AcessoDoTenant.Lote LoteNa(string particao) =>
             lotes.TryGetValue(particao, out var lote) ? lote : lotes[particao] = _acesso.NovoLote(particao);
+        AcessoDoTenant.Lote LoteDe(IdDeAtivo ativo) => LoteNa(Mapeamento.Texto(ativo.Valor));
 
         var eventos = new List<(Ativo Ativo, int Quantos)>();
 
@@ -284,6 +285,8 @@ public sealed class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRela
 
         foreach (var registro in _auditoriaPendente)
             LoteDe(registro.Ativo).Criar(Mapeamento.ParaDocumento(registro));
+
+        AgendarAcesso(LoteNa(AcessoDoTenant.ParticaoDeAcesso));
 
         foreach (var lote in lotes.Values)
             await lote.ExecutarAsync(ct);

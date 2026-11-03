@@ -28,12 +28,21 @@ internal sealed class AcessoDoTenant(BancoDoCatalogo banco, IContextoDeTenantAtu
     private readonly Container _catalogo = banco.Catalogo;
     private readonly Container _contadores = banco.Contadores;
 
+    /// <summary>
+    /// A partição das pessoas e dos pleitos da empresa: <c>[empresa, "acesso"]</c>.
+    /// Uma só por empresa, para que a pessoa, a reserva da matrícula e o pleito
+    /// entrem no mesmo lote (ADR-0018).
+    /// </summary>
+    public const string ParticaoDeAcesso = "acesso";
+
     public IdDeEmpresa Empresa => tenant.Atual.Empresa;
 
     private string EmpresaTexto => Mapeamento.Texto(Empresa.Valor);
 
-    private PartitionKey Chave(IdDeAtivo particao) =>
-        new PartitionKeyBuilder().Add(EmpresaTexto).Add(Mapeamento.Texto(particao.Valor)).Build();
+    private PartitionKey Chave(IdDeAtivo particao) => Chave(Mapeamento.Texto(particao.Valor));
+
+    private PartitionKey Chave(string particao) =>
+        new PartitionKeyBuilder().Add(EmpresaTexto).Add(particao).Build();
 
     private PartitionKey PrefixoDaEmpresa => new PartitionKeyBuilder().Add(EmpresaTexto).Build();
 
@@ -43,7 +52,11 @@ internal sealed class AcessoDoTenant(BancoDoCatalogo banco, IContextoDeTenantAtu
         where T : DocumentoDoCatalogo =>
         LerAsync<T>(particao, Mapeamento.Texto(id), ct);
 
-    public async Task<T?> LerAsync<T>(IdDeAtivo particao, string id, CancellationToken ct)
+    public Task<T?> LerAsync<T>(IdDeAtivo particao, string id, CancellationToken ct)
+        where T : DocumentoDoCatalogo =>
+        LerAsync<T>(Mapeamento.Texto(particao.Valor), id, ct);
+
+    public async Task<T?> LerAsync<T>(string particao, string id, CancellationToken ct)
         where T : DocumentoDoCatalogo
     {
         try
@@ -109,10 +122,11 @@ internal sealed class AcessoDoTenant(BancoDoCatalogo banco, IContextoDeTenantAtu
     public async Task CriarAsync<T>(T documento, CancellationToken ct) where T : DocumentoDoCatalogo
     {
         Conferir(documento, null);
-        await _catalogo.CreateItemAsync(documento, Chave(new IdDeAtivo(Guid.Parse(documento.IdAtivo))), cancellationToken: ct);
+        await _catalogo.CreateItemAsync(documento, Chave(documento.IdAtivo), cancellationToken: ct);
     }
 
-    public Lote NovoLote(IdDeAtivo particao) => new(this, particao);
+    /// <param name="particao">O id de um ativo, ou <see cref="ParticaoDeAcesso"/>.</param>
+    public Lote NovoLote(string particao) => new(this, particao);
 
     /// <summary>
     /// Sequencial por (empresa, nome) com incremento atômico no servidor. O
@@ -156,18 +170,18 @@ internal sealed class AcessoDoTenant(BancoDoCatalogo banco, IContextoDeTenantAtu
         return documento;
     }
 
-    private void Conferir(DocumentoDoCatalogo documento, IdDeAtivo? particao)
+    private void Conferir(DocumentoDoCatalogo documento, string? particao)
     {
         if (documento.Empresa != EmpresaTexto)
             throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de gravar documento de outra empresa.");
-        if (particao is { } p && documento.IdAtivo != Mapeamento.Texto(p.Valor))
+        if (particao is not null && documento.IdAtivo != particao)
             throw new InvalidOperationException(
-                $"Documento {documento.Tipo} {documento.Id} não pertence à partição do ativo {p}.");
+                $"Documento {documento.Tipo} {documento.Id} não pertence à partição {particao}.");
     }
 
     /// <summary>
-    /// Um <c>TransactionalBatch</c> sobre a partição de UM ativo: tudo entra ou
-    /// nada entra (ADR-0016 §2). Cada operação leva um retorno que recebe o
+    /// Um <c>TransactionalBatch</c> sobre UMA partição (a de um ativo, ou a de
+    /// acesso): tudo entra ou nada entra (ADR-0016 §2). Cada operação leva um retorno que recebe o
     /// ETag novo, para o rastreamento da sessão continuar valendo depois.
     /// </summary>
     public sealed class Lote
@@ -176,11 +190,11 @@ internal sealed class AcessoDoTenant(BancoDoCatalogo banco, IContextoDeTenantAtu
         private const int LimiteDeOperacoes = 100;
 
         private readonly AcessoDoTenant _acesso;
-        private readonly IdDeAtivo _particao;
+        private readonly string _particao;
         private readonly TransactionalBatch _lote;
         private readonly List<Action<string>> _aoConfirmar = [];
 
-        internal Lote(AcessoDoTenant acesso, IdDeAtivo particao)
+        internal Lote(AcessoDoTenant acesso, string particao)
         {
             _acesso = acesso;
             _particao = particao;

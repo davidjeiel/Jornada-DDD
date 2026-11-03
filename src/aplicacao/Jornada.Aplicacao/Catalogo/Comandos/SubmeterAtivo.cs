@@ -1,4 +1,5 @@
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -44,12 +45,10 @@ public sealed class SubmeterAtivo(
         var ator = await atorAtual.ObterAsync(ct);
         var contexto = tenant.Atual;
 
-        var alvo = new AlvoDaAcao(contexto.Empresa, tipo.Chave, tipo.Bloco,
-                                  Unidade: contexto.Unidade);
+        var alvo = await AlvoDoAtivo.ResolverAsync(ativos, contexto, ativo, tipo, ct);
 
         if (!PoliticaDeAutorizacao.Pode(ator, Acao.Submeter, alvo, relogio.Hoje))
-            return Resultado<Saida>.Recusado("SEM_PERMISSAO",
-                "Sem permissão para submeter este ativo.");
+            return Recusa.Para<Saida>(ator, "Sem permissão para submeter este ativo.");
 
         // O ciclo de vida é verificado antes do pré-check: não adianta dizer que
         // faltam evidências num ativo que já está publicado.

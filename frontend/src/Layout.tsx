@@ -3,13 +3,15 @@ import { Bell, ChevronsLeft, ChevronsRight, HelpCircle, Search } from 'lucide-re
 import { CARTILHA, itensVisiveis, type Grupo, type ItemDeMenu, type Secao } from './navegacao';
 import { estadoDoTema, type Tema } from './preferencias';
 import { Link } from './roteador';
-import { empresaDe, type UsuarioDeTeste } from './usuarios';
+import type { Perfil } from './api';
 
 const GRUPOS: (Grupo | undefined)[] = [undefined, 'Trabalhar', 'Você', 'Administração'];
 
 type Props = {
   secao: Secao;
-  usuario: UsuarioDeTeste;
+  /** Nulo enquanto a API não respondeu: ninguém identificado, nada de administração. */
+  perfil: Perfil | null;
+  nomeDaEmpresa: string;
   tema: Tema;
   onAlternarTema: () => void;
   menuCompacto: boolean;
@@ -19,8 +21,10 @@ type Props = {
   children: ReactNode;
 };
 
-export function Layout({ secao, usuario, tema, onAlternarTema, menuCompacto, onAlternarMenu, termo, onBuscar, children }: Props) {
-  const itens = itensVisiveis(usuario.papel);
+export function Layout({ secao, perfil, nomeDaEmpresa, tema, onAlternarTema, menuCompacto, onAlternarMenu, termo, onBuscar, children }: Props) {
+  const itens = itensVisiveis(perfil ?? { podeConceder: false, podeAdministrar: false });
+  const nome = perfil?.pessoa?.nome ?? 'Quem é você?';
+  const papel = perfil?.papeis.map((p) => p.rotulo).join(', ') || (perfil?.identificado ? 'Sem papel: só consulta' : 'Não identificado');
   const estadoTema = estadoDoTema(tema);
   const campoBusca = useRef<HTMLInputElement>(null);
 
@@ -99,7 +103,10 @@ export function Layout({ secao, usuario, tema, onAlternarTema, menuCompacto, onA
                 <Bell size={15} aria-hidden="true" /> <span className="rotulo-topo">Notificações</span>
               </Link>
               <Link className={secao === 'perfil' ? 'quem ativo' : 'quem'} href="/perfil" title="Seu perfil: quem assina o que você fizer">
-                <span className="quem-texto"><strong>{usuario.nome}</strong><small>{usuario.rotuloPapel} · {empresaDe(usuario).nome}</small></span>
+                <span className="quem-texto">
+                  <strong>{nome}</strong>
+                  <small>{papel} · {nomeDaEmpresa}{perfil?.modoLeitura && <span className="modo-leitura"> · modo leitura</span>}</small>
+                </span>
               </Link>
               {/* Ao lado de quem você é: o que o seu papel permite fazer. */}
               <Link

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
-import { definirUsuarioAtual, empresaDe, listarAtivos, listarValidacoes, obterUsuarioAtual, type AtivoResumo, type Validacao } from './api';
+import {
+  consultarPerfil, definirAoFaltarIdentificacao, definirIdentidade, listarAtivos, listarPessoas, listarValidacoes, obterIdentidade,
+  type AtivoResumo, type Perfil as DadosDoPerfil, type Pessoa, type Validacao,
+} from './api';
 import { Erro } from './componentes';
+import { gravarIdentidade, type Identidade } from './identidade';
 import { Layout } from './Layout';
 import { itemDaSecao, secaoDoCaminho } from './navegacao';
 import {
@@ -12,9 +16,11 @@ import { Catalogo } from './telas/Catalogo';
 import { EmBreve, NaoEncontrada } from './telas/EmBreve';
 import { NovoAtivo } from './telas/NovoAtivo';
 import { Perfil } from './telas/Perfil';
+import { Pleitos } from './telas/Pleitos';
+import { SolicitarAcesso } from './telas/SolicitarAcesso';
 import { Validacoes } from './telas/Validacoes';
 import { VisaoExecutiva } from './telas/VisaoExecutiva';
-import { salvarUsuario, type UsuarioDeTeste } from './usuarios';
+import { empresaDe, registrarPessoas } from './usuarios';
 
 const armazenamento = armazenamentoDoNavegador();
 
@@ -22,7 +28,9 @@ function App() {
   const local = useLocal();
   const secao = secaoDoCaminho(local.caminho);
 
-  const [usuario, setUsuario] = useState<UsuarioDeTeste>(() => obterUsuarioAtual());
+  const [identidade, setIdentidade] = useState<Identidade>(() => obterIdentidade());
+  const [perfil, setPerfil] = useState<DadosDoPerfil | null>(null);
+  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [ativos, setAtivos] = useState<AtivoResumo[]>([]);
   const [validacoes, setValidacoes] = useState<Validacao[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -45,6 +53,10 @@ function App() {
     else raiz.removeAttribute('data-menu');
   }, [menuCompacto]);
 
+  useEffect(() => {
+    definirAoFaltarIdentificacao(() => navegar('/perfil'));
+  }, []);
+
   function alternarTema() {
     const proximo = proximoTema(tema);
     gravarTema(armazenamento, proximo);
@@ -54,6 +66,17 @@ function App() {
   function alternarMenu() {
     gravarMenuCompacto(armazenamento, !menuCompacto);
     setMenuCompacto(!menuCompacto);
+  }
+
+  async function carregarPerfil() {
+    try {
+      const [eu, lista] = await Promise.all([consultarPerfil(), listarPessoas()]);
+      registrarPessoas(lista.pessoas);
+      setPessoas(lista.pessoas);
+      setPerfil(eu);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível saber quem é você.');
+    }
   }
 
   async function carregar() {
@@ -70,8 +93,9 @@ function App() {
   }
 
   useEffect(() => {
+    void carregarPerfil();
     void carregar();
-  }, [usuario.id]);
+  }, [identidade]);
 
   useEffect(() => {
     const titulo = itemDaSecao(secao)?.rotulo ?? 'Página não encontrada';
@@ -79,19 +103,27 @@ function App() {
     setErro('');
   }, [secao]);
 
-  function trocarUsuario(novo: UsuarioDeTeste) {
-    definirUsuarioAtual(novo);
-    salvarUsuario(novo);
-    setAtivos([]);
-    setValidacoes([]);
-    setUsuario(novo);
+  function trocarIdentidade(nova: Identidade) {
+    definirIdentidade(nova);
+    gravarIdentidade(nova);
+    if (nova.empresaId !== identidade.empresaId) {
+      setAtivos([]);
+      setValidacoes([]);
+    }
+    setPerfil(null);
+    setIdentidade(nova);
   }
 
   function buscar(termo: string) {
     navegar(termo ? `/catalogo?termo=${encodeURIComponent(termo)}` : '/catalogo');
   }
 
-  const podeEscrever = usuario.papel !== 'consulta';
+  // Quem escreve é quem o servidor diz: blocos do papel concedido, fora do modo leitura.
+  const blocos = perfil?.blocosQueEscreve ?? [];
+  const podeEscrever = blocos.length > 0;
+  const podeDecidir = !!perfil?.identificado && !perfil.modoLeitura;
+  const papeis = perfil?.papeis.map((p) => p.papel) ?? [];
+  const nomeDaEmpresa = empresaDe(identidade.empresaId).nome;
   const item = itemDaSecao(secao);
 
   let tela;
@@ -100,19 +132,43 @@ function App() {
   } else {
     switch (secao) {
       case 'painel':
-        tela = <VisaoExecutiva ativos={ativos} validacoes={validacoes} nomeDaEmpresa={empresaDe(usuario).nome} podeEscrever={podeEscrever} />;
+        tela = <VisaoExecutiva ativos={ativos} validacoes={validacoes} nomeDaEmpresa={nomeDaEmpresa} podeEscrever={podeEscrever} />;
         break;
       case 'catalogo':
-        tela = <Catalogo ativos={ativos} carregando={carregando} termo={local.busca.get('termo') ?? ''} idSelecionado={local.busca.get('ativo')} usuario={usuario} podeEscrever={podeEscrever} onAlterado={carregar} onErro={setErro} />;
+        tela = <Catalogo ativos={ativos} carregando={carregando} termo={local.busca.get('termo') ?? ''} idSelecionado={local.busca.get('ativo')} papeis={papeis} idPessoa={perfil?.pessoa?.id ?? null} podeEscrever={podeEscrever} onAlterado={carregar} onErro={setErro} />;
         break;
       case 'novo':
-        tela = <NovoAtivo ativos={ativos} podeEscrever={podeEscrever} onCadastrado={carregar} onErro={setErro} />;
+        tela = <NovoAtivo key={blocos.join('|')} ativos={ativos} blocos={blocos} identificado={!!perfil?.identificado} modoLeitura={!!perfil?.modoLeitura} onCadastrado={carregar} onErro={setErro} />;
         break;
       case 'validacoes':
-        tela = <Validacoes validacoes={validacoes} ativos={ativos} podeDecidir={podeEscrever} onAlterado={carregar} onErro={setErro} />;
+        tela = <Validacoes validacoes={validacoes} ativos={ativos} podeDecidir={podeDecidir} onAlterado={carregar} onErro={setErro} />;
         break;
       case 'perfil':
-        tela = <Perfil usuario={usuario} onTrocar={trocarUsuario} />;
+        tela = (
+          <Perfil
+            perfil={perfil}
+            identidade={identidade}
+            pessoas={pessoas}
+            onIdentificar={(pessoaId) => trocarIdentidade({ ...identidade, pessoaId })}
+            onTrocarEmpresa={(empresaId) => trocarIdentidade({ empresaId, pessoaId: null, modoLeitura: identidade.modoLeitura })}
+            onModo={(modoLeitura) => trocarIdentidade({ ...identidade, modoLeitura })}
+          />
+        );
+        break;
+      case 'solicitar-acesso':
+        tela = (
+          <SolicitarAcesso
+            onCadastrado={(pessoaId) => {
+              // Quem acabou de se cadastrar já passa a ser quem disse que é.
+              trocarIdentidade({ ...identidade, pessoaId, modoLeitura: false });
+              navegar('/perfil');
+            }}
+            onErro={setErro}
+          />
+        );
+        break;
+      case 'pleitos':
+        tela = <Pleitos ativos={ativos} onErro={setErro} onDecidido={() => void carregarPerfil()} />;
         break;
       case 'cartilha':
         tela = <Cartilha />;
@@ -125,7 +181,8 @@ function App() {
   return (
     <Layout
       secao={secao}
-      usuario={usuario}
+      perfil={perfil}
+      nomeDaEmpresa={nomeDaEmpresa}
       tema={tema}
       onAlternarTema={alternarTema}
       menuCompacto={menuCompacto}

@@ -1,4 +1,4 @@
-import { empresaDe, unidadeDe, usuarioSalvo, type UsuarioDeTeste } from './usuarios';
+import { cabecalhosDe, lerIdentidade, type Identidade } from './identidade';
 
 export type AtivoResumo = {
   id: string;
@@ -101,19 +101,84 @@ export type Historico = { revisoes: RevisaoRetratada[]; auditoria: RegistroDeAud
 
 export type Comparacao = { a: number; b: number; diferencas: { campo: string; rotulo: string; antes: string; depois: string }[] };
 
-// ── Identidade de teste (ADR-0007 ainda não tem SSO real) ─────────────────
-// Trocar de usuário troca as três coisas que o middleware de tenant lê:
-// empresa, papel e pessoa — e, quando houver, a unidade. Nenhum caso de uso
-// recebe isso "de quem chama" no corpo da requisição; é sempre cabeçalho,
-// exatamente como vai virar claim de token depois (ADR-0009).
-let usuarioAtual: UsuarioDeTeste = usuarioSalvo();
+// ── Pessoas e acesso (ADR-0018) ─────────────────────────────────────────
 
-export function obterUsuarioAtual(): UsuarioDeTeste {
-  return usuarioAtual;
+export type Pessoa = {
+  id: string;
+  matricula: string;
+  nome: string;
+  email: string;
+  unidade: string;
+  ativa: boolean;
+  papeis: string[];
+};
+
+export type PapelConcedido = {
+  papel: string;
+  rotulo: string;
+  escopoTipo: string;
+  escopoId: string | null;
+  escopoRotulo: string;
+  blocos: string[];
+  desde: string;
+};
+
+export type Pleito = {
+  id: string;
+  status: 'pendente' | 'aprovado' | 'negado';
+  papelPleiteado: string;
+  justificativa: string;
+  criadoEm: string;
+  pessoa: Pessoa | null;
+  papelConcedido: string | null;
+  escopoTipo: string | null;
+  escopoRotulo: string | null;
+  decididoPor: string | null;
+  decididoEm: string | null;
+  resposta: string;
+};
+
+/** Quem você é para a API agora, e o que pode fazer (GET /v1/perfil). */
+export type Perfil = {
+  identificado: boolean;
+  modoLeitura: boolean;
+  modoDemonstracao: boolean;
+  pessoa: Pessoa | null;
+  papeis: PapelConcedido[];
+  pleitos: Pleito[];
+  blocosQueEscreve: string[];
+  podeConceder: boolean;
+  podeConcederAdmin: boolean;
+  podeAdministrar: boolean;
+};
+
+export type FilaDePleitos = { total: number; pendentes: number; podeConcederAdmin: boolean; pleitos: Pleito[] };
+
+/** Recusa da API no padrão CAIXA (ApiError), com o código para a tela decidir o que fazer. */
+export class ErroDaApi extends Error {
+  constructor(public readonly codigo: string, mensagem: string, public readonly status: number) {
+    super(mensagem);
+  }
 }
 
-export function definirUsuarioAtual(usuario: UsuarioDeTeste): void {
-  usuarioAtual = usuario;
+// ── Identidade ────────────────────────────────────────────────────────────
+// Empresa, pessoa e modo vão por cabeçalho, como vão virar claim de token
+// depois (ADR-0009). Nenhum caso de uso recebe isso no corpo da requisição.
+let identidadeAtual: Identidade = lerIdentidade();
+
+// Escrita sem pessoa: a tela manda ao perfil, como o web.exige do painel.
+let aoFaltarIdentificacao: () => void = () => {};
+
+export function definirAoFaltarIdentificacao(acao: () => void): void {
+  aoFaltarIdentificacao = acao;
+}
+
+export function obterIdentidade(): Identidade {
+  return identidadeAtual;
+}
+
+export function definirIdentidade(identidade: Identidade): void {
+  identidadeAtual = identidade;
 }
 
 async function requisicao<T>(caminho: string, init?: RequestInit): Promise<T> {
@@ -121,10 +186,7 @@ async function requisicao<T>(caminho: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      'X-Empresa': usuarioAtual.empresaId,
-      'X-Papel': usuarioAtual.papel,
-      'X-Pessoa': usuarioAtual.id,
-      'X-Unidade': usuarioAtual.unidadeId,
+      ...cabecalhosDe(identidadeAtual),
       ...init?.headers,
     },
   });
@@ -132,10 +194,36 @@ async function requisicao<T>(caminho: string, init?: RequestInit): Promise<T> {
   if (!resposta.ok) {
     // Erro no padrão CAIXA (ApiError): { codigo, mensagem, correlationId, dataHora }.
     const erro = await resposta.json().catch(() => null);
-    throw new Error(erro?.mensagem ?? `A API respondeu com ${resposta.status}`);
+    if (erro?.codigo === 'PESSOA_NAO_IDENTIFICADA') aoFaltarIdentificacao();
+    throw new ErroDaApi(erro?.codigo ?? 'ERRO', erro?.mensagem ?? `A API respondeu com ${resposta.status}`, resposta.status);
   }
 
   return resposta.status === 204 ? (undefined as T) : resposta.json();
+}
+
+export function consultarPerfil(): Promise<Perfil> {
+  return requisicao('/v1/perfil');
+}
+
+export function listarPessoas(): Promise<{ total: number; pessoas: Pessoa[] }> {
+  return requisicao('/v1/pessoas');
+}
+
+/** Aberta a quem não tem papel: cadastra a pessoa e pede o papel. */
+export function solicitarAcesso(payload: {
+  matricula: string; nome: string; email: string; unidade: string; papelPleiteado: string; justificativa: string;
+}): Promise<{ idPessoa: string; idPleito: string; status: string }> {
+  return requisicao('/v1/pleitos', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function listarPleitos(status?: string): Promise<FilaDePleitos> {
+  return requisicao(`/v1/pleitos${status ? `?status=${status}` : ''}`);
+}
+
+export function decidirPleito(id: string, payload: {
+  aprovar: boolean; resposta: string; papelConcedido?: string; escopoTipo?: string; escopoId?: string;
+}): Promise<Pleito> {
+  return requisicao(`/v1/pleitos/${id}/decisoes`, { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export function listarAtivos(): Promise<{ total: number; ativos: AtivoResumo[] }> {
@@ -170,10 +258,10 @@ export function editarAtivo(id: string, payload: {
   return requisicao(`/v1/ativos/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
-export function atribuirResponsavel(id: string, papel: string = 'OwnerTecnico'): Promise<void> {
+export function atribuirResponsavel(id: string, idPessoa: string, papel: string = 'OwnerTecnico'): Promise<void> {
   return requisicao(`/v1/ativos/${id}/responsaveis`, {
     method: 'POST',
-    body: JSON.stringify({ idPessoa: usuarioAtual.id, papel }),
+    body: JSON.stringify({ idPessoa, papel }),
   });
 }
 
@@ -236,5 +324,3 @@ export function decidirValidacao(id: string, aprovada: boolean, motivo: string):
     body: JSON.stringify({ aprovada, motivo }),
   });
 }
-
-export { empresaDe, unidadeDe };

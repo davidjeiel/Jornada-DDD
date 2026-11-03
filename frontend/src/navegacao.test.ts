@@ -20,19 +20,20 @@ describe('menu', () => {
   });
 
   it('só mostra a fila de pleitos e os squads para quem concede (test_menu_so_mostra_a_fila_para_quem_concede)', () => {
-    const rotulos = (papel: Parameters<typeof itensVisiveis>[0]) => itensVisiveis(papel).map((item) => item.secao);
-    for (const papel of ['admin', 'curador'] as const) {
-      expect(rotulos(papel)).toContain('pleitos');
-      expect(rotulos(papel)).toContain('squads');
-    }
-    for (const papel of ['arquiteto', 'techlead', 'negocio', 'consulta'] as const) {
-      expect(rotulos(papel)).not.toContain('pleitos');
-      expect(rotulos(papel)).not.toContain('squads');
-      expect(rotulos(papel)).not.toContain('gestao-acessos');
-      expect(rotulos(papel)).toContain('politicas');
-    }
-    expect(rotulos('admin')).toContain('gestao-acessos');
-    expect(rotulos('curador')).not.toContain('gestao-acessos');
+    // As alçadas vêm da API (GET /v1/perfil), já com os papéis concedidos e o modo leitura.
+    const secoes = (podeConceder: boolean, podeAdministrar: boolean) =>
+      itensVisiveis({ podeConceder, podeAdministrar }).map((item) => item.secao);
+    expect(secoes(true, false)).toContain('pleitos');
+    expect(secoes(true, false)).toContain('squads');
+    expect(secoes(true, false)).not.toContain('gestao-acessos');
+    expect(secoes(true, true)).toContain('gestao-acessos');
+    for (const secao of ['pleitos', 'squads', 'gestao-acessos']) expect(secoes(false, false)).not.toContain(secao);
+    expect(secoes(false, false)).toContain('politicas');
+  });
+
+  it('a fila de pleitos já é uma tela, não um aviso de fase', () => {
+    expect(MENU.find((item) => item.secao === 'pleitos')?.fase).toBeUndefined();
+    expect(secaoDoCaminho('/pleitos')).toBe('pleitos');
   });
 });
 
@@ -42,6 +43,7 @@ describe('seção marcada no menu', () => {
     expect(secaoDoCaminho('/catalogo')).toBe('catalogo');
     expect(secaoDoCaminho('/validacoes/')).toBe('validacoes');
     expect(secaoDoCaminho(CARTILHA.caminho)).toBe('cartilha');
+    expect(secaoDoCaminho('/acesso/solicitar')).toBe('solicitar-acesso');
   });
 
   it('continua no catálogo dentro de um ativo (test_menu_continua_marcado_dentro_de_um_ativo)', () => {

@@ -130,6 +130,9 @@ public static class PoliticaDeAutorizacao
     /// </summary>
     public static bool Pode(Ator ator, Acao acao, AlvoDaAcao alvo, DateOnly hoje)
     {
+        // Sem pessoa ou em modo de leitura, nenhuma ação passa (web.pode do painel).
+        if (!ator.Identificado || ator.ModoLeitura) return false;
+
         var permitidos = Permissoes[acao];
         var efetivos = PapeisEfetivos(ator, alvo, hoje);
 
@@ -153,20 +156,51 @@ public static class PoliticaDeAutorizacao
             $"Sem permissão para {acao.ToString().ToLowerInvariant()} neste ativo.");
     }
 
-    /// <summary>Blocos em que a pessoa pode cadastrar. De <c>acesso.blocos_que_escreve</c>.</summary>
+    private static readonly string[] TodosOsBlocos = [CatalogoDeTipos.BlocoEstruturaDdd, CatalogoDeTipos.BlocoAtivosTecnicos];
+
+    /// <summary>
+    /// Blocos em que a pessoa pode cadastrar. De <c>acesso.blocos_que_escreve</c>.
+    /// Vazio sem pessoa ou em modo de leitura: é o que manda o assistente pedir papel.
+    /// </summary>
     public static IReadOnlySet<string> BlocosQueEscreve(Ator ator, DateOnly hoje)
     {
-        var todos = new[] { CatalogoDeTipos.BlocoEstruturaDdd, CatalogoDeTipos.BlocoAtivosTecnicos };
         var alcance = new HashSet<string>();
+        if (!ator.Identificado || ator.ModoLeitura) return alcance;
 
         foreach (var papel in ator.Atribuicoes.Where(a => a.Vigente(hoje)).Select(a => a.Papel).Distinct())
         {
             if (!Permissoes[Acao.Cadastrar].Contains(papel)) continue;
-            var blocos = BlocosPorPapel.TryGetValue(papel, out var b) ? b : null;
-            foreach (var bloco in blocos ?? todos) alcance.Add(bloco);
+            foreach (var bloco in BlocosDoPapel(papel)) alcance.Add(bloco);
         }
         return alcance;
     }
+
+    /// <summary>Os blocos de tipos em que o papel escreve, como o perfil e a cartilha mostram.</summary>
+    public static IReadOnlyList<string> BlocosDoPapel(Papel papel) =>
+        BlocosPorPapel.TryGetValue(papel, out var blocos) && blocos is not null ? blocos : TodosOsBlocos;
+
+    /// <summary>
+    /// Quem despacha pleitos, e até onde vai. Portado de <c>acesso.pode_conceder</c>.
+    ///
+    /// Curador despacha o dia a dia; só um administrador cria outro
+    /// administrador. Sem esse teto, o poder de administrar a ferramenta se
+    /// espalharia por concessão lateral, sem ninguém ter decidido isso. Como no
+    /// painel, vale o papel em qualquer escopo: quem concede é da empresa.
+    /// </summary>
+    public static DecisaoDeAutorizacao PodeConceder(Ator ator, Papel? papelAlvo, DateOnly hoje)
+    {
+        if (!ator.Identificado) return DecisaoDeAutorizacao.Nao("Sessão sem pessoa identificada.");
+        if (ator.ModoLeitura) return DecisaoDeAutorizacao.Nao(MensagemDoModoLeitura);
+
+        var papeis = ator.Atribuicoes.Where(a => a.Vigente(hoje)).Select(a => a.Papel).ToHashSet();
+        if (!papeis.Overlaps(Permissoes[Acao.Conceder]))
+            return DecisaoDeAutorizacao.Nao("Conceder acesso é atribuição de curador ou administrador.");
+        if (papelAlvo == Papel.Admin && !papeis.Contains(Papel.Admin))
+            return DecisaoDeAutorizacao.Nao("Só um administrador concede o papel de administrador.");
+        return DecisaoDeAutorizacao.Sim;
+    }
+
+    public const string MensagemDoModoLeitura = "Você está em modo de leitura. Troque no seu perfil para editar.";
 
     /// <summary>Decisão de validação e o motivo da recusa. De <c>acesso.pode_decidir</c>.</summary>
     public sealed record DecisaoDeAutorizacao(bool Permitido, string Motivo)
@@ -192,6 +226,9 @@ public static class PoliticaDeAutorizacao
         AlvoDaAcao alvo,
         DateOnly hoje)
     {
+        if (!ator.Identificado) return DecisaoDeAutorizacao.Nao("Sessão sem pessoa identificada.");
+        if (ator.ModoLeitura) return DecisaoDeAutorizacao.Nao(MensagemDoModoLeitura);
+
         if (ator.IdPessoa == quemSubmeteu)
             return DecisaoDeAutorizacao.Nao(
                 "Segregação de função: quem submeteu a revisão não decide sobre ela.");

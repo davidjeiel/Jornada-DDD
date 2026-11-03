@@ -2,9 +2,11 @@ using Jornada.Adaptadores.Memoria;
 using Jornada.Api;
 using Jornada.Api.Contrato;
 using Jornada.Api.Demonstracao;
+using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Comandos;
 using Jornada.Aplicacao.Catalogo.Consultas;
 using Jornada.Aplicacao.Portas;
+using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Tenancy;
@@ -31,7 +33,14 @@ builder.Services.AddSingleton<IRelogio, RelogioDoSistema>();
 
 builder.Services.AddScoped<ContextoDaRequisicao>();
 builder.Services.AddScoped<IContextoDeTenantAtual>(sp => sp.GetRequiredService<ContextoDaRequisicao>());
-builder.Services.AddScoped<IAtorAtual>(sp => sp.GetRequiredService<ContextoDaRequisicao>());
+builder.Services.AddScoped<IAtorAtual, AtorDaRequisicao>();
+
+// Papel concedido, não escolhido (ADR-0018). A escolha livre pelo X-Papel só
+// com Acesso:ModoDemonstracao, que o ambiente local liga (local/compose.yaml).
+var opcoesDeAcesso = builder.Configuration.GetSection("Acesso").Get<OpcoesDeAcesso>() ?? new OpcoesDeAcesso();
+builder.Services.AddSingleton(opcoesDeAcesso);
+builder.Services.AddSingleton(new RegrasDeAcesso(
+    opcoesDeAcesso.AdministradoresIniciais.Select(m => m.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase)));
 
 // Adaptador de persistência escolhido em RUNTIME, por configuração — nunca por
 // rebuild de imagem (Grupo 1 do plano de containers: um container só é
@@ -67,6 +76,8 @@ if (usaCosmos)
     builder.Services.AddScoped<IUnidadeDeTrabalho>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<IRepositorioDeRevisoes>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<ITrilhaDeAuditoria>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IRepositorioDePessoas>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IRepositorioDePleitos>(sp => sp.GetRequiredService<RepositorioCosmos>());
 }
 else
 {
@@ -81,6 +92,9 @@ else
     builder.Services.AddScoped<IRepositorioDeValidacoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
     builder.Services.AddScoped<IRepositorioDeRevisoes>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
     builder.Services.AddScoped<ITrilhaDeAuditoria>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+    builder.Services.AddScoped<RepositorioDeAcessoEmMemoria>();
+    builder.Services.AddScoped<IRepositorioDePessoas>(sp => sp.GetRequiredService<RepositorioDeAcessoEmMemoria>());
+    builder.Services.AddScoped<IRepositorioDePleitos>(sp => sp.GetRequiredService<RepositorioDeAcessoEmMemoria>());
 }
 
 builder.Services.AddSingleton<IMetamodelo, MetamodeloPadrao>();
@@ -102,6 +116,11 @@ builder.Services.AddScoped<ConsultarHistorico>();
 builder.Services.AddScoped<CompararRevisoes>();
 builder.Services.AddScoped<AvaliarPreCheck>();
 builder.Services.AddScoped<ObterVisaoDoAtivo>();
+builder.Services.AddScoped<SolicitarAcesso>();
+builder.Services.AddScoped<DecidirPleito>();
+builder.Services.AddScoped<ListarPleitos>();
+builder.Services.AddScoped<ConsultarPerfil>();
+builder.Services.AddScoped<ListarPessoas>();
 
 // Probe de prontidão real: só existe verificação quando há algo externo para
 // verificar. Com "memoria" não há tag "pronto" nenhuma, e o middleware de
@@ -242,12 +261,13 @@ app.MapGet("/saude/pronto", async Task<Results<Ok<SaudeResponse>, JsonHttpResult
 
 app.MapGet("/demo", () => Results.Ok(new
 {
-    explicacao = "Use estes cabeçalhos para exercitar a API sem autenticação real.",
+    explicacao = "Use estes cabeçalhos para exercitar a API sem autenticação real. Os papéis são os concedidos " +
+                 "à pessoa do X-Pessoa (veja GET /v1/pessoas); X-Papel só vale com Acesso:ModoDemonstracao.",
+    modoDemonstracao = opcoesDeAcesso.ModoDemonstracao,
     cabecalhos = new
     {
         X_Empresa = "11111111-1111-1111-1111-111111111111",
-        X_Papel = "curador",
-        X_Pessoa = "33333333-3333-3333-3333-333333333333",
+        X_Pessoa = "20000000-0000-0000-0000-000000000001",
     },
     exemplo = $"curl -H 'X-Empresa: 11111111-1111-1111-1111-111111111111' http://localhost:5080{metadados.PrefixoDasRotas}/ativos",
 })).ExcludeFromDescription();
@@ -480,6 +500,75 @@ governanca.MapPost("/validacoes/{id:guid}/decisoes", async Task<Results<NoConten
     .WithSummary("Aprova ou reprova uma etapa de validação")
     .WithDescription("Quem submeteu a revisão não decide sobre ela, nem sendo admin. Cada etapa exige o papel correspondente (negocial: negócio; técnica: tech lead; arquitetural: arquiteto) ou ser o owner do ativo. Reprovar uma etapa cancela as outras etapas abertas da mesma revisão e devolve o ativo para ajuste; aprovar a última etapa da revisão publica o ativo.")
     .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
+// ── acesso ──────────────────────────────────────────────────────────────────
+
+var acesso = v1.MapGroup("").WithTags(OpenApiCaixa.TagAcesso);
+
+acesso.MapGet("/perfil", async (ConsultarPerfil caso, IRelogio relogio, CancellationToken ct) =>
+    TypedResults.Ok(PerfilResponse.De(await caso.ExecutarAsync(ct), opcoesDeAcesso.ModoDemonstracao, relogio.Hoje)))
+    .WithName("consultarPerfil")
+    .WithSummary("Quem é você para a API e o que pode fazer")
+    .WithDescription("A pessoa do X-Pessoa, os papéis que valem agora (com escopo e blocos de tipos), os pleitos dela e o que ela pode fazer. Sem pessoa, identificado é false e tudo é consulta.");
+
+acesso.MapGet("/pessoas", async (ListarPessoas caso, IRelogio relogio, CancellationToken ct) =>
+{
+    var pessoas = await caso.ExecutarAsync(ct);
+    return TypedResults.Ok(new ListaDePessoasResponse(pessoas.Count, pessoas.Select(p => PessoaResponse.De(p, relogio.Hoje)).ToArray()));
+})
+    .WithName("listarPessoas")
+    .WithSummary("Lista as pessoas ativas da empresa")
+    .WithDescription("Por nome. É o \"quem é você\" do perfil enquanto não há identidade corporativa (ADR-0007).");
+
+acesso.MapPost("/pleitos", async Task<Results<Created<PleitoAbertoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, SolicitarAcessoRequest corpo, SolicitarAcesso caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(new ComandoSolicitarAcesso(
+        corpo.Matricula, corpo.Nome, corpo.Email, corpo.Unidade, corpo.PapelPleiteado, corpo.Justificativa), ct);
+    if (!r.Sucesso) return Erro(http, r.Codigo!, r.Mensagem!);
+
+    return TypedResults.Created($"{metadados.PrefixoDasRotas}/pleitos/{r.Valor!.Pleito.Id}",
+        new PleitoAbertoResponse(r.Valor.Pessoa.Id, r.Valor.Pleito.Id, PleitoResponse.Rotulo(r.Valor.Pleito.Status)));
+})
+    .WithName("solicitarAcesso")
+    .WithSummary("Cadastra a pessoa e pede um papel")
+    .WithDescription("Aberta a quem ainda não tem papel: não exige X-Pessoa. O cadastro não concede nada; a pessoa consulta o catálogo até um curador ou admin decidir. Matrícula já cadastrada atualiza o cadastro, sem duplicar; com pleito pendente, devolve 409 PLEITO_PENDENTE.")
+    .ComErros(StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity);
+
+acesso.MapGet("/pleitos", async Task<Results<Ok<FilaDePleitosResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, ListarPleitos caso, IRelogio relogio, CancellationToken ct, string? status = null) =>
+{
+    StatusDoPleito? filtro = status?.ToLowerInvariant() switch
+    {
+        null or "" => null,
+        "pendente" => StatusDoPleito.Pendente,
+        "aprovado" => StatusDoPleito.Aprovado,
+        "negado" => StatusDoPleito.Negado,
+        _ => (StatusDoPleito)(-1),
+    };
+    if (filtro is (StatusDoPleito)(-1))
+        return Erro(http, CodigosDeErro.RequisicaoInvalida, "status deve ser pendente, aprovado ou negado.");
+
+    var r = await caso.ExecutarAsync(filtro, ct);
+    return r.Sucesso ? TypedResults.Ok(FilaDePleitosResponse.De(r.Valor!, relogio.Hoje)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("listarPleitos")
+    .WithSummary("Fila de pleitos de acesso")
+    .WithDescription("Só para quem concede (curador ou admin). Pendentes primeiro e, entre eles, quem espera há mais tempo. O parâmetro status filtra: pendente, aprovado ou negado.")
+    .ComErros(StatusCodes.Status403Forbidden);
+
+acesso.MapPost("/pleitos/{id:guid}/decisoes", async Task<Results<Ok<PleitoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, DecidirPleitoRequest corpo, DecidirPleito caso, IRelogio relogio, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(new ComandoDecidirPleito(
+        id, corpo.Aprovar, corpo.Resposta, corpo.PapelConcedido, corpo.EscopoTipo, corpo.EscopoId), ct);
+    return r.Sucesso ? TypedResults.Ok(PleitoResponse.De(r.Valor!, relogio.Hoje)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("decidirPleito")
+    .WithSummary("Concede ou nega um pleito de acesso")
+    .WithDescription("Curador concede todo papel menos admin; só admin concede admin. Ninguém decide o próprio pleito (403 SEGREGACAO_DE_FUNCAO). Negar, ou conceder papel diferente do pleiteado, exige resposta (422 RESPOSTA_OBRIGATORIA). Pleito já decidido devolve 409 PLEITO_JA_DECIDIDO.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound,
+              StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity);
 
 app.Run();
 return;
