@@ -52,11 +52,15 @@ public sealed class Pessoa
     public bool Ativa { get; private set; }
     public DateTimeOffset CadastradaEm { get; }
 
+    /// <summary>O time da pessoa (<c>pessoa.id_squad</c>). Nulo: sem squad.</summary>
+    public Guid? IdSquad { get; private set; }
+
     public IReadOnlyList<AtribuicaoDePapel> Atribuicoes => _atribuicoes;
 
     private Pessoa(Guid id, IdDeEmpresa empresa, DadosDeCadastro dados, bool ativa,
-                   DateTimeOffset cadastradaEm, IEnumerable<AtribuicaoDePapel> atribuicoes)
+                   DateTimeOffset cadastradaEm, IEnumerable<AtribuicaoDePapel> atribuicoes, Guid? idSquad = null)
     {
+        IdSquad = idSquad;
         Id = id;
         Empresa = empresa;
         Matricula = dados.Matricula;
@@ -87,6 +91,50 @@ public sealed class Pessoa
 
     public void Conceder(AtribuicaoDePapel atribuicao) => _atribuicoes.Add(atribuicao);
 
+    /// <summary>
+    /// Correção do cadastro pela gestão de acessos (<c>atualizar_pessoa</c>). A
+    /// matrícula não muda: é ela que amarra a pessoa à trilha.
+    /// </summary>
+    public void Corrigir(string? nome, string? email, string? unidade, Guid? idSquad)
+    {
+        var dados = DadosDeCadastro.Conferir(Matricula.Valor, nome, email, unidade);
+        Nome = dados.Nome;
+        Email = dados.Email;
+        Unidade = dados.Unidade;
+        IdSquad = idSquad;
+    }
+
+    /// <summary>
+    /// Encerra a atribuição. A vigência termina ONTEM: revogado hoje, não vale
+    /// mais hoje. (No painel, <c>fim_vigencia</c> = hoje e o papel ainda vale até
+    /// a meia-noite.) A atribuição fica no histórico, encerrada.
+    /// </summary>
+    public bool Revogar(Papel papel, TipoDeEscopo escopoTipo, Guid? escopoId, DateOnly hoje)
+    {
+        var revogou = false;
+        for (var i = 0; i < _atribuicoes.Count; i++)
+        {
+            var a = _atribuicoes[i];
+            if (a.Vigente(hoje) && a.Papel == papel && a.EscopoTipo == escopoTipo && a.EscopoId == escopoId)
+            {
+                _atribuicoes[i] = a with { FimVigencia = hoje.AddDays(-1) };
+                revogou = true;
+            }
+        }
+        return revogou;
+    }
+
+    /// <summary>Inativa o cadastro e encerra todos os papéis (<c>inativar_pessoa</c>).</summary>
+    public void Inativar(DateOnly hoje)
+    {
+        foreach (var a in Vigentes(hoje).ToArray())
+            Revogar(a.Papel, a.EscopoTipo, a.EscopoId, hoje);
+        Ativa = false;
+    }
+
+    /// <summary>Reativa o cadastro, sem devolver papel nenhum: o papel volta por pleito ou concessão.</summary>
+    public void Reativar() => Ativa = true;
+
     public IEnumerable<AtribuicaoDePapel> Vigentes(DateOnly hoje) => _atribuicoes.Where(a => a.Vigente(hoje));
 
     /// <summary>A pessoa como ator de uma requisição. Inativa age como anônima: não tem papel nenhum.</summary>
@@ -95,6 +143,7 @@ public sealed class Pessoa
 
     /// <summary>Reidratação pela persistência. Não usar em regra de negócio.</summary>
     public static Pessoa Reidratar(Guid id, IdDeEmpresa empresa, DadosDeCadastro dados, bool ativa,
-                                   DateTimeOffset cadastradaEm, IEnumerable<AtribuicaoDePapel> atribuicoes) =>
-        new(id, empresa, dados, ativa, cadastradaEm, atribuicoes);
+                                   DateTimeOffset cadastradaEm, IEnumerable<AtribuicaoDePapel> atribuicoes,
+                                   Guid? idSquad = null) =>
+        new(id, empresa, dados, ativa, cadastradaEm, atribuicoes, idSquad);
 }

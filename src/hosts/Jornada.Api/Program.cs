@@ -78,6 +78,8 @@ if (usaCosmos)
     builder.Services.AddScoped<ITrilhaDeAuditoria>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<IRepositorioDePessoas>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<IRepositorioDePleitos>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IRepositorioDeSquads>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IConsultaDeVinculos>(sp => sp.GetRequiredService<RepositorioCosmos>());
 }
 else
 {
@@ -95,6 +97,8 @@ else
     builder.Services.AddScoped<RepositorioDeAcessoEmMemoria>();
     builder.Services.AddScoped<IRepositorioDePessoas>(sp => sp.GetRequiredService<RepositorioDeAcessoEmMemoria>());
     builder.Services.AddScoped<IRepositorioDePleitos>(sp => sp.GetRequiredService<RepositorioDeAcessoEmMemoria>());
+    builder.Services.AddScoped<IRepositorioDeSquads>(sp => sp.GetRequiredService<RepositorioDeAcessoEmMemoria>());
+    builder.Services.AddScoped<IConsultaDeVinculos>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
 }
 
 builder.Services.AddSingleton<IMetamodelo, MetamodeloPadrao>();
@@ -121,6 +125,9 @@ builder.Services.AddScoped<DecidirPleito>();
 builder.Services.AddScoped<ListarPleitos>();
 builder.Services.AddScoped<ConsultarPerfil>();
 builder.Services.AddScoped<ListarPessoas>();
+builder.Services.AddScoped<GestaoDeAcessos>();
+builder.Services.AddScoped<CadastroDeSquads>();
+builder.Services.AddScoped<ConsultarCartilha>();
 
 // Probe de prontidão real: só existe verificação quando há algo externo para
 // verificar. Com "memoria" não há tag "pronto" nenhuma, e o middleware de
@@ -569,6 +576,142 @@ acesso.MapPost("/pleitos/{id:guid}/decisoes", async Task<Results<Ok<PleitoRespon
     .WithDescription("Curador concede todo papel menos admin; só admin concede admin. Ninguém decide o próprio pleito (403 SEGREGACAO_DE_FUNCAO). Negar, ou conceder papel diferente do pleiteado, exige resposta (422 RESPOSTA_OBRIGATORIA). Pleito já decidido devolve 409 PLEITO_JA_DECIDIDO.")
     .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound,
               StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity);
+
+// A cartilha: leitura aberta, inclusive para quem ainda não se identificou.
+acesso.MapGet("/cartilha", async (ConsultarCartilha caso, CancellationToken ct) =>
+    TypedResults.Ok(CartilhaResponse.De(await caso.ExecutarAsync(ct))))
+    .WithName("consultarCartilha")
+    .WithSummary("Tabelas de referência da cartilha")
+    .WithDescription("Quem pode fazer o quê, as etapas que cada papel decide, os blocos em que cada papel escreve e o rito de cada tipo de ativo. Tudo lido das políticas que a API aplica, não escrito à mão. Não exige X-Pessoa.");
+
+// ── gestão de acessos (só admin) ──
+
+var gestao = v1.MapGroup("/gestao").WithTags(OpenApiCaixa.TagAcesso);
+
+gestao.MapGet("/pessoas", async Task<Results<Ok<ListaDeCadastrosResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, GestaoDeAcessos caso, IRelogio relogio, CancellationToken ct, string? busca = null) =>
+{
+    var r = await caso.ListarAsync(busca, ct);
+    return r.Sucesso
+        ? TypedResults.Ok(new ListaDeCadastrosResponse(r.Valor!.Count, r.Valor.Select(c => CadastroResponse.De(c, relogio.Hoje)).ToArray()))
+        : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("listarCadastros")
+    .WithSummary("Lista todos os cadastros, inclusive os inativos")
+    .WithDescription("Só admin. Ativos primeiro, por nome. O parâmetro busca filtra por nome, matrícula, e-mail, unidade ou squad.")
+    .ComErros(StatusCodes.Status403Forbidden);
+
+gestao.MapGet("/pessoas/{id:guid}/vinculos", async Task<Results<Ok<VinculosResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, GestaoDeAcessos caso, CancellationToken ct) =>
+{
+    var r = await caso.VinculosAsync(id, ct);
+    return r.Sucesso ? TypedResults.Ok(new VinculosResponse(r.Valor!.Count == 0, r.Valor)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("consultarVinculos")
+    .WithSummary("O que amarra o cadastro ao histórico")
+    .WithDescription("Só admin. Papéis, pleitos, responsabilidades, revisões, validações e auditoria. Sem vínculo, o cadastro pode ser excluído.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound);
+
+gestao.MapPut("/pessoas/{id:guid}", async Task<Results<Ok<CadastroResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, CorrigirCadastroRequest corpo, GestaoDeAcessos caso, IRelogio relogio, CancellationToken ct) =>
+{
+    var r = await caso.CorrigirAsync(id, corpo.Nome, corpo.Email, corpo.Unidade, corpo.IdSquad, corpo.Ativa, ct);
+    return r.Sucesso ? TypedResults.Ok(CadastroResponse.De(r.Valor!, relogio.Hoje)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("corrigirCadastro")
+    .WithSummary("Corrige o cadastro e o situa como ativo ou inativo")
+    .WithDescription("Só admin. Nome, e-mail, unidade e squad; a matrícula não muda. ativa=false encerra todos os papéis; o administrador conectado não se inativa (403 PROPRIO_CADASTRO).")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound);
+
+gestao.MapPost("/pessoas/{id:guid}/papeis", async Task<Results<Ok<CadastroResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, PapelNoEscopoRequest corpo, GestaoDeAcessos caso, IRelogio relogio, CancellationToken ct) =>
+{
+    var r = await caso.ConcederAsync(id, corpo.Papel, corpo.EscopoTipo, corpo.EscopoId, ct);
+    return r.Sucesso ? TypedResults.Ok(CadastroResponse.De(r.Valor!, relogio.Hoje)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("concederPapel")
+    .WithSummary("Concede um papel direto, fora de pleito")
+    .WithDescription("Só admin. Ninguém concede a si mesmo (403 SEGREGACAO_DE_FUNCAO). Papel repetido no mesmo escopo devolve 409 PAPEL_JA_CONCEDIDO.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
+gestao.MapPost("/pessoas/{id:guid}/revogacoes", async Task<Results<Ok<CadastroResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, PapelNoEscopoRequest corpo, GestaoDeAcessos caso, IRelogio relogio, CancellationToken ct) =>
+{
+    var r = await caso.RevogarAsync(id, corpo.Papel, corpo.EscopoTipo, corpo.EscopoId, ct);
+    return r.Sucesso ? TypedResults.Ok(CadastroResponse.De(r.Valor!, relogio.Hoje)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("revogarPapel")
+    .WithSummary("Revoga um papel vigente")
+    .WithDescription("Só admin. A atribuição deixa de valer na hora e fica no histórico, encerrada. O administrador conectado não revoga os próprios papéis (403 PROPRIO_CADASTRO).")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
+gestao.MapPost("/inativacoes", async Task<Results<Ok<InativacaoEmLoteResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, InativarEmLoteRequest corpo, GestaoDeAcessos caso, CancellationToken ct) =>
+{
+    var r = await caso.InativarEmLoteAsync(corpo.Ids, ct);
+    return r.Sucesso ? TypedResults.Ok(new InativacaoEmLoteResponse(r.Valor)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("inativarEmLote")
+    .WithSummary("Inativa vários cadastros")
+    .WithDescription("Só admin. Encerra os papéis de cada um. O cadastro do administrador conectado e os já inativos ficam de fora.")
+    .ComErros(StatusCodes.Status403Forbidden);
+
+gestao.MapDelete("/pessoas/{id:guid}", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, GestaoDeAcessos caso, CancellationToken ct) =>
+{
+    var r = await caso.ExcluirAsync(id, ct);
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("excluirCadastro")
+    .WithSummary("Exclui um cadastro sem vínculo")
+    .WithDescription("Só admin. Com qualquer vínculo (papel, pleito, responsabilidade, revisão, validação, auditoria) devolve 409 CADASTRO_COM_VINCULOS: inative em vez de excluir.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
+// ── squads ──
+
+acesso.MapGet("/squads", async (CadastroDeSquads caso, CancellationToken ct, string? busca = null) =>
+{
+    var squads = await caso.ListarAsync(busca, ct);
+    return TypedResults.Ok(new ListaDeSquadsResponse(squads.Count, squads.Select(SquadResponse.De).ToArray()));
+})
+    .WithName("listarSquads")
+    .WithSummary("Lista os squads da empresa")
+    .WithDescription("Ativos primeiro, por título. O parâmetro busca filtra por título, sigla ou descrição.");
+
+acesso.MapPost("/squads", async Task<Results<Created<SquadResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, SquadRequest corpo, CadastroDeSquads caso, CancellationToken ct) =>
+{
+    var r = await caso.CriarAsync(corpo.Sigla, corpo.Titulo, corpo.Descricao, ct);
+    return r.Sucesso
+        ? TypedResults.Created($"{metadados.PrefixoDasRotas}/squads/{r.Valor!.Id}", SquadResponse.De(r.Valor))
+        : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("cadastrarSquad")
+    .WithSummary("Cadastra um squad")
+    .WithDescription("Curador ou admin. Sigla repetida na empresa devolve 409 SIGLA_DUPLICADA.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status409Conflict);
+
+acesso.MapPut("/squads/{id:guid}", async Task<Results<Ok<SquadResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, SquadRequest corpo, CadastroDeSquads caso, CancellationToken ct) =>
+{
+    var r = await caso.AlterarAsync(id, corpo.Sigla, corpo.Titulo, corpo.Descricao, ct);
+    return r.Sucesso ? TypedResults.Ok(SquadResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("alterarSquad")
+    .WithSummary("Altera título, sigla e descrição do squad")
+    .WithDescription("Curador ou admin.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
+acesso.MapPost("/squads/{id:guid}/inativacao", async Task<Results<Ok<SquadResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, CadastroDeSquads caso, CancellationToken ct) =>
+{
+    var r = await caso.InativarAsync(id, ct);
+    return r.Sucesso ? TypedResults.Ok(SquadResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("inativarSquad")
+    .WithSummary("Inativa um squad")
+    .WithDescription("Curador ou admin. Os vínculos existentes são preservados.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound);
 
 app.Run();
 return;

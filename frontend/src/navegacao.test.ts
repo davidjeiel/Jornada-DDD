@@ -31,8 +31,8 @@ describe('menu', () => {
     expect(secoes(false, false)).toContain('politicas');
   });
 
-  it('a fila de pleitos já é uma tela, não um aviso de fase', () => {
-    expect(MENU.find((item) => item.secao === 'pleitos')?.fase).toBeUndefined();
+  it('a administração de acesso já tem telas, não avisos de fase', () => {
+    for (const secao of ['pleitos', 'squads', 'gestao-acessos']) expect(MENU.find((item) => item.secao === secao)?.fase, secao).toBeUndefined();
     expect(secaoDoCaminho('/pleitos')).toBe('pleitos');
   });
 });

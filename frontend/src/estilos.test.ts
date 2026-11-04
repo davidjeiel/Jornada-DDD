@@ -33,6 +33,15 @@ describe('paleta', () => {
     expect(foraDosTokens).not.toMatch(/:\s*(white|black)\b/);
   });
 
+  it('as cores de perfil existem nos três estados de tema (test_cores_de_perfil_existem_nos_tres_estados_de_tema)', () => {
+    for (const perfil of ['negocio', 'tech', 'arquiteto', 'curador', 'admin', 'consulta']) {
+      for (const bloco of [BLOCO_CLARO, BLOCO_ESCURO, BLOCO_SISTEMA]) {
+        expect(variaveis(bloco).has(`--perfil-${perfil}`), perfil).toBe(true);
+        expect(variaveis(bloco).has(`--perfil-${perfil}-bg`), perfil).toBe(true);
+      }
+    }
+  });
+
   it('todo token do tema claro existe nos dois escuros', () => {
     const claro = variaveis(BLOCO_CLARO);
     expect(claro.size).toBeGreaterThan(20);

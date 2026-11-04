@@ -54,6 +54,8 @@ public static class CodigosDeErro
         ["EMAIL_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["ESCOPO_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["ESCOPO_SEM_ALVO"] = StatusCodes.Status400BadRequest,
+        ["SQUAD_INCOMPLETA"] = StatusCodes.Status400BadRequest,
+        ["SIGLA_INVALIDA"] = StatusCodes.Status400BadRequest,
 
         [EmpresaNaoIdentificada] = StatusCodes.Status401Unauthorized,
         // Sem pessoa, a pergunta é "quem é você?": 401, e a tela manda ao perfil.
@@ -61,11 +63,14 @@ public static class CodigosDeErro
         [SemPermissao] = StatusCodes.Status403Forbidden,
         ["MODO_LEITURA"] = StatusCodes.Status403Forbidden,
         ["SEGREGACAO_DE_FUNCAO"] = StatusCodes.Status403Forbidden,
+        ["PROPRIO_CADASTRO"] = StatusCodes.Status403Forbidden,
 
         ["ATIVO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
         ["VALIDACAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["REVISAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["PLEITO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
+        ["PESSOA_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
+        ["SQUAD_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
 
         ["TRANSICAO_INVALIDA"] = StatusCodes.Status409Conflict,
         ["VALIDACAO_JA_DECIDIDA"] = StatusCodes.Status409Conflict,
@@ -74,6 +79,11 @@ public static class CodigosDeErro
         ["CONFLITO_DE_EDICAO"] = StatusCodes.Status409Conflict,
         ["PLEITO_JA_DECIDIDO"] = StatusCodes.Status409Conflict,
         ["PLEITO_PENDENTE"] = StatusCodes.Status409Conflict,
+        ["CADASTRO_COM_VINCULOS"] = StatusCodes.Status409Conflict,
+        ["CADASTRO_INATIVO"] = StatusCodes.Status409Conflict,
+        ["PAPEL_JA_CONCEDIDO"] = StatusCodes.Status409Conflict,
+        ["PAPEL_NAO_CONCEDIDO"] = StatusCodes.Status409Conflict,
+        ["SIGLA_DUPLICADA"] = StatusCodes.Status409Conflict,
 
         [ErroInterno] = StatusCodes.Status500InternalServerError,
     };

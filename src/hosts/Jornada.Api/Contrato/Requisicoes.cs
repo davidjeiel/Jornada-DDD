@@ -166,3 +166,58 @@ public sealed record DecidirPleitoRequest
     /// <summary>Id do domínio, quando o escopo é dominio.</summary>
     public Guid? EscopoId { get; init; }
 }
+
+/// <summary>Correção do cadastro pela gestão de acessos. A matrícula não muda.</summary>
+public sealed record CorrigirCadastroRequest
+{
+    /// <example>Davi Souza Lima</example>
+    public required string Nome { get; init; }
+
+    /// <example>davi.lima@empresa.com</example>
+    public required string Email { get; init; }
+
+    /// <example>0500</example>
+    public required string Unidade { get; init; }
+
+    /// <summary>O squad da pessoa; nulo tira do squad.</summary>
+    public Guid? IdSquad { get; init; }
+
+    /// <summary>false inativa o cadastro e encerra todos os papéis; true reativa, sem devolver papel.</summary>
+    /// <example>true</example>
+    public required bool Ativa { get; init; }
+}
+
+/// <summary>Um papel num escopo, para conceder ou revogar direto.</summary>
+public sealed record PapelNoEscopoRequest
+{
+    /// <summary>admin, curador, arquiteto, techlead, negocio ou consulta.</summary>
+    /// <example>arquiteto</example>
+    public required string Papel { get; init; }
+
+    /// <summary>empresa (padrão) ou dominio.</summary>
+    /// <example>empresa</example>
+    public string? EscopoTipo { get; init; }
+
+    /// <summary>Id do domínio, quando o escopo é dominio.</summary>
+    public Guid? EscopoId { get; init; }
+}
+
+/// <summary>Cadastros a inativar de uma vez. O do administrador conectado é ignorado.</summary>
+public sealed record InativarEmLoteRequest
+{
+    public required IReadOnlyList<Guid> Ids { get; init; }
+}
+
+/// <summary>Um squad: título, sigla e descrição, os três obrigatórios.</summary>
+public sealed record SquadRequest
+{
+    /// <summary>Até 20 letras; guardada em maiúsculas e única na empresa.</summary>
+    /// <example>CRED</example>
+    public required string Sigla { get; init; }
+
+    /// <example>Squad Crédito</example>
+    public required string Titulo { get; init; }
+
+    /// <example>Originação e manutenção de contratos de crédito.</example>
+    public required string Descricao { get; init; }
+}

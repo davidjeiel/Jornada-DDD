@@ -17,6 +17,8 @@ public sealed class Sessao(
     ITrilhaDeAuditoria trilha,
     IRepositorioDePessoas pessoas,
     IRepositorioDePleitos pleitos,
+    IRepositorioDeSquads squads,
+    IConsultaDeVinculos vinculos,
     IAsyncDisposable? recursos = null) : IAsyncDisposable
 {
     public IRepositorioDeAtivos Ativos { get; } = ativos;
@@ -27,6 +29,8 @@ public sealed class Sessao(
     public ITrilhaDeAuditoria Trilha { get; } = trilha;
     public IRepositorioDePessoas Pessoas { get; } = pessoas;
     public IRepositorioDePleitos Pleitos { get; } = pleitos;
+    public IRepositorioDeSquads Squads { get; } = squads;
+    public IConsultaDeVinculos Vinculos { get; } = vinculos;
 
     public ValueTask DisposeAsync() => recursos?.DisposeAsync() ?? ValueTask.CompletedTask;
 }

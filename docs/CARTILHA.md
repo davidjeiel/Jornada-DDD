@@ -8,14 +8,14 @@ realidade, e ninguém aprova o que escreveu. Esta cartilha mostra, para cada pap
 você consegue fazer, o que a ferramenta vai recusar e por quê — e a rotina que resolve o
 seu dia.
 
-> **A matriz de permissões abaixo é lida direto do domínio**, em
-> [`PoliticaDeAutorizacao.cs`](../src/dominio/Jornada.Dominio/Acesso/PoliticaDeAutorizacao.cs),
-> e a tabela de ritos, de [`PoliticasDeGovernanca.Padrao()`](../src/dominio/Jornada.Dominio/Governanca/PoliticaDeGovernanca.cs).
-> Isso é herança direta do `painel-ddd`: lá, `test_cartilha.py` falha o build se este
-> documento descrever uma regra que o código já não aplica. Aqui esse teste **ainda não
-> existe** — é dívida assumida, não descuido; ver [Limitações](../README.md#limitações-desta-primeira-versão).
-> Até lá, este arquivo é responsabilidade de quem mexe em `Acesso/` ou `Governanca/`: mudou
-> a regra, atualiza a cartilha no mesmo PR.
+> **As tabelas de referência não estão neste arquivo.** A matriz "quem pode fazer o quê",
+> as etapas de cada papel e o rito de cada tipo de ativo são lidos das regras que a API
+> aplica ([`PoliticaDeAutorizacao.cs`](../src/dominio/Jornada.Dominio/Acesso/PoliticaDeAutorizacao.cs)
+> e [`PoliticasDeGovernanca`](../src/dominio/Jornada.Dominio/Governanca/PoliticaDeGovernanca.cs))
+> e servidos em `GET /v1/cartilha`; a tela Cartilha os mostra na
+> [Tabela de referência](#tabela-de-referência). É herança do `painel-ddd`: uma cartilha que
+> repete a regra à mão envelhece em silêncio na primeira mudança. Este arquivo guarda só a
+> prosa: a rotina, os avisos e as dúvidas de cada papel.
 
 | Papel | Você responde por |
 | --- | --- |
@@ -212,6 +212,11 @@ alguém resolver.
 - Cadastrar e editar qualquer tipo de ativo, nos dois blocos
 - Registrar relações entre ativos
 - Anexar evidência, assumir ativos e submeter para validação
+- Despachar os **Pleitos de acesso**, no grupo Administração do menu: você concede todo
+  papel menos o de administrador, e não decide o próprio pleito; negar, ou conceder papel
+  diferente do pedido, exige resposta
+- Cadastrar e manter os **Squads**: título, sigla (única, até 20 letras) e descrição.
+  Inativar um squad não apaga os vínculos que ele já tem
 
 **O que a ferramenta recusa**
 
@@ -220,9 +225,6 @@ alguém resolver.
 
 **O que o `painel-ddd` já dava ao curador, e esta versão ainda não tem**
 
-- **Conceder papéis pleiteados** — já existe: **Pleitos de acesso**, no grupo
-  Administração do menu. Você concede todo papel menos o de administrador, e não decide o
-  próprio pleito; negar, ou conceder papel diferente do pedido, exige resposta
 - **Importar descobertas e triar bandeja** — ADR-0012 lista descoberta automática como
   item do roteiro, não desta fase
 
@@ -245,19 +247,28 @@ alguém resolver.
 
 `admin`
 
-Você faz tudo o que os outros fazem. Nesta versão, sem console de administração próprio,
-"administrar" ainda é sinônimo de "ter todos os papéis de escrita" — a ação
-`Administrar` existe na política do domínio, mas nenhuma tela a usa ainda.
+Você faz tudo o que os outros fazem, e opera a ferramenta: é quem mantém os cadastros das
+pessoas e é o único que concede o papel de administrador.
 
 **O que você faz**
 
 - Todas as ações de cadastro, edição, relação e submissão, nos dois blocos
 - Decidir qualquer etapa de validação
+- Despachar os **Pleitos de acesso**, inclusive os de administrador
+- Na **Gestão de acessos**: buscar qualquer cadastro, inclusive os inativos; corrigir nome,
+  e-mail, unidade e squad; conceder um papel direto ou revogar um papel (a revogação vale
+  na hora); inativar quem saiu, um a um ou em lote. Inativar encerra todos os papéis, e
+  reativar não devolve nenhum
+- Excluir um cadastro que não tem vínculo nenhum com o histórico. Com vínculo (papel,
+  pleito, responsabilidade, revisão, validação ou auditoria), inative em vez de excluir
+- Cadastrar e manter os **Squads**, como o curador
 
 **O que nem você escapa**
 
 - Decidir sobre uma revisão que você mesmo submeteu — a segregação de função não tem
   exceção de papel
+- Mexer no próprio acesso: você não se inativa, não se exclui, não revoga os próprios
+  papéis e não concede papel a si mesmo. Outro administrador faz isso por você
 - Editar um ativo publicado sem abrir revisão — publicado é imutável. O botão
   **Abrir revisão**, no painel do ativo, leva o ativo para `em_revisao`; aí a edição
   volta a valer, e a revisão passa de novo pelo rito. Se a revisão for reprovada, o
@@ -294,60 +305,20 @@ direto.
 
 ## Tabela de referência
 
-A matriz completa, do jeito que o domínio aplica
-([`PoliticaDeAutorizacao.cs`](../src/dominio/Jornada.Dominio/Acesso/PoliticaDeAutorizacao.cs)).
-Onde a coluna diz "sim" mas não há tela para a ação hoje, a política já está pronta —
-falta o fio até a interface.
+As tabelas abaixo saem das regras que a API aplica, não de um texto: mudou a regra no
+código, muda esta página. Na leitura do repositório elas não aparecem; abra a Cartilha na
+ferramenta, ou chame `GET /v1/cartilha`.
 
-### Quem pode fazer o quê
-
-| Ação | Negócio | Time técnico | Arquiteto | Curador | Admin | Consulta | Tem tela hoje? |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| Cadastrar ativo | sim | sim | sim | sim | sim | — | sim |
-| Editar ativo | sim | sim | sim | sim | sim | — | sim |
-| Registrar relação | — | sim | sim | sim | sim | — | sim |
-| Submeter para validação | sim | sim | sim | sim | sim | — | sim |
-| Abrir revisão | sim | sim | sim | sim | sim | — | sim |
-| Decidir validação | sim | sim | sim | — | sim | — | sim |
-| Importar descobertas | — | sim | — | sim | sim | — | não |
-| Triar bandeja | — | sim | — | sim | sim | — | não |
-| Descontinuar ativo | — | — | sim | sim | sim | — | não |
-| Conceder papéis | — | — | — | sim | sim | — | não |
-| Administrar a ferramenta | — | — | — | — | sim | — | não |
-
-"Decidir validação" é permissão para **entrar na fila** — qual etapa você decide depende
-do papel: *negocial* exige negócio, *técnica* exige time técnico, *arquitetural* exige
-arquiteto. Admin decide qualquer uma. Em qualquer caso, o **responsável formal** do ativo
-pode decidir a etapa correspondente ao papel de ownership que exerce sobre ele
+"Decidir validação" é permissão para **entrar na fila**: qual etapa você decide depende do
+papel. *Negocial* exige negócio, *técnica* exige time técnico, *arquitetural* exige
+arquiteto, e o admin decide qualquer uma. Em qualquer caso, o **responsável formal** do
+ativo pode decidir a etapa correspondente ao papel de ownership que exerce sobre ele
 (`OwnerNegocial`, `OwnerTecnico` ou `Arquiteto`).
 
-### O rito de cada tipo de ativo
-
 Governança proporcional: um endpoint não passa pelo mesmo rito de um contexto delimitado.
-Quem define é a política do tipo e da criticidade
-([`PoliticasDeGovernanca.Padrao()`](../src/dominio/Jornada.Dominio/Governanca/PoliticaDeGovernanca.cs)).
-
-| Tipo | Etapas de validação | Evidências mínimas | Score mínimo | Prazo por etapa | Revisar a cada |
-| --- | --- | :---: | :---: | :---: | :---: |
-| Domínio | negocial → arquitetural | 1 | 70% | 72h | 365 dias |
-| Subdomínio | negocial | 0 | 65% | 72h | 365 dias |
-| Contextos Delimitados | negocial → técnica → arquitetural | 1 | 75% | 48h | 180 dias |
-| Capacidade de negócio | negocial → técnica | 1 | 70% | 48h | 180 dias |
-| Capacidade de negócio **crítica** | negocial → técnica → arquitetural | 2 | 80% | 24h | 90 dias |
-| Sistema | técnica | 0 | 60% | 72h | 365 dias |
-| Aplicação | técnica | 1 | 65% | 48h | 180 dias |
-| Repositório | técnica | 1 | 60% | 72h | 180 dias |
-| API | técnica → arquitetural | 1 | 70% | 48h | 120 dias |
-| API **crítica** | negocial → técnica → arquitetural | 2 | 80% | 24h | 90 dias |
-| Endpoint | técnica | 0 | 55% | 72h | 180 dias |
-| Base de dados | técnica | 0 | 60% | 72h | 365 dias |
-| Objeto de dado | técnica | 0 | 55% | 72h | 365 dias |
-| Evento de negócio | técnica → arquitetural | 1 | 70% | 48h | 120 dias |
-
-> **Marcar um ativo como crítico aperta o rito de verdade**: mais uma etapa, mais uma
-> evidência, score mais alto e metade do prazo. Use a criticidade pelo risco real, não por
-> importância percebida — a política acima é por (tipo, criticidade), e "crítica" muda a
-> linha inteira.
+**Marcar um ativo como crítico aperta o rito de verdade**: mais uma etapa, mais uma
+evidência, score mais alto e metade do prazo. Use a criticidade pelo risco real, não por
+importância percebida.
 
 ---
 

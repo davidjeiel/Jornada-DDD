@@ -229,12 +229,13 @@ public sealed record SaudeResponse(string Situacao);
 /// <param name="Unidade">Código de quatro números da unidade.</param>
 /// <param name="Ativa">Cadastro inativo não tem papel nenhum.</param>
 /// <param name="Papeis">Chaves dos papéis vigentes, em qualquer escopo.</param>
+/// <param name="IdSquad">O squad da pessoa, quando tem.</param>
 public sealed record PessoaResponse(
-    Guid Id, string Matricula, string Nome, string Email, string Unidade, bool Ativa, IReadOnlyList<string> Papeis)
+    Guid Id, string Matricula, string Nome, string Email, string Unidade, bool Ativa, IReadOnlyList<string> Papeis, Guid? IdSquad)
 {
     public static PessoaResponse De(Pessoa p, DateOnly hoje) => new(
         p.Id, p.Matricula.Valor, p.Nome, p.Email, p.Unidade.Valor, p.Ativa,
-        p.Vigentes(hoje).Select(a => a.Papel.Chave()).Distinct().Order().ToArray());
+        p.Vigentes(hoje).Select(a => a.Papel.Chave()).Distinct().Order().ToArray(), p.IdSquad);
 }
 
 /// <summary>As pessoas ativas da empresa, por nome.</summary>
@@ -330,4 +331,83 @@ public sealed record PerfilResponse(
         s.Pleitos.Select(l => PleitoResponse.De(l, hoje)).ToArray(),
         s.BlocosQueEscreve.Order().ToArray(),
         s.PodeConceder, s.PodeConcederAdmin, s.PodeAdministrar);
+}
+
+/// <summary>Um squad.</summary>
+/// <param name="Id">Identificador do squad.</param>
+/// <param name="Sigla">Única na empresa, em maiúsculas.</param>
+/// <param name="Titulo">Nome do squad.</param>
+/// <param name="Descricao">Do que o squad cuida.</param>
+/// <param name="Ativa">Inativo não aparece para novos vínculos; os existentes ficam.</param>
+public sealed record SquadResponse(Guid Id, string Sigla, string Titulo, string Descricao, bool Ativa)
+{
+    public static SquadResponse De(Squad s) => new(s.Id, s.Sigla, s.Titulo, s.Descricao, s.Ativa);
+}
+
+/// <summary>Os squads da empresa, ativos primeiro.</summary>
+public sealed record ListaDeSquadsResponse(int Total, IReadOnlyList<SquadResponse> Squads);
+
+/// <summary>Um cadastro na gestão de acessos.</summary>
+/// <param name="Pessoa">O cadastro.</param>
+/// <param name="Squad">O squad da pessoa, quando tem.</param>
+/// <param name="Papeis">Os papéis vigentes, com escopo e blocos.</param>
+public sealed record CadastroResponse(PessoaResponse Pessoa, SquadResponse? Squad, IReadOnlyList<PapelResponse> Papeis)
+{
+    public static CadastroResponse De(CadastroLegivel c, DateOnly hoje) => new(
+        PessoaResponse.De(c.Pessoa, hoje), c.Squad is { } s ? SquadResponse.De(s) : null,
+        c.Papeis.Select(PapelResponse.De).ToArray());
+}
+
+/// <summary>Os cadastros da empresa, ativos primeiro, por nome.</summary>
+public sealed record ListaDeCadastrosResponse(int Total, IReadOnlyList<CadastroResponse> Cadastros);
+
+/// <summary>O que amarra o cadastro ao histórico.</summary>
+/// <param name="PodeExcluir">Nenhum vínculo: o cadastro pode ser excluído. Com vínculo, inativa-se.</param>
+/// <param name="Vinculos">"papéis atribuídos", "pleitos de acesso", "responsabilidades em ativos"...</param>
+public sealed record VinculosResponse(bool PodeExcluir, IReadOnlyList<string> Vinculos);
+
+/// <summary>Quantos cadastros foram inativados.</summary>
+public sealed record InativacaoEmLoteResponse(int Inativados);
+
+/// <summary>Uma linha da matriz "quem pode fazer o quê".</summary>
+/// <param name="Acao">A ação, em minúsculas (cadastrar, decidir, conceder...).</param>
+/// <param name="Rotulo">A ação para pessoas.</param>
+/// <param name="Papeis">Papel → pode. Lido da política de autorização, não escrito à mão.</param>
+public sealed record LinhaDaMatrizResponse(string Acao, string Rotulo, IReadOnlyDictionary<string, bool> Papeis);
+
+/// <summary>O rito de validação de um tipo (e criticidade).</summary>
+/// <param name="TipoItem">Chave do tipo.</param>
+/// <param name="Rotulo">Nome do tipo.</param>
+/// <param name="Criticidade">"*" vale para qualquer criticidade.</param>
+/// <param name="Etapas">Etapas de validação, na ordem.</param>
+/// <param name="EvidenciaMinima">Evidências exigidas para publicar.</param>
+/// <param name="ScoreMinimo">Score de qualidade mínimo, de 0 a 100.</param>
+/// <param name="SlaHoras">Prazo de cada etapa.</param>
+/// <param name="RevisarACadaDias">Periodicidade de revisão do ativo publicado.</param>
+public sealed record RitoResponse(
+    string TipoItem, string Rotulo, string Criticidade, IReadOnlyList<string> Etapas,
+    int EvidenciaMinima, int ScoreMinimo, int SlaHoras, int RevisarACadaDias);
+
+/// <summary>As tabelas de referência da cartilha, lidas do código.</summary>
+/// <param name="Papeis">As colunas da matriz, na ordem da tela.</param>
+/// <param name="Matriz">Quem pode fazer o quê.</param>
+/// <param name="EtapasPorPapel">Papel → etapas de validação que ele decide.</param>
+/// <param name="BlocosPorPapel">Papel → blocos de tipos em que escreve.</param>
+/// <param name="Ritos">O rito de cada tipo de ativo.</param>
+public sealed record CartilhaResponse(
+    IReadOnlyList<string> Papeis, IReadOnlyList<LinhaDaMatrizResponse> Matriz,
+    IReadOnlyDictionary<string, IReadOnlyList<string>> EtapasPorPapel,
+    IReadOnlyDictionary<string, IReadOnlyList<string>> BlocosPorPapel,
+    IReadOnlyList<RitoResponse> Ritos)
+{
+    public static CartilhaResponse De(ConsultarCartilha.Saida s) => new(
+        ConsultarCartilha.OrdemDosPapeis.Select(p => p.Chave()).ToArray(),
+        s.Matriz.Select(l => new LinhaDaMatrizResponse(l.Acao.ToString().ToLowerInvariant(), l.Rotulo,
+            l.Papeis.ToDictionary(kv => kv.Key.Chave(), kv => kv.Value))).ToArray(),
+        s.EtapasPorPapel.ToDictionary(kv => kv.Key.Chave(),
+            kv => (IReadOnlyList<string>)kv.Value.Select(e => e.ToString().ToLowerInvariant()).ToArray()),
+        s.BlocosPorPapel.ToDictionary(kv => kv.Key.Chave(), kv => kv.Value),
+        s.Ritos.Select(r => new RitoResponse(r.TipoItem, r.Rotulo, r.Politica.Criticidade,
+            r.Politica.Etapas.Select(e => e.ToString().ToLowerInvariant()).ToArray(),
+            r.Politica.EvidenciaMinima, r.Politica.ScoreMinimo, r.Politica.SlaHoras, r.Politica.PeriodicidadeRevisaoDias)).ToArray());
 }

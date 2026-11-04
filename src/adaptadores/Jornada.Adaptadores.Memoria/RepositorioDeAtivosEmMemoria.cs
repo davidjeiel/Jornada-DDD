@@ -28,9 +28,11 @@ public sealed class ArmazemEmMemoria
     internal ConcurrentQueue<RegistroDeAuditoria> Auditoria { get; } = new();
     internal ConcurrentDictionary<Guid, Pessoa> Pessoas { get; } = new();
     internal ConcurrentDictionary<Guid, PleitoDeAcesso> Pleitos { get; } = new();
+    internal ConcurrentDictionary<Guid, Squad> Squads { get; } = new();
 
     public void Limpar()
     {
+        Squads.Clear();
         Pessoas.Clear();
         Pleitos.Clear();
         Revisoes.Clear();
@@ -68,7 +70,7 @@ public sealed class ArmazemEmMemoria
 public sealed class RepositorioDeAtivosEmMemoria(
     ArmazemEmMemoria armazem, IContextoDeTenantAtual tenant)
     : IRepositorioDeAtivos, IRepositorioDeRelacoes, IUnidadeDeTrabalho, IRepositorioDeValidacoes,
-      IRepositorioDeRevisoes, ITrilhaDeAuditoria
+      IRepositorioDeRevisoes, ITrilhaDeAuditoria, IConsultaDeVinculos
 {
     private ConcurrentDictionary<IdDeAtivo, Ativo> _ativos => armazem.Ativos;
     private ConcurrentDictionary<string, int> _sequenciais => armazem.Sequenciais;
@@ -258,6 +260,22 @@ public sealed class RepositorioDeAtivosEmMemoria(
             .OrderByDescending(r => r.Numero)
             .ToArray());
 
+    // ─────────────────────────────────────────────────── IConsultaDeVinculos
+
+    public Task<IReadOnlyList<string>> DaPessoaAsync(Guid idPessoa, CancellationToken ct = default)
+    {
+        var vinculos = new List<string>();
+        if (_ativos.Values.Any(a => MinhaEmpresa(a) && a.Responsaveis.Any(r => r.IdPessoa == idPessoa)))
+            vinculos.Add("responsabilidades em ativos");
+        if (armazem.Revisoes.Values.Any(r => r.Empresa == Empresa && r.IdAutor == idPessoa))
+            vinculos.Add("revisões criadas");
+        if (_validacoes.Values.Any(v => v.Empresa == Empresa && (v.IdSubmissor == idPessoa || v.IdDecisor == idPessoa)))
+            vinculos.Add("validações submetidas ou decididas");
+        if (armazem.Auditoria.Any(r => r.Empresa == Empresa && r.IdPessoa == idPessoa))
+            vinculos.Add("eventos de auditoria");
+        return Task.FromResult<IReadOnlyList<string>>(vinculos);
+    }
+
     // ──────────────────────────────────────────────────── ITrilhaDeAuditoria
 
     public Task RegistrarAsync(RegistroDeAuditoria registro, CancellationToken ct = default)
@@ -286,7 +304,7 @@ public sealed class RepositorioDeAtivosEmMemoria(
 /// fazer com eles, que já são gravados ao adicionar.
 /// </summary>
 public sealed class RepositorioDeAcessoEmMemoria(ArmazemEmMemoria armazem, IContextoDeTenantAtual tenant)
-    : IRepositorioDePessoas, IRepositorioDePleitos
+    : IRepositorioDePessoas, IRepositorioDePleitos, IRepositorioDeSquads
 {
     private IdDeEmpresa Empresa => tenant.Atual.Empresa;
 
@@ -314,6 +332,41 @@ public sealed class RepositorioDeAcessoEmMemoria(ArmazemEmMemoria armazem, ICont
         }
         return Task.CompletedTask;
     }
+
+    public Task RemoverAsync(Pessoa pessoa, CancellationToken ct = default)
+    {
+        if (pessoa.Empresa == Empresa) armazem.Pessoas.TryRemove(pessoa.Id, out _);
+        return Task.CompletedTask;
+    }
+
+    // ───────────────────────────────────────────────── IRepositorioDeSquads
+
+    Task<Squad?> IRepositorioDeSquads.ObterAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(armazem.Squads.TryGetValue(id, out var s) && s.Empresa == Empresa ? s : null);
+
+    public Task<Squad?> ObterPorSiglaAsync(string sigla, CancellationToken ct = default) =>
+        Task.FromResult(armazem.Squads.Values.FirstOrDefault(s => s.Empresa == Empresa && s.Sigla == Squad.NormalizarSigla(sigla)));
+
+    Task<IReadOnlyList<Squad>> IRepositorioDeSquads.ListarAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Squad>>(armazem.Squads.Values
+            .Where(s => s.Empresa == Empresa)
+            .OrderBy(s => s.Ativa ? 0 : 1).ThenBy(s => s.Titulo, StringComparer.CurrentCulture)
+            .ToArray());
+
+    public Task AdicionarAsync(Squad squad, CancellationToken ct = default)
+    {
+        if (squad.Empresa != Empresa)
+            throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de gravar squad de outra empresa.");
+        lock (armazem.Squads)
+        {
+            if (armazem.Squads.Values.Any(s => s.Empresa == Empresa && s.Sigla == squad.Sigla && s.Id != squad.Id))
+                throw new ErroDeDominio("CONFLITO_DE_EDICAO", $"Já existe uma squad com a sigla {squad.Sigla}.");
+            armazem.Squads[squad.Id] = squad;
+        }
+        return Task.CompletedTask;
+    }
+
+    // ───────────────────────────────────────────────── IRepositorioDePleitos
 
     public Task AdicionarAsync(PleitoDeAcesso pleito, CancellationToken ct = default)
     {

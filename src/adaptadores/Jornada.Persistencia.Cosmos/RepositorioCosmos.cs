@@ -291,6 +291,7 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
         foreach (var lote in lotes.Values)
             await lote.ExecutarAsync(ct);
         _auditoriaPendente.Clear();
+        AcessoConfirmado();
 
         foreach (var (ativo, _) in eventos)
             ativo.DrenarEventos();

@@ -149,6 +149,7 @@ internal static class Mapeamento
         Unidade = p.Unidade.Valor,
         Ativa = p.Ativa,
         CadastradaEm = p.CadastradaEm,
+        IdSquad = p.IdSquad,
         Atribuicoes = [.. p.Atribuicoes.Select(a => new AtribuicaoEmbutida(
             a.Papel.Chave(), a.EscopoTipo.ToString().ToLowerInvariant(), a.EscopoId, a.InicioVigencia, a.FimVigencia, a.ConcedidoPor))],
     };
@@ -159,7 +160,8 @@ internal static class Mapeamento
         d.Ativa, d.CadastradaEm,
         d.Atribuicoes.Select(a => new AtribuicaoDePapel(
             PapelDe(a.Papel), Enum.Parse<TipoDeEscopo>(a.EscopoTipo, ignoreCase: true), a.EscopoId,
-            a.InicioVigencia, a.FimVigencia, a.ConcedidoPor)));
+            a.InicioVigencia, a.FimVigencia, a.ConcedidoPor)),
+        d.IdSquad);
 
     public static DocumentoDeMatricula Reserva(Pessoa p) => new()
     {
@@ -167,6 +169,30 @@ internal static class Mapeamento
         Empresa = Texto(p.Empresa.Valor),
         IdAtivo = AcessoDoTenant.ParticaoDeAcesso,
         IdPessoa = Texto(p.Id),
+    };
+
+    public static string IdDaSigla(string sigla) => $"sigla-{sigla}";
+
+    public static DocumentoDeSquad ParaDocumento(Squad s) => new()
+    {
+        Id = Texto(s.Id),
+        Empresa = Texto(s.Empresa.Valor),
+        IdAtivo = AcessoDoTenant.ParticaoDeAcesso,
+        Sigla = s.Sigla,
+        Titulo = s.Titulo,
+        Descricao = s.Descricao,
+        Ativa = s.Ativa,
+    };
+
+    public static Squad ParaDominio(DocumentoDeSquad d) => Squad.Reidratar(
+        Guid.Parse(d.Id), new IdDeEmpresa(Guid.Parse(d.Empresa)), d.Sigla, d.Titulo, d.Descricao, d.Ativa);
+
+    public static DocumentoDeSigla Reserva(Squad s) => new()
+    {
+        Id = IdDaSigla(s.Sigla),
+        Empresa = Texto(s.Empresa.Valor),
+        IdAtivo = AcessoDoTenant.ParticaoDeAcesso,
+        IdSquad = Texto(s.Id),
     };
 
     public static DocumentoDePleito ParaDocumento(PleitoDeAcesso p) => new()

@@ -32,6 +32,9 @@ public sealed class PoliticasDeGovernanca(IEnumerable<PoliticaDeGovernanca> poli
 {
     private readonly PoliticaDeGovernanca[] _politicas = politicas.ToArray();
 
+    /// <summary>Todas as políticas declaradas, na ordem em que foram declaradas. A cartilha mostra esta tabela.</summary>
+    public IReadOnlyList<PoliticaDeGovernanca> Todas => _politicas;
+
     public PoliticaDeGovernanca Para(string tipoItem, Criticidade criticidade)
     {
         var chave = criticidade.Chave();

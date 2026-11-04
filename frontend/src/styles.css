@@ -67,6 +67,13 @@
   --danger-soft: #fff8f7;
   --retired-weak: #fdecea;
   --retired-ink: #8a2c25;
+  /* Cor de cada perfil na cartilha (as do painel-ddd). */
+  --perfil-negocio: #a2610b;    --perfil-negocio-bg: #fbf1de;
+  --perfil-tech: #1a56c4;       --perfil-tech-bg: #e8effe;
+  --perfil-arquiteto: #6d3ec4;  --perfil-arquiteto-bg: #f0eafd;
+  --perfil-curador: #0e7a58;    --perfil-curador-bg: #e4f4ed;
+  --perfil-admin: #445067;      --perfil-admin-bg: #eaeef5;
+  --perfil-consulta: #55647c;   --perfil-consulta-bg: #eef1f6;
   --info: #1a4bb0;
   --info-weak: #e8f0ff;
   --info-border: #c8dafd;
@@ -145,6 +152,12 @@
   --danger-soft: #2a1a20;
   --retired-weak: #3a2027;
   --retired-ink: #ff9aa6;
+  --perfil-negocio: #e3ab5b;    --perfil-negocio-bg: #33280f;
+  --perfil-tech: #7f9cff;       --perfil-tech-bg: #1d2747;
+  --perfil-arquiteto: #b494fb;  --perfil-arquiteto-bg: #281d45;
+  --perfil-curador: #58d3a8;    --perfil-curador-bg: #12332a;
+  --perfil-admin: #a9b6cd;      --perfil-admin-bg: #222a3b;
+  --perfil-consulta: #9aa4bb;   --perfil-consulta-bg: #1d2434;
   --info: #9ab4ff;
   --info-weak: #1b2747;
   --info-border: #2c3b68;
@@ -221,6 +234,12 @@
     --danger-soft: #2a1a20;
     --retired-weak: #3a2027;
     --retired-ink: #ff9aa6;
+    --perfil-negocio: #e3ab5b;    --perfil-negocio-bg: #33280f;
+    --perfil-tech: #7f9cff;       --perfil-tech-bg: #1d2747;
+    --perfil-arquiteto: #b494fb;  --perfil-arquiteto-bg: #281d45;
+    --perfil-curador: #58d3a8;    --perfil-curador-bg: #12332a;
+    --perfil-admin: #a9b6cd;      --perfil-admin-bg: #222a3b;
+    --perfil-consulta: #9aa4bb;   --perfil-consulta-bg: #1d2434;
     --info: #9ab4ff;
     --info-weak: #1b2747;
     --info-border: #2c3b68;
@@ -640,3 +659,44 @@ fieldset.atributos legend { padding: 0 6px; color: var(--muted); font-size: 12.5
   .cartilha-nav { flex-direction: row; flex-wrap: wrap; padding: 0 0 12px; border-right: 0; border-bottom: 1px solid var(--line); }
   .perfil-cartao { flex-direction: column; }
 }
+
+/* Cartilha: os perfis, cada um com a sua cor, e as tabelas lidas da API. */
+.perfis-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 4px 0 18px; }
+.cartao-perfil { display: block; padding: 12px 14px; border: 1px solid var(--line); border-left: 4px solid var(--tom); border-radius: 8px; background: var(--tom-bg); color: var(--ink); }
+.cartao-perfil:hover { text-decoration: none; border-color: var(--tom); }
+.cartao-perfil strong { display: block; color: var(--tom); font-size: 15px; }
+.cartao-perfil span { display: block; margin-top: 2px; color: var(--muted); font-size: 13px; }
+.perfil-negocio { --tom: var(--perfil-negocio); --tom-bg: var(--perfil-negocio-bg); }
+.perfil-tech { --tom: var(--perfil-tech); --tom-bg: var(--perfil-tech-bg); }
+.perfil-arquiteto { --tom: var(--perfil-arquiteto); --tom-bg: var(--perfil-arquiteto-bg); }
+.perfil-curador { --tom: var(--perfil-curador); --tom-bg: var(--perfil-curador-bg); }
+.perfil-admin { --tom: var(--perfil-admin); --tom-bg: var(--perfil-admin-bg); }
+.perfil-consulta { --tom: var(--perfil-consulta); --tom-bg: var(--perfil-consulta-bg); }
+.cartilha-secao { scroll-margin-top: 16px; padding: 18px 0; border-top: 1px solid var(--line); }
+.cartilha-secao:first-child { border-top: 0; padding-top: 0; }
+.cartilha-secao.perfil-negocio h2, .cartilha-secao.perfil-tech h2, .cartilha-secao.perfil-arquiteto h2,
+.cartilha-secao.perfil-curador h2, .cartilha-secao.perfil-admin h2, .cartilha-secao.perfil-consulta h2 { color: var(--tom); }
+.cartilha-nav a.cartilha-nav-item { display: block; text-decoration: none; }
+.cartilha-nav { position: sticky; top: 16px; align-self: flex-start; }
+.matriz td, .matriz th { text-align: center; }
+.matriz td:first-child, .matriz th:first-child { text-align: left; }
+.sim { color: var(--success-ink); font-weight: 600; }
+.nao { color: var(--muted); }
+.etapa { display: inline-block; margin-right: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; }
+.etapa-negocial { background: var(--perfil-negocio-bg); color: var(--perfil-negocio); }
+.etapa-tecnica { background: var(--perfil-tech-bg); color: var(--perfil-tech); }
+.etapa-arquitetural { background: var(--perfil-arquiteto-bg); color: var(--perfil-arquiteto); }
+@media (max-width: 760px) {
+  .cartilha-shell { flex-direction: column; }
+  .cartilha-nav { position: static; flex-basis: auto; padding-right: 0; border-right: 0; }
+}
+
+/* Gestão de acessos e squads. */
+.barra-de-busca { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.barra-de-busca input { flex: 1 1 260px; }
+.paginacao { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--muted); font-size: 13px; }
+.tabela tr.selecionada td { background: var(--brand-weak); }
+.lista-de-papeis { display: grid; gap: 4px; margin: 0 0 12px; padding: 0; list-style: none; }
+.lista-de-papeis li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; }
+.caixa-de-marcar { display: block; margin: 10px 0; }
+.caixa-de-marcar input { margin-right: 6px; }
