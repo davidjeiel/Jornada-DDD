@@ -52,7 +52,7 @@ public interface IRepositorioDeAtivos
 /// decide se a descontinuação do destino exige confirmação.
 /// </summary>
 public sealed record RelacaoResumo(
-    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media);
+    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media, string? Mecanismo = null);
 
 /// <summary>Consultas e escrita sobre o grafo de relações.</summary>
 public interface IRepositorioDeRelacoes
@@ -66,7 +66,14 @@ public interface IRepositorioDeRelacoes
 
     /// <summary>Grava uma aresta (origem → destino). Não valida regra de negócio — isso é do caso de uso.</summary>
     public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo,
-        Criticidade criticidade = Criticidade.Media, CancellationToken ct = default);
+        Criticidade criticidade = Criticidade.Media, string? mecanismo = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Há caminho de <c>depende_de</c> de <paramref name="de"/> até <paramref name="ate"/>?
+    /// É a pergunta antes de gravar <c>ate → de</c>: se já existe o caminho de volta,
+    /// a aresta nova fecharia um ciclo (<c>governanca._tem_ciclo</c>).
+    /// </summary>
+    public Task<bool> TemCaminhoDeDependenciaAsync(IdDeAtivo de, IdDeAtivo ate, CancellationToken ct = default);
 
     /// <summary>Todas as arestas em que o ativo aparece, como origem OU destino.</summary>
     public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default);

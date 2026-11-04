@@ -85,9 +85,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 76 |
-| 🟡 parcial | 12 |
-| ⬜ pendente | 64 |
+| ✅ coberto | 95 |
+| 🟡 parcial | 6 |
+| ⬜ pendente | 51 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -99,7 +99,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | 0 | Fundação, mais o que o domínio já cobria | 29 | 0 | 0 |
 | 1 | Ciclo de vida | 4 | 0 | 0 |
 | 2 | Pessoas e acesso | 43 | 2 | 0 |
-| 3 | Ficha e cadastro | 0 | 8 | 14 |
+| 3 | Ficha e cadastro | 19 | 2 | 1 |
 | 4 | Validação e mesa | 0 | 0 | 8 |
 | 5 | Catálogo e busca | 0 | 1 | 11 |
 | 6 | Mapas e grafo | 0 | 0 | 12 |
@@ -124,6 +124,13 @@ restam na fase 2 são os avisos de pleito aberto e decidido, que entram com as
 notificações, na fase 8. A gestão de acessos e os squads do painel não têm
 teste próprio lá; no Jornada estão em `GestaoTestes`, no contrato de
 persistência e em `telas/Gestao.test.tsx`.
+
+A fase 3 também foi dividida. O 3a traz a ficha do ativo como página própria
+(`/ativos/{id}`, cinco abas pela URL, trilha clicável, caminho até a
+publicação), a relação com mecanismo, destinos sugeridos, recusa de ciclo
+antes de gravar e relação repetida ignorada, e as relações em lote. O 3b traz o
+assistente de cadastro lendo o metamodelo (`GET /v1/metamodelo`) com o rito do
+tipo antecipado, o squad do ativo e o escopo de papel por squad.
 
 ### Governança (regras de publicação) — `tests/test_governanca.py` (10)
 
@@ -216,14 +223,14 @@ persistência e em `telas/Gestao.test.tsx`.
 
 | Teste do painel | Fase | Situação | No Jornada |
 |---|---|---|---|
-| `test_visao_360_abre_no_resumo_e_esconde_as_outras_abas` | 3 | ⬜ |  |
-| `test_aba_escolhida_e_a_que_abre` | 3 | ⬜ |  |
-| `test_aba_desconhecida_cai_no_resumo` | 3 | ⬜ |  |
-| `test_escrita_volta_para_a_aba_de_origem` | 3 | ⬜ |  |
-| `test_checklist_reflete_o_que_falta` | 3 | 🟡 | `ChecklistDerivaDoPreCheck`; a tela mostra só três passos. |
-| `test_checklist_fica_completo_quando_o_precheck_aprova` | 3 | 🟡 | Idem. |
+| `test_visao_360_abre_no_resumo_e_esconde_as_outras_abas` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx`: as cinco abas no HTML, só a escolhida visível |
+| `test_aba_escolhida_e_a_que_abre` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` (`?aba=`) |
+| `test_aba_desconhecida_cai_no_resumo` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` (`abaDaUrl`) |
+| `test_escrita_volta_para_a_aba_de_origem` | 3 | ✅ | A aba mora na URL e a escrita não sai dela; `telas/PaginaDoAtivo.test.tsx` (`caminhoDaAba`) |
+| `test_checklist_reflete_o_que_falta` | 3 | ✅ | `ChecklistRefleteOQueFalta` e `telas/PaginaDoAtivo.test.tsx`: os cinco passos, com a pendência e a aba que a resolve |
+| `test_checklist_fica_completo_quando_o_precheck_aprova` | 3 | ✅ | `ChecklistFicaCompletoQuandoOPreCheckAprova` |
 | `test_todo_bloqueio_do_precheck_cai_em_algum_passo` — O checklist não pode esconder um impedimento que a submissão vai levantar. | 0 | ✅ | `ChecklistDerivaDoPreCheck` |
-| `test_checklist_aparece_no_rascunho_e_some_no_publicado` | 3 | ⬜ |  |
+| `test_checklist_aparece_no_rascunho_e_some_no_publicado` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |
 | `test_wizard_antecipa_o_rito_do_tipo` | 3 | ⬜ |  |
 | `test_painel_do_validador_mostra_evidencias_e_responsaveis` | 4 | ⬜ |  |
 | `test_painel_mostra_o_que_mudou_na_segunda_revisao` | 4 | ⬜ |  |
@@ -234,19 +241,19 @@ persistência e em `telas/Gestao.test.tsx`.
 | `test_minha_mesa_separa_o_que_e_meu` | 4 | ⬜ |  |
 | `test_tela_da_mesa_responde_e_entra_no_menu` | 4 | ⬜ |  |
 | `test_migracao_cria_a_coluna_em_banco_antigo` — Banco criado antes da onda 2 recebe atribuido_a sem perder dados. |  | — | Migração de coluna do SQLite; o Cosmos não tem esquema. |
-| `test_formulario_de_relacao_oferece_mecanismo` | 3 | ⬜ |  |
-| `test_mecanismo_chega_ao_banco` | 3 | ⬜ |  |
-| `test_relacao_sem_destino_avisa_em_vez_de_quebrar` | 3 | 🟡 | `RelacionarAtivos` recusa destino inexistente; falta teste. |
-| `test_destinos_sugeridos_cobrem_todas_as_relacoes` — A lista que filtra o combobox não pode deixar uma relação sem sugestão. | 3 | ⬜ |  |
+| `test_formulario_de_relacao_oferece_mecanismo` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx`: mecanismo e busca de destino (`destino-busca`) |
+| `test_mecanismo_chega_ao_banco` | 3 | ✅ | `MecanismoChegaAoBanco` e o contrato de persistência |
+| `test_relacao_sem_destino_avisa_em_vez_de_quebrar` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` (`problemaDaRelacao`); a API devolve 404 `DESTINO_NAO_ENCONTRADO` (`TipoEMecanismoSaoConferidos`) |
+| `test_destinos_sugeridos_cobrem_todas_as_relacoes` — A lista que filtra o combobox não pode deixar uma relação sem sugestão. | 3 | ✅ | `DestinosSugeridosCobremTodasAsRelacoes` e `telas/PaginaDoAtivo.test.tsx` |
 
 ### Navegação e filtros — `tests/test_jornada.py` (17)
 
 | Teste do painel | Fase | Situação | No Jornada |
 |---|---|---|---|
-| `test_trilha_sobe_da_raiz_ate_o_pai_direto` | 3 | 🟡 | `TrilhaAsync` existe e vai na ficha; falta teste dedicado. |
-| `test_trilha_de_item_raiz_e_vazia` | 3 | 🟡 | Idem. |
-| `test_tela_do_ativo_mostra_a_trilha_clicavel` | 3 | ⬜ |  |
-| `test_menu_continua_marcado_dentro_de_um_ativo` | 3 | 🟡 | `secaoDoCaminho` já marca o catálogo em `/ativos/...`; a página do ativo chega na fase 3. |
+| `test_trilha_sobe_da_raiz_ate_o_pai_direto` | 3 | ✅ | `TrilhaSobeDaRaizAteOPaiDireto` |
+| `test_trilha_de_item_raiz_e_vazia` | 3 | ✅ | `TrilhaDeItemRaizEVazia` |
+| `test_tela_do_ativo_mostra_a_trilha_clicavel` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |
+| `test_menu_continua_marcado_dentro_de_um_ativo` | 3 | ✅ | `navegacao.test.ts` e `telas/PaginaDoAtivo.test.tsx`: `/ativos/{id}` é a página do ativo |
 | `test_menu_marca_o_cadastro_no_wizard` | 0 | ✅ | `navegacao.test.ts` |
 | `test_busca_global_sugere_ativos_por_termo` | 5 | ⬜ | A busca do topo já leva ao catálogo filtrado; as sugestões chegam na fase 5. |
 | `test_busca_global_ignora_termo_curto` | 5 | ⬜ |  |
@@ -275,10 +282,10 @@ persistência e em `telas/Gestao.test.tsx`.
 | `test_triagem_aceita_e_descarta` | 9 | ⬜ |  |
 | `test_triagem_nao_toca_em_cadastro_humano` | 9 | ⬜ |  |
 | `test_triagem_recusa_acao_desconhecida` | 9 | ⬜ |  |
-| `test_lote_cria_varias_e_ignora_as_existentes` | 3 | ⬜ |  |
-| `test_lote_ignora_o_proprio_ativo` | 3 | ⬜ |  |
-| `test_tela_de_lote_marca_o_que_ja_existe` | 3 | ⬜ |  |
-| `test_post_do_lote_volta_para_a_aba_de_relacoes` | 3 | ⬜ |  |
+| `test_lote_cria_varias_e_ignora_as_existentes` | 3 | ✅ | `LoteCriaVariasEIgnoraAsExistentes` |
+| `test_lote_ignora_o_proprio_ativo` | 3 | ✅ | `LoteIgnoraOProprioAtivo` |
+| `test_tela_de_lote_marca_o_que_ja_existe` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |
+| `test_post_do_lote_volta_para_a_aba_de_relacoes` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |
 | `test_pagina_traz_o_total_real_e_nao_o_tamanho_da_pagina` | 5 | ⬜ |  |
 | `test_pagina_fora_do_intervalo_volta_para_a_ultima` | 5 | ⬜ |  |
 | `test_ordenacao_por_score_e_por_nome` | 5 | ⬜ |  |

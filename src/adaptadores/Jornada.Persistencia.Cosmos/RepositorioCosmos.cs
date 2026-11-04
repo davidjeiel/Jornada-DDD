@@ -115,7 +115,7 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
     // ───────────────────────────────────────────────── IRepositorioDeRelacoes
 
     public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo,
-        Criticidade criticidade = Criticidade.Media, CancellationToken ct = default) =>
+        Criticidade criticidade = Criticidade.Media, string? mecanismo = null, CancellationToken ct = default) =>
         // Grava na hora: a porta não passa pela unidade de trabalho.
         _acesso.CriarAsync(new DocumentoDeRelacao
         {
@@ -125,6 +125,7 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
             Destino = Mapeamento.Texto(destino.Valor),
             TipoRelacao = tipo,
             Criticidade = criticidade.Chave(),
+            Mecanismo = mecanismo,
             CriadoEm = DateTimeOffset.UtcNow,
         }, ct);
 
@@ -136,6 +137,27 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
             "c.idAtivo = @id OR c.destino = @id",
             parametros: new Dictionary<string, object?> { ["@id"] = Mapeamento.Texto(id.Valor) }, ct: ct);
         return documentos.Select(Resumo).ToArray();
+    }
+
+    public async Task<bool> TemCaminhoDeDependenciaAsync(IdDeAtivo de, IdDeAtivo ate, CancellationToken ct = default)
+    {
+        // As arestas `depende_de` da empresa numa consulta só, como na detecção de ciclo.
+        var arestas = (await _acesso.ConsultarAsync<DocumentoDeRelacao>(TiposDeDocumento.Relacao,
+                "c.tipoRelacao = 'depende_de'", ct: ct))
+            .ToLookup(r => r.IdAtivo, r => r.Destino);
+
+        var alvo = Mapeamento.Texto(ate.Valor);
+        var inicio = Mapeamento.Texto(de.Valor);
+        var visitados = new HashSet<string> { inicio };
+        var pilha = new Stack<string>([inicio]);
+        while (pilha.Count > 0)
+        {
+            var atual = pilha.Pop();
+            if (atual == alvo) return true;
+            foreach (var destino in arestas[atual])
+                if (visitados.Add(destino)) pilha.Push(destino);
+        }
+        return false;
     }
 
     public async Task<bool> TemDependenciaCircularAsync(IdDeAtivo id, CancellationToken ct = default)
@@ -353,7 +375,7 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
 
     private static RelacaoResumo Resumo(DocumentoDeRelacao r) => new(
         new IdDeAtivo(Guid.Parse(r.IdAtivo)), new IdDeAtivo(Guid.Parse(r.Destino)), r.TipoRelacao,
-        CriticidadeExtensoes.De(r.Criticidade));
+        CriticidadeExtensoes.De(r.Criticidade), r.Mecanismo);
 
     private sealed class Rastreado<T>
     {

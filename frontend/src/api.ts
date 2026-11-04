@@ -15,7 +15,8 @@ export type PreCheck = {
   dimensoes: Record<string, number>;
   bloqueios: { codigo: string; mensagem: string }[];
   alertas: string[];
-  caminho: { passo: string; rotulo: string; concluido: boolean; impedimentos: string[] }[];
+  politica: { scoreMinimo: number; evidenciaMinima: number; slaHoras: number; etapas: string[] };
+  caminho: { passo: string; rotulo: string; concluido: boolean; impedimentos: string[]; pendencias: string[] }[];
 };
 
 export type Validacao = {
@@ -46,7 +47,11 @@ export type RelacaoDoAtivo = {
   nome: string;
   tipo: string;
   criticidade: string;
+  mecanismo: string | null;
 };
+
+/** Um degrau da trilha hierárquica, da raiz até o pai direto. */
+export type Ancestral = { id: string; codigo: string; nome: string; tipoItem: string };
 
 export type Consumidor = { id: string; codigo: string; nome: string; tipoItem: string; tipoRelacao: string; criticidade: string };
 
@@ -71,7 +76,7 @@ export type FichaDoAtivo = {
   criticidade: string;
   descricao: string;
   revisaoAtual: number;
-  trilha: string[];
+  trilha: Ancestral[];
   atributos: Record<string, string>;
   evidencias: Evidencia[];
   responsaveis: Responsavel[];
@@ -291,11 +296,34 @@ export function anexarEvidencia(id: string, payload: { tipo: string; titulo: str
   return requisicao(`/v1/ativos/${id}/evidencias`, { method: 'POST', body: JSON.stringify(payload) });
 }
 
-export function relacionarAtivos(id: string, idDestino: string, tipo: string, criticidade = 'media'): Promise<void> {
+export type NovaRelacao = { tipo: string; criticidade: string; mecanismo?: string };
+
+/** criada=false: a mesma relação já existia, e nada mudou. */
+export function relacionarAtivos(id: string, idDestino: string, relacao: NovaRelacao): Promise<{ criada: boolean }> {
   return requisicao(`/v1/ativos/${id}/relacoes`, {
     method: 'POST',
-    body: JSON.stringify({ idDestino, tipo, criticidade }),
+    body: JSON.stringify({ idDestino, ...relacao, mecanismo: relacao.mecanismo || undefined }),
   });
+}
+
+export type ResultadoDoLote = { criadas: number; ignoradas: number; erros: { destino: string; codigo: string; mensagem: string }[] };
+
+export function relacionarEmLote(id: string, destinos: string[], relacao: NovaRelacao): Promise<ResultadoDoLote> {
+  return requisicao(`/v1/ativos/${id}/relacoes/lote`, {
+    method: 'POST',
+    body: JSON.stringify({ destinos, ...relacao, mecanismo: relacao.mecanismo || undefined }),
+  });
+}
+
+export type CampoDoTipo = { nome: string; rotulo: string; tipo: string; obrigatorio: boolean; opcoes: string[] };
+export type TipoDeAtivo = { chave: string; rotulo: string; bloco: string; pai: string | null; campos: CampoDoTipo[] };
+export type TipoDeRelacao = { chave: string; rotulo: string; destinosSugeridos: string[] };
+
+/** Tipos de ativo, tipos de relação e mecanismos da empresa (GET /v1/metamodelo). */
+export type Metamodelo = { tipos: TipoDeAtivo[]; relacoes: TipoDeRelacao[]; mecanismos: { chave: string; rotulo: string }[] };
+
+export function consultarMetamodelo(): Promise<Metamodelo> {
+  return requisicao('/v1/metamodelo');
 }
 
 export function analisarImpacto(id: string): Promise<Impacto> {

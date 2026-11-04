@@ -18,11 +18,11 @@ public sealed class ArmazemEmMemoria
     internal List<EventoDeDominio> Eventos { get; } = [];
 
     /// <summary>
-    /// Relações: (empresa, origem, destino, tipo, criticidade). A empresa vai junto pelo
+    /// Relações: (empresa, origem, destino, tipo, criticidade, mecanismo). A empresa vai junto pelo
     /// mesmo motivo do <c>tenant_id</c> em <c>relacao_ativo</c>: sem ela, uma
     /// empresa enxergaria as arestas de outra.
     /// </summary>
-    internal List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade)> Relacoes { get; } = [];
+    internal List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade, string? Mecanismo)> Relacoes { get; } = [];
     internal ConcurrentDictionary<Guid, ValidacaoEmProcesso> Validacoes { get; } = new();
     internal ConcurrentDictionary<(IdDeAtivo Ativo, int Numero), RevisaoDoAtivo> Revisoes { get; } = new();
     internal ConcurrentQueue<RegistroDeAuditoria> Auditoria { get; } = new();
@@ -75,10 +75,10 @@ public sealed class RepositorioDeAtivosEmMemoria(
     private ConcurrentDictionary<IdDeAtivo, Ativo> _ativos => armazem.Ativos;
     private ConcurrentDictionary<string, int> _sequenciais => armazem.Sequenciais;
     private List<EventoDeDominio> _eventosPublicados => armazem.Eventos;
-    private List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade)> _relacoes => armazem.Relacoes;
+    private List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade, string? Mecanismo)> _relacoes => armazem.Relacoes;
 
     /// <summary>As relações desta empresa. Toda consulta ao grafo parte daqui.</summary>
-    private IEnumerable<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade)> MinhasRelacoes =>
+    private IEnumerable<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade, string? Mecanismo)> MinhasRelacoes =>
         _relacoes.Where(r => r.Empresa == Empresa);
     private ConcurrentDictionary<Guid, ValidacaoEmProcesso> _validacoes => armazem.Validacoes;
 
@@ -151,17 +151,31 @@ public sealed class RepositorioDeAtivosEmMemoria(
     // ───────────────────────────────────────────────── IRepositorioDeRelacoes
 
     public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo,
-        Criticidade criticidade = Criticidade.Media, CancellationToken ct = default)
+        Criticidade criticidade = Criticidade.Media, string? mecanismo = null, CancellationToken ct = default)
     {
-        _relacoes.Add((Empresa, origem, destino, tipo, criticidade));
+        _relacoes.Add((Empresa, origem, destino, tipo, criticidade, mecanismo));
         return Task.CompletedTask;
+    }
+
+    public Task<bool> TemCaminhoDeDependenciaAsync(IdDeAtivo de, IdDeAtivo ate, CancellationToken ct = default)
+    {
+        var visitados = new HashSet<IdDeAtivo> { de };
+        var pilha = new Stack<IdDeAtivo>([de]);
+        while (pilha.Count > 0)
+        {
+            var atual = pilha.Pop();
+            if (atual == ate) return Task.FromResult(true);
+            foreach (var r in MinhasRelacoes.Where(r => r.Origem == atual && r.Tipo == CatalogoDeRelacoes.DependeDe))
+                if (visitados.Add(r.Destino)) pilha.Push(r.Destino);
+        }
+        return Task.FromResult(false);
     }
 
     public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default)
     {
         var lista = MinhasRelacoes
             .Where(r => r.Origem == id || r.Destino == id)
-            .Select(r => new RelacaoResumo(r.Origem, r.Destino, r.Tipo, r.Criticidade))
+            .Select(r => new RelacaoResumo(r.Origem, r.Destino, r.Tipo, r.Criticidade, r.Mecanismo))
             .ToArray();
         return Task.FromResult<IReadOnlyList<RelacaoResumo>>(lista);
     }
@@ -176,7 +190,7 @@ public sealed class RepositorioDeAtivosEmMemoria(
         while (pilha.Count > 0)
         {
             var atual = pilha.Pop();
-            foreach (var (_, _, destino, _, _) in MinhasRelacoes.Where(
+            foreach (var (_, _, destino, _, _, _) in MinhasRelacoes.Where(
                          r => r.Origem == atual && r.Tipo == "depende_de"))
             {
                 if (destino == id) return Task.FromResult(true);

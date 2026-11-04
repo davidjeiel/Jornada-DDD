@@ -56,6 +56,8 @@ public static class CodigosDeErro
         ["ESCOPO_SEM_ALVO"] = StatusCodes.Status400BadRequest,
         ["SQUAD_INCOMPLETA"] = StatusCodes.Status400BadRequest,
         ["SIGLA_INVALIDA"] = StatusCodes.Status400BadRequest,
+        ["TIPO_DE_RELACAO_INVALIDO"] = StatusCodes.Status400BadRequest,
+        ["MECANISMO_INVALIDO"] = StatusCodes.Status400BadRequest,
 
         [EmpresaNaoIdentificada] = StatusCodes.Status401Unauthorized,
         // Sem pessoa, a pergunta é "quem é você?": 401, e a tela manda ao perfil.
@@ -71,6 +73,7 @@ public static class CodigosDeErro
         ["PLEITO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
         ["PESSOA_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["SQUAD_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
+        ["DESTINO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
 
         ["TRANSICAO_INVALIDA"] = StatusCodes.Status409Conflict,
         ["VALIDACAO_JA_DECIDIDA"] = StatusCodes.Status409Conflict,

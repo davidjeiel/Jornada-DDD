@@ -10,14 +10,20 @@ namespace Jornada.Aplicacao.Catalogo.Comandos;
 /// Quanto a origem depende do destino. Alta ou crítica faz a descontinuação do
 /// destino exigir confirmação (<see cref="DescontinuarAtivo"/>).
 /// </param>
+/// <param name="Mecanismo">Como a relação acontece: sincrono, assincrono, batch, arquivo ou biblioteca. Opcional.</param>
 public sealed record ComandoRelacionarAtivos(
-    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media);
+    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media, string? Mecanismo = null);
 
 /// <summary>
 /// Grava uma aresta do grafo do catálogo (<c>implementa</c>, <c>expõe</c>,
 /// <c>consome</c>, <c>depende_de</c>...). A tabela e as consultas de leitura
 /// (<see cref="IRepositorioDeRelacoes"/>) já existiam desde o Grupo 1 — só
 /// faltava o caminho de escrita.
+///
+/// Como <c>servicos.relacionar</c> do painel: o tipo tem de ser um dos
+/// conhecidos, a mesma aresta (origem, destino, tipo) não se grava duas vezes,
+/// e uma <c>depende_de</c> que fecharia um ciclo é recusada antes de gravar.
+/// O valor do resultado diz se a relação foi criada (falso: já existia).
 /// </summary>
 public sealed class RelacionarAtivos(
     IRepositorioDeAtivos ativos,
@@ -34,8 +40,14 @@ public sealed class RelacionarAtivos(
         if (cmd.Origem == cmd.Destino)
             return Resultado<bool>.Recusado("CICLO", "Um ativo não pode se relacionar consigo mesmo.");
 
-        if (string.IsNullOrWhiteSpace(cmd.Tipo))
-            return Resultado<bool>.Recusado("TIPO_OBRIGATORIO", "Tipo de relação é obrigatório.");
+        string tipo;
+        string? mecanismo;
+        try
+        {
+            tipo = CatalogoDeRelacoes.ConferirTipo(cmd.Tipo);
+            mecanismo = CatalogoDeRelacoes.ConferirMecanismo(cmd.Mecanismo);
+        }
+        catch (ErroDeDominio e) { return Resultado<bool>.Recusado(e.Codigo, e.Message); }
 
         var origem = await ativos.ObterAsync(cmd.Origem, ct);
         if (origem is null)
@@ -56,8 +68,16 @@ public sealed class RelacionarAtivos(
         // busca em profundidade sobre "depende_de" — uma aresta na direção
         // errada nunca aparece nessa busca. Registrar só o sentido pedido é
         // suficiente e é o que os testes do domínio já esperam.
-        var tipo = cmd.Tipo.Trim().ToLowerInvariant();
-        await relacoes.RelacionarAsync(cmd.Origem, cmd.Destino, tipo, cmd.Criticidade, ct);
+        var existentes = await relacoes.ListarRelacoesAsync(cmd.Origem, ct);
+        if (existentes.Any(r => r.Origem == cmd.Origem && r.Destino == cmd.Destino && r.Tipo == tipo))
+            return Resultado<bool>.Ok(false);
+
+        // A aresta origem → destino fecha um ciclo se o destino já chega à origem.
+        if (tipo == CatalogoDeRelacoes.DependeDe && await relacoes.TemCaminhoDeDependenciaAsync(cmd.Destino, cmd.Origem, ct))
+            return Resultado<bool>.Recusado("CICLO_DE_DEPENDENCIA",
+                $"A relação criaria dependência circular: {destino.Codigo} já depende de {origem.Codigo}.");
+
+        await relacoes.RelacionarAsync(cmd.Origem, cmd.Destino, tipo, cmd.Criticidade, mecanismo, ct);
 
         // A aresta é gravada na hora (a porta não passa pela unidade de
         // trabalho); o registro de auditoria vai logo depois, na partição da origem.
@@ -65,6 +85,7 @@ public sealed class RelacionarAtivos(
             depois: new Dictionary<string, string>
             {
                 ["destino"] = destino.Codigo.Valor, ["tipo"] = tipo, ["criticidade"] = cmd.Criticidade.Chave(),
+                ["mecanismo"] = mecanismo ?? "",
             }), ct);
         await uow.ConfirmarAsync(ct);
         return Resultado<bool>.Ok(true);

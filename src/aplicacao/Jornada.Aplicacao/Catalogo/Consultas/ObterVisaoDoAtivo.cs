@@ -17,7 +17,10 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
         Guid IdPessoa, string Papel, DateOnly InicioVigencia, DateOnly? FimVigencia, bool Vigente);
 
     public sealed record RelacaoResumo(
-        string Direcao, string AtivoId, string Codigo, string Nome, string Tipo, string Criticidade);
+        string Direcao, string AtivoId, string Codigo, string Nome, string Tipo, string Criticidade, string? Mecanismo);
+
+    /// <summary>Um degrau da trilha hierárquica, da raiz até o pai direto.</summary>
+    public sealed record Ancestral(IdDeAtivo Id, string Codigo, string Nome, string TipoItem);
 
     public sealed record Saida(
         IdDeAtivo Id,
@@ -28,7 +31,7 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
         string Criticidade,
         string Descricao,
         int RevisaoAtual,
-        IReadOnlyList<string> Trilha,
+        IReadOnlyList<Ancestral> Trilha,
         IReadOnlyDictionary<string, string> Atributos,
         IReadOnlyList<EvidenciaResumo> Evidencias,
         IReadOnlyList<ResponsavelResumo> Responsaveis,
@@ -54,7 +57,7 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
 
             relacoesResolvidas.Add(new RelacaoResumo(
                 direcao, outroAtivo.Id.Valor.ToString(), outroAtivo.Codigo.Valor, outroAtivo.Nome, aresta.Tipo,
-                aresta.Criticidade.Chave()));
+                aresta.Criticidade.Chave(), aresta.Mecanismo));
         }
 
         return Resultado<Saida>.Ok(new Saida(
@@ -66,7 +69,8 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
             ativo.Criticidade.Chave(),
             ativo.Descricao,
             ativo.RevisaoAtual,
-            trilha.Select(a => a.Nome).ToArray(),
+            // De servicos.trilha: da raiz até o pai direto, sem o próprio ativo. Raiz: vazia.
+            trilha.Where(a => a.Id != ativo.Id).Select(a => new Ancestral(a.Id, a.Codigo.Valor, a.Nome, a.TipoItem)).ToArray(),
             ativo.Atributos,
             ativo.Evidencias.Select(e => new EvidenciaResumo(e.Id, e.Tipo, e.Titulo, e.Url)).ToArray(),
             ativo.Responsaveis.Select(r => new ResponsavelResumo(
