@@ -2224,7 +2224,7 @@ paths:
       tags:
         - Catálogo
       summary: Relaciona este ativo a outro
-      description: 'Cria uma aresta do grafo do catálogo, com este ativo como origem. A criticidade é a da dependência; alta ou crítica faz a descontinuação do destino exigir confirmação.'
+      description: 'Cria uma aresta do grafo do catálogo, com este ativo como origem. A criticidade é a da dependência; alta ou crítica faz a descontinuação do destino exigir confirmação. A mesma relação (destino e tipo) não se grava duas vezes: criada=false. Uma depende_de que fecharia um ciclo devolve 422 CICLO_DE_DEPENDENCIA.'
       operationId: relacionarAtivos
       parameters:
         - name: id
@@ -2247,14 +2247,30 @@ paths:
               $ref: '#/components/schemas/RelacionarAtivosRequest'
         required: true
       responses:
-        '204':
-          description: 'Operação concluída, sem conteúdo de resposta.'
+        '200':
+          description: Operação concluída com sucesso.
           headers:
             x-correlation-id:
               description: O identificador de rastreabilidade desta requisição.
               schema:
                 type: string
                 format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelacaoRegistradaResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
         '403':
           description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
           headers:
@@ -2291,6 +2307,166 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/relacoes/lote':
+    post:
+      tags:
+        - Catálogo
+      summary: Relaciona este ativo a vários de uma vez
+      description: 'Mesmo tipo, criticidade e mecanismo para todos os destinos. O próprio ativo e as relações que já existem são ignorados; um destino recusado (ciclo, inexistente) vai para erros sem impedir os outros.'
+      operationId: relacionarEmLote
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelacionarEmLoteRequest'
+        required: true
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoteDeRelacoesResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/metamodelo:
+    get:
+      tags:
+        - Catálogo
+      summary: 'Tipos de ativo, tipos de relação e mecanismos da empresa'
+      description: 'O que o assistente de cadastro e o formulário de relação leem: os campos de cada tipo, os destinos sugeridos para cada relação e os mecanismos.'
+      operationId: consultarMetamodelo
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetamodeloResponse'
         '400':
           description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
           headers:
@@ -3413,6 +3589,25 @@ paths:
                 $ref: '#/components/schemas/SaudeResponse'
 components:
   schemas:
+    AncestralResponse:
+      required:
+        - id
+        - codigo
+        - nome
+        - tipoItem
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        codigo:
+          type: string
+        nome:
+          type: string
+        tipoItem:
+          type: string
+      additionalProperties: false
+      description: Um degrau da trilha hierárquica.
     AnexarEvidenciaRequest:
       required:
         - tipo
@@ -3622,6 +3817,34 @@ components:
           description: 'Os papéis vigentes, com escopo e blocos.'
       additionalProperties: false
       description: Um cadastro na gestão de acessos.
+    CampoDoTipoResponse:
+      required:
+        - nome
+        - rotulo
+        - tipo
+        - obrigatorio
+        - opcoes
+      type: object
+      properties:
+        nome:
+          type: string
+          description: Chave do atributo.
+        rotulo:
+          type: string
+          description: O campo para pessoas.
+        tipo:
+          type: string
+          description: 'texto, area, selecao ou url.'
+        obrigatorio:
+          type: boolean
+          description: Exigido para publicar.
+        opcoes:
+          type: array
+          items:
+            type: string
+          description: 'As opções, quando o tipo é selecao.'
+      additionalProperties: false
+      description: 'Um campo específico do tipo, declarado no metamodelo.'
     CartilhaResponse:
       required:
         - papeis
@@ -3886,6 +4109,22 @@ components:
             plataforma: mainframe
       additionalProperties: false
       description: 'Estado completo dos campos editáveis (PUT substitui, não mescla).'
+    ErroDoLoteResponse:
+      required:
+        - destino
+        - codigo
+        - mensagem
+      type: object
+      properties:
+        destino:
+          type: string
+          format: uuid
+        codigo:
+          type: string
+        mensagem:
+          type: string
+      additionalProperties: false
+      description: Um destino que o lote recusou.
     EvidenciaResponse:
       required:
         - id
@@ -3923,42 +4162,55 @@ components:
       properties:
         id:
           type: string
+          description: Identificador do ativo.
           format: uuid
         codigo:
           type: string
+          description: 'Código gerado pelo tipo (ex.: SIS-0001).'
         nome:
           type: string
+          description: Nome do ativo.
         tipoItem:
           type: string
+          description: Chave do tipo no metamodelo.
         status:
           type: string
+          description: Estado do ciclo de vida.
         criticidade:
           type: string
+          description: 'baixa, media, alta ou critica.'
         descricao:
           type: string
+          description: Para que serve o ativo.
         revisaoAtual:
           type: integer
+          description: Número da revisão corrente.
           format: int32
         trilha:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/AncestralResponse'
+          description: 'Da raiz até o pai direto, sem o próprio ativo. Vazia num ativo raiz.'
         atributos:
           type: object
           additionalProperties:
             type: string
+          description: Campos específicos do tipo.
         evidencias:
           type: array
           items:
             $ref: '#/components/schemas/EvidenciaResponse'
+          description: Evidências anexadas.
         responsaveis:
           type: array
           items:
             $ref: '#/components/schemas/ResponsavelResponse'
+          description: 'Responsáveis, vigentes e encerrados.'
         relacoes:
           type: array
           items:
             $ref: '#/components/schemas/RelacaoResponse'
+          description: Relações nos dois sentidos.
       additionalProperties: false
       description: Ficha completa do ativo (visão 360°).
       example:
@@ -3970,8 +4222,7 @@ components:
         criticidade: alta
         descricao: Sistema central de contas e lançamentos.
         revisaoAtual: 1
-        trilha:
-          - Core Bancário
+        trilha: [ ]
         atributos:
           plataforma: mainframe
         evidencias:
@@ -4194,6 +4445,61 @@ components:
             $ref: '#/components/schemas/ValidacaoResponse'
       additionalProperties: false
       description: Fila de validações da empresa.
+    LoteDeRelacoesResponse:
+      required:
+        - criadas
+        - ignoradas
+        - erros
+      type: object
+      properties:
+        criadas:
+          type: integer
+          description: Relações novas.
+          format: int32
+        ignoradas:
+          type: integer
+          description: O próprio ativo e as que já existiam.
+          format: int32
+        erros:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErroDoLoteResponse'
+          description: 'Destinos recusados, com o motivo.'
+      additionalProperties: false
+      description: O que o lote fez.
+    MecanismoResponse:
+      required:
+        - chave
+        - rotulo
+      type: object
+      properties:
+        chave:
+          type: string
+        rotulo:
+          type: string
+      additionalProperties: false
+      description: Um mecanismo de relação.
+    MetamodeloResponse:
+      required:
+        - tipos
+        - relacoes
+        - mecanismos
+      type: object
+      properties:
+        tipos:
+          type: array
+          items:
+            $ref: '#/components/schemas/TipoDeAtivoResponse'
+        relacoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TipoDeRelacaoResponse'
+        mecanismos:
+          type: array
+          items:
+            $ref: '#/components/schemas/MecanismoResponse'
+      additionalProperties: false
+      description: 'O metamodelo da empresa: tipos de ativo, tipos de relação e mecanismos.'
     PapelNoEscopoRequest:
       required:
         - papel
@@ -4259,18 +4565,28 @@ components:
         - rotulo
         - concluido
         - impedimentos
+        - pendencias
       type: object
       properties:
         passo:
           type: string
+          description: 'descrever, responsaveis, conectar, evidenciar ou qualidade.'
         rotulo:
           type: string
+          description: O passo para pessoas.
         concluido:
           type: boolean
+          description: Nenhum bloqueio do pré-check cai neste passo.
         impedimentos:
           type: array
           items:
             type: string
+          description: Códigos dos bloqueios que impedem o passo.
+        pendencias:
+          type: array
+          items:
+            type: string
+          description: 'As mensagens desses bloqueios, para a tela.'
       additionalProperties: false
       description: Passo do caminho até a publicação.
     PerfilResponse:
@@ -4526,6 +4842,17 @@ components:
             concluido: false
             impedimentos:
               - OWNER_NAO_DEFINIDO
+            pendencias:
+              - Owner técnico não definido
+    RelacaoRegistradaResponse:
+      required:
+        - criada
+      type: object
+      properties:
+        criada:
+          type: boolean
+      additionalProperties: false
+      description: 'Relação registrada, ou ignorada porque já existia.'
     RelacaoResponse:
       required:
         - direcao
@@ -4555,6 +4882,10 @@ components:
         criticidade:
           type: string
           description: 'Quanto a origem depende do destino: baixa, media, alta ou critica.'
+        mecanismo:
+          type: string
+          description: 'Como a relação acontece (sincrono, assincrono, batch, arquivo, biblioteca); nulo se não informado.'
+          nullable: true
       additionalProperties: false
       description: Relação vista a partir deste ativo.
     RelacionarAtivosRequest:
@@ -4575,8 +4906,37 @@ components:
           description: 'Quanto a origem depende do destino: baixa, media, alta ou critica. Ausente vale media. Alta ou crítica faz a descontinuação do destino exigir confirmação.'
           nullable: true
           example: critica
+        mecanismo:
+          type: string
+          description: 'Como a relação acontece: sincrono, assincrono, batch, arquivo ou biblioteca. Opcional.'
+          nullable: true
+          example: assincrono
       additionalProperties: false
       description: Relação deste ativo (origem) com outro (destino).
+    RelacionarEmLoteRequest:
+      required:
+        - destinos
+        - tipo
+      type: object
+      properties:
+        destinos:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tipo:
+          type: string
+          example: expoe
+        criticidade:
+          type: string
+          nullable: true
+          example: media
+        mecanismo:
+          type: string
+          nullable: true
+          example: sincrono
+      additionalProperties: false
+      description: 'Várias relações do mesmo tipo, com a mesma criticidade e o mesmo mecanismo.'
     ResponsavelResponse:
       required:
         - idPessoa
@@ -4806,6 +5166,51 @@ components:
         score: 97
         etapasAbertas:
           - tecnica
+    TipoDeAtivoResponse:
+      required:
+        - chave
+        - rotulo
+        - bloco
+        - campos
+      type: object
+      properties:
+        chave:
+          type: string
+          description: 'Chave do tipo (dominio, api...).'
+        rotulo:
+          type: string
+          description: O tipo para pessoas.
+        bloco:
+          type: string
+          description: Estrutura DDD ou Ativos técnicos.
+        pai:
+          type: string
+          description: 'A chave do tipo pai, quando o tipo exige hierarquia.'
+          nullable: true
+        campos:
+          type: array
+          items:
+            $ref: '#/components/schemas/CampoDoTipoResponse'
+          description: Os campos específicos do tipo.
+      additionalProperties: false
+      description: Um tipo de ativo do metamodelo da empresa.
+    TipoDeRelacaoResponse:
+      required:
+        - chave
+        - rotulo
+        - destinosSugeridos
+      type: object
+      properties:
+        chave:
+          type: string
+        rotulo:
+          type: string
+        destinosSugeridos:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      description: Um tipo de relação e os tipos de destino que fazem sentido para ele.
     ValidacaoResponse:
       required:
         - id

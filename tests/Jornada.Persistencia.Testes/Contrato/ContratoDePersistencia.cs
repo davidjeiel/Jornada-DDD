@@ -293,6 +293,49 @@ public abstract class ContratoDePersistencia
         Verificar.Verdadeiro(await s.Relacoes.TemDependenciaCircularAsync(x.Id), "x → y → z → x");
     }
 
+    [Teste("caminho de dependência: só por depende_de, no sentido das arestas, e só nesta empresa")]
+    public async Task CaminhoDeDependencia()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var x = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0001", "X"));
+        var y = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0002", "Y"));
+        var z = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0003", "Z"));
+
+        await using var s = Abrir(empresa);
+        await s.Relacoes.RelacionarAsync(x.Id, y.Id, "depende_de");
+        await s.Relacoes.RelacionarAsync(y.Id, z.Id, "consome");
+        Verificar.Verdadeiro(await s.Relacoes.TemCaminhoDeDependenciaAsync(x.Id, y.Id));
+        Verificar.Falso(await s.Relacoes.TemCaminhoDeDependenciaAsync(y.Id, x.Id), "a aresta tem sentido");
+        Verificar.Falso(await s.Relacoes.TemCaminhoDeDependenciaAsync(x.Id, z.Id), "consome não é dependência");
+
+        await s.Relacoes.RelacionarAsync(y.Id, z.Id, "depende_de");
+        Verificar.Verdadeiro(await s.Relacoes.TemCaminhoDeDependenciaAsync(x.Id, z.Id), "x → y → z");
+
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Falso(await deFora.Relacoes.TemCaminhoDeDependenciaAsync(x.Id, z.Id), "as arestas de outra empresa não contam");
+    }
+
+    [Teste("relação guarda o mecanismo; sem ele, fica nulo")]
+    public async Task RelacaoGuardaOMecanismo()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var app = await Gravar(empresa, Novo(empresa, "aplicacao", "APP-0001", "Motor"));
+        var api = await Gravar(empresa, Novo(empresa, "api", "API-0001", "API"));
+        var bd = await Gravar(empresa, Novo(empresa, "base_dados", "BDD-0001", "Base"));
+
+        await using (var s = Abrir(empresa))
+        {
+            await s.Relacoes.RelacionarAsync(app.Id, api.Id, "consome", Criticidade.Alta, "assincrono");
+            await s.Relacoes.RelacionarAsync(app.Id, bd.Id, "persiste_em");
+        }
+
+        await using var nova = Abrir(empresa);
+        var arestas = (await nova.Relacoes.ListarRelacoesAsync(app.Id)).ToDictionary(r => r.Tipo);
+        Verificar.Igual("assincrono", arestas["consome"].Mecanismo);
+        Verificar.Igual(Criticidade.Alta, arestas["consome"].Criticidade);
+        Verificar.Igual(null, arestas["persiste_em"].Mecanismo);
+    }
+
     [Teste("destino descontinuado aparece como fora de vigência")]
     public async Task DestinoForaDeVigencia()
     {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  consultarPerfil, definirAoFaltarIdentificacao, definirIdentidade, listarAtivos, listarPessoas, listarValidacoes, obterIdentidade,
-  type AtivoResumo, type Perfil as DadosDoPerfil, type Pessoa, type Validacao,
+  consultarMetamodelo, consultarPerfil, definirAoFaltarIdentificacao, definirIdentidade, listarAtivos, listarPessoas, listarValidacoes, obterIdentidade,
+  type AtivoResumo, type Metamodelo, type Perfil as DadosDoPerfil, type Pessoa, type Validacao,
 } from './api';
 import { Erro } from './componentes';
 import { gravarIdentidade, type Identidade } from './identidade';
@@ -16,6 +16,9 @@ import { Catalogo } from './telas/Catalogo';
 import { EmBreve, NaoEncontrada } from './telas/EmBreve';
 import { GestaoDeAcessos } from './telas/GestaoDeAcessos';
 import { NovoAtivo } from './telas/NovoAtivo';
+import { abaDaUrl, PaginaDoAtivo } from './telas/PaginaDoAtivo';
+import { podeDescontinuar } from './telas/Impacto';
+import { RelacoesEmLote } from './telas/RelacoesEmLote';
 import { Perfil } from './telas/Perfil';
 import { Pleitos } from './telas/Pleitos';
 import { SolicitarAcesso } from './telas/SolicitarAcesso';
@@ -35,6 +38,7 @@ function App() {
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [ativos, setAtivos] = useState<AtivoResumo[]>([]);
   const [validacoes, setValidacoes] = useState<Validacao[]>([]);
+  const [metamodelo, setMetamodelo] = useState<Metamodelo | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
 
@@ -97,6 +101,7 @@ function App() {
   useEffect(() => {
     void carregarPerfil();
     void carregar();
+    consultarMetamodelo().then(setMetamodelo).catch(() => setMetamodelo(null));
   }, [identidade]);
 
   useEffect(() => {
@@ -128,8 +133,18 @@ function App() {
   const nomeDaEmpresa = empresaDe(identidade.empresaId).nome;
   const item = itemDaSecao(secao);
 
+  // /ativos/{id} e /ativos/{id}/relacoes-lote: dentro de um ativo, o menu continua no catálogo.
+  const rotaDoAtivo = /^\/ativos\/([0-9a-f-]{36})(\/relacoes-lote)?\/?$/i.exec(local.caminho);
+
   let tela;
-  if (item?.fase !== undefined) {
+  if (rotaDoAtivo) {
+    const [, idDoAtivo, lote] = rotaDoAtivo;
+    tela = lote
+      ? <RelacoesEmLote id={idDoAtivo} tipo={local.busca.get('tipo') ?? ''} ativos={ativos} metamodelo={metamodelo} onAlterado={carregar} onErro={setErro} />
+      : <PaginaDoAtivo key={idDoAtivo} id={idDoAtivo} aba={abaDaUrl(local.busca.get('aba'))} ativos={ativos} pessoas={pessoas} metamodelo={metamodelo}
+          podeEscrever={podeEscrever} podeDescontinuar={podeEscrever && podeDescontinuar(papeis)} idPessoa={perfil?.pessoa?.id ?? null}
+          onAlterado={carregar} onErro={setErro} />;
+  } else if (item?.fase !== undefined) {
     tela = <EmBreve item={item} />;
   } else {
     switch (secao) {

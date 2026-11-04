@@ -87,6 +87,25 @@ public sealed record RelacionarAtivosRequest
     /// <summary>Quanto a origem depende do destino: baixa, media, alta ou critica. Ausente vale media. Alta ou crítica faz a descontinuação do destino exigir confirmação.</summary>
     /// <example>critica</example>
     public string? Criticidade { get; init; }
+
+    /// <summary>Como a relação acontece: sincrono, assincrono, batch, arquivo ou biblioteca. Opcional.</summary>
+    /// <example>assincrono</example>
+    public string? Mecanismo { get; init; }
+}
+
+/// <summary>Várias relações do mesmo tipo, com a mesma criticidade e o mesmo mecanismo.</summary>
+public sealed record RelacionarEmLoteRequest
+{
+    public required IReadOnlyList<Guid> Destinos { get; init; }
+
+    /// <example>expoe</example>
+    public required string Tipo { get; init; }
+
+    /// <example>media</example>
+    public string? Criticidade { get; init; }
+
+    /// <example>sincrono</example>
+    public string? Mecanismo { get; init; }
 }
 
 /// <summary>Pedido para tirar o ativo de vigência.</summary>

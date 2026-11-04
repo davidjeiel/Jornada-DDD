@@ -700,3 +700,27 @@ fieldset.atributos legend { padding: 0 6px; color: var(--muted); font-size: 12.5
 .lista-de-papeis li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; }
 .caixa-de-marcar { display: block; margin: 10px 0; }
 .caixa-de-marcar input { margin-right: 6px; }
+
+/* Página do ativo (visão 360°): trilha, cabeçalho, abas, resumo e caminho até a publicação. */
+.trilha ol { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; padding: 0; list-style: none; color: var(--muted); font-size: 13px; }
+.trilha li + li::before { content: "›"; margin-right: 4px; color: var(--muted); }
+.trilha li[aria-current="page"] { color: var(--ink); }
+.cabecalho-do-ativo { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.cabecalho-do-ativo h1 { margin: 2px 0 0; font-size: 24px; }
+.cabecalho-do-ativo .etiquetas { display: flex; gap: 8px; }
+.ficha-tabs a.ficha-tab { text-decoration: none; }
+.painel-aba[hidden] { display: none; }
+.resumo-do-ativo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 24px; align-items: start; }
+.dados-do-ativo { display: grid; gap: 10px; margin: 0; }
+.dados-do-ativo dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.dados-do-ativo dd { margin: 2px 0 0; }
+.passos { display: grid; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+.passo { display: flex; gap: 8px; align-items: flex-start; }
+.passo a { color: var(--ink); }
+.passo.feito a { color: var(--muted); }
+.pendencias { margin: 4px 0 0; padding-left: 16px; color: var(--pending-ink); font-size: 12.5px; }
+.lista-do-lote { display: grid; gap: 2px; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; max-height: 420px; overflow-y: auto; }
+.lista-do-lote legend { padding: 0 4px; font-weight: 600; }
+@media (max-width: 860px) {
+  .resumo-do-ativo { grid-template-columns: 1fr; }
+}

@@ -61,13 +61,26 @@ A escolha fica salva no seu navegador — ao voltar, você continua como a mesma
 - **Indicadores** — uma leitura agregada: publicados, validações abertas, composição por
   tipo.
 
-### 3. Abra a ficha completa
+### 3. Abra a ficha do ativo
 
-Selecione um ativo na lista e clique em **Abrir ficha completa**. Ali vivem três abas:
-**Detalhes** (editar nome, criticidade, descrição e atributos, e ver os responsáveis
-vigentes), **Evidências** (anexar e listar ADRs, contratos, links) e **Relações**
-(registrar e listar `implementa`, `expõe`, `consome`, `depende_de` com outros ativos). Se
-o seu papel é **consulta**, a aba Detalhes some o formulário e mostra só os dados.
+Selecione um ativo na lista e clique em **Abrir a ficha do ativo**: cada ativo tem a sua
+página, com endereço próprio (dá para mandar o link). No alto, a **trilha** até o pai
+direto (Domínio › Subdomínio › Contexto), com cada degrau clicável. Embaixo, cinco abas:
+
+- **Resumo**: os dados e os campos do tipo (editáveis em rascunho ou revisão), o score do
+  pré-check e o **caminho até a publicação**, com os cinco passos, o que falta em cada um e
+  o link para a aba que resolve;
+- **Relações**: as relações nos dois sentidos, com o **mecanismo** (síncrono, assíncrono,
+  batch, arquivo, biblioteca) e a criticidade da dependência. A busca de destino sugere os
+  tipos que fazem sentido para a relação escolhida ("implementa" propõe capacidades), e
+  **Relacionar em lote** registra várias de uma vez. A mesma relação não se grava duas
+  vezes, e uma `depende_de` que fecharia um ciclo é recusada;
+- **Pessoas**: os responsáveis, e quem define um novo;
+- **Evidências**: os ADRs, contratos e links anexados;
+- **Histórico**: as revisões, com o hash de cada uma, e a trilha de auditoria.
+
+A aba aberta fica no endereço: depois de salvar, você continua nela. Sem papel de escrita,
+ou em modo de leitura, os formulários somem e ficam só os dados.
 
 ### Três regras que valem para todo mundo
 

@@ -43,9 +43,26 @@ public sealed record ResponsavelResponse(
 /// <param name="Nome">Nome do ativo do outro lado.</param>
 /// <param name="Tipo">Tipo da relação.</param>
 /// <param name="Criticidade">Quanto a origem depende do destino: baixa, media, alta ou critica.</param>
-public sealed record RelacaoResponse(string Direcao, Guid AtivoId, string Codigo, string Nome, string Tipo, string Criticidade);
+/// <param name="Mecanismo">Como a relação acontece (sincrono, assincrono, batch, arquivo, biblioteca); nulo se não informado.</param>
+public sealed record RelacaoResponse(string Direcao, Guid AtivoId, string Codigo, string Nome, string Tipo, string Criticidade, string? Mecanismo);
+
+/// <summary>Um degrau da trilha hierárquica.</summary>
+public sealed record AncestralResponse(Guid Id, string Codigo, string Nome, string TipoItem);
 
 /// <summary>Ficha completa do ativo (visão 360°).</summary>
+/// <param name="Id">Identificador do ativo.</param>
+/// <param name="Codigo">Código gerado pelo tipo (ex.: SIS-0001).</param>
+/// <param name="Nome">Nome do ativo.</param>
+/// <param name="TipoItem">Chave do tipo no metamodelo.</param>
+/// <param name="Status">Estado do ciclo de vida.</param>
+/// <param name="Criticidade">baixa, media, alta ou critica.</param>
+/// <param name="Descricao">Para que serve o ativo.</param>
+/// <param name="RevisaoAtual">Número da revisão corrente.</param>
+/// <param name="Trilha">Da raiz até o pai direto, sem o próprio ativo. Vazia num ativo raiz.</param>
+/// <param name="Atributos">Campos específicos do tipo.</param>
+/// <param name="Evidencias">Evidências anexadas.</param>
+/// <param name="Responsaveis">Responsáveis, vigentes e encerrados.</param>
+/// <param name="Relacoes">Relações nos dois sentidos.</param>
 public sealed record FichaDoAtivoResponse(
     Guid Id,
     string Codigo,
@@ -55,7 +72,7 @@ public sealed record FichaDoAtivoResponse(
     string Criticidade,
     string Descricao,
     int RevisaoAtual,
-    IReadOnlyList<string> Trilha,
+    IReadOnlyList<AncestralResponse> Trilha,
     IReadOnlyDictionary<string, string> Atributos,
     IReadOnlyList<EvidenciaResponse> Evidencias,
     IReadOnlyList<ResponsavelResponse> Responsaveis,
@@ -63,12 +80,12 @@ public sealed record FichaDoAtivoResponse(
 {
     public static FichaDoAtivoResponse De(ObterVisaoDoAtivo.Saida s) => new(
         s.Id.Valor, s.Codigo, s.Nome, s.TipoItem, s.Status, s.Criticidade, s.Descricao,
-        s.RevisaoAtual, s.Trilha, s.Atributos,
+        s.RevisaoAtual, s.Trilha.Select(a => new AncestralResponse(a.Id.Valor, a.Codigo, a.Nome, a.TipoItem)).ToArray(), s.Atributos,
         s.Evidencias.Select(e => new EvidenciaResponse(e.Id, e.Tipo, e.Titulo, e.Url)).ToArray(),
         s.Responsaveis.Select(r => new ResponsavelResponse(
             r.IdPessoa, r.Papel, r.InicioVigencia, r.FimVigencia, r.Vigente)).ToArray(),
         s.Relacoes.Select(r => new RelacaoResponse(
-            r.Direcao, Guid.Parse(r.AtivoId), r.Codigo, r.Nome, r.Tipo, r.Criticidade)).ToArray());
+            r.Direcao, Guid.Parse(r.AtivoId), r.Codigo, r.Nome, r.Tipo, r.Criticidade, r.Mecanismo)).ToArray());
 }
 
 /// <summary>Ativo que aponta para o analisado e ainda vale como referência (publicado ou em revisão).</summary>
@@ -167,7 +184,50 @@ public sealed record BloqueioResponse(string Codigo, string Mensagem);
 public sealed record PoliticaResponse(int ScoreMinimo, int EvidenciaMinima, int SlaHoras, IReadOnlyList<string> Etapas);
 
 /// <summary>Passo do caminho até a publicação.</summary>
-public sealed record PassoResponse(string Passo, string Rotulo, bool Concluido, IReadOnlyList<string> Impedimentos);
+/// <param name="Passo">descrever, responsaveis, conectar, evidenciar ou qualidade.</param>
+/// <param name="Rotulo">O passo para pessoas.</param>
+/// <param name="Concluido">Nenhum bloqueio do pré-check cai neste passo.</param>
+/// <param name="Impedimentos">Códigos dos bloqueios que impedem o passo.</param>
+/// <param name="Pendencias">As mensagens desses bloqueios, para a tela.</param>
+public sealed record PassoResponse(string Passo, string Rotulo, bool Concluido, IReadOnlyList<string> Impedimentos, IReadOnlyList<string> Pendencias);
+
+/// <summary>Um campo específico do tipo, declarado no metamodelo.</summary>
+/// <param name="Nome">Chave do atributo.</param>
+/// <param name="Rotulo">O campo para pessoas.</param>
+/// <param name="Tipo">texto, area, selecao ou url.</param>
+/// <param name="Obrigatorio">Exigido para publicar.</param>
+/// <param name="Opcoes">As opções, quando o tipo é selecao.</param>
+public sealed record CampoDoTipoResponse(string Nome, string Rotulo, string Tipo, bool Obrigatorio, IReadOnlyList<string> Opcoes);
+
+/// <summary>Um tipo de ativo do metamodelo da empresa.</summary>
+/// <param name="Chave">Chave do tipo (dominio, api...).</param>
+/// <param name="Rotulo">O tipo para pessoas.</param>
+/// <param name="Bloco">Estrutura DDD ou Ativos técnicos.</param>
+/// <param name="Pai">A chave do tipo pai, quando o tipo exige hierarquia.</param>
+/// <param name="Campos">Os campos específicos do tipo.</param>
+public sealed record TipoDeAtivoResponse(string Chave, string Rotulo, string Bloco, string? Pai, IReadOnlyList<CampoDoTipoResponse> Campos);
+
+/// <summary>Um tipo de relação e os tipos de destino que fazem sentido para ele.</summary>
+public sealed record TipoDeRelacaoResponse(string Chave, string Rotulo, IReadOnlyList<string> DestinosSugeridos);
+
+/// <summary>Um mecanismo de relação.</summary>
+public sealed record MecanismoResponse(string Chave, string Rotulo);
+
+/// <summary>O metamodelo da empresa: tipos de ativo, tipos de relação e mecanismos.</summary>
+public sealed record MetamodeloResponse(
+    IReadOnlyList<TipoDeAtivoResponse> Tipos, IReadOnlyList<TipoDeRelacaoResponse> Relacoes, IReadOnlyList<MecanismoResponse> Mecanismos);
+
+/// <summary>Relação registrada, ou ignorada porque já existia.</summary>
+public sealed record RelacaoRegistradaResponse(bool Criada);
+
+/// <summary>O que o lote fez.</summary>
+/// <param name="Criadas">Relações novas.</param>
+/// <param name="Ignoradas">O próprio ativo e as que já existiam.</param>
+/// <param name="Erros">Destinos recusados, com o motivo.</param>
+public sealed record LoteDeRelacoesResponse(int Criadas, int Ignoradas, IReadOnlyList<ErroDoLoteResponse> Erros);
+
+/// <summary>Um destino que o lote recusou.</summary>
+public sealed record ErroDoLoteResponse(Guid Destino, string Codigo, string Mensagem);
 
 /// <summary>Resultado do pré-check: o que falta para o ativo poder ser submetido.</summary>
 public sealed record PreCheckResponse(
@@ -190,7 +250,8 @@ public sealed record PreCheckResponse(
             s.Checagem.Politica.SlaHoras,
             s.Checagem.Politica.Etapas.Select(e => e.ToString().ToLowerInvariant()).ToArray()),
         s.Caminho.Select(p => new PassoResponse(p.Chave, p.Rotulo, p.Concluido,
-            p.Impedimentos.Select(b => b.Codigo.Chave()).ToArray())).ToArray());
+            p.Impedimentos.Select(b => b.Codigo.Chave()).ToArray(),
+            p.Impedimentos.Select(b => b.Mensagem).ToArray())).ToArray());
 }
 
 /// <summary>Submissão aceita: a revisão foi aberta e as etapas exigidas pela política aguardam decisão.</summary>

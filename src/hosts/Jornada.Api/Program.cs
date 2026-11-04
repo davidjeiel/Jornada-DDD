@@ -110,6 +110,7 @@ builder.Services.AddScoped<EditarAtivo>();
 builder.Services.AddScoped<AtribuirResponsavel>();
 builder.Services.AddScoped<AnexarEvidencia>();
 builder.Services.AddScoped<RelacionarAtivos>();
+builder.Services.AddScoped<RelacionarEmLote>();
 builder.Services.AddScoped<SubmeterAtivo>();
 builder.Services.AddScoped<AbrirRevisao>();
 builder.Services.AddScoped<DecidirValidacao>();
@@ -368,17 +369,45 @@ catalogo.MapPost("/ativos/{id:guid}/evidencias", async Task<Results<NoContent, J
     .WithDescription("A política do tipo define quantas evidências são exigidas para publicar. Só em rascunho ou com revisão aberta.")
     .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
 
-catalogo.MapPost("/ativos/{id:guid}/relacoes", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+catalogo.MapPost("/ativos/{id:guid}/relacoes", async Task<Results<Ok<RelacaoRegistradaResponse>, JsonHttpResult<ApiError>>> (
     HttpContext http, Guid id, RelacionarAtivosRequest corpo, RelacionarAtivos caso, CancellationToken ct) =>
 {
     var r = await caso.ExecutarAsync(new ComandoRelacionarAtivos(new IdDeAtivo(id), new IdDeAtivo(corpo.IdDestino), corpo.Tipo,
-        CriticidadeExtensoes.De(corpo.Criticidade)), ct);
-    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+        CriticidadeExtensoes.De(corpo.Criticidade), corpo.Mecanismo), ct);
+    return r.Sucesso ? TypedResults.Ok(new RelacaoRegistradaResponse(r.Valor)) : Erro(http, r.Codigo!, r.Mensagem!);
 })
     .WithName("relacionarAtivos")
     .WithSummary("Relaciona este ativo a outro")
-    .WithDescription("Cria uma aresta do grafo do catálogo, com este ativo como origem. A criticidade é a da dependência; alta ou crítica faz a descontinuação do destino exigir confirmação.")
-    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity);
+    .WithDescription("Cria uma aresta do grafo do catálogo, com este ativo como origem. A criticidade é a da dependência; alta ou crítica faz a descontinuação do destino exigir confirmação. A mesma relação (destino e tipo) não se grava duas vezes: criada=false. Uma depende_de que fecharia um ciclo devolve 422 CICLO_DE_DEPENDENCIA.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status422UnprocessableEntity);
+
+catalogo.MapPost("/ativos/{id:guid}/relacoes/lote", async Task<Results<Ok<LoteDeRelacoesResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, RelacionarEmLoteRequest corpo, RelacionarEmLote caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(new ComandoRelacionarEmLote(new IdDeAtivo(id),
+        corpo.Destinos.Select(d => new IdDeAtivo(d)).ToArray(), corpo.Tipo, CriticidadeExtensoes.De(corpo.Criticidade), corpo.Mecanismo), ct);
+    return r.Sucesso
+        ? TypedResults.Ok(new LoteDeRelacoesResponse(r.Valor!.Criadas, r.Valor.Ignoradas,
+            r.Valor.Erros.Select(e => new ErroDoLoteResponse(e.Destino.Valor, e.Codigo, e.Mensagem)).ToArray()))
+        : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("relacionarEmLote")
+    .WithSummary("Relaciona este ativo a vários de uma vez")
+    .WithDescription("Mesmo tipo, criticidade e mecanismo para todos os destinos. O próprio ativo e as relações que já existem são ignorados; um destino recusado (ciclo, inexistente) vai para erros sem impedir os outros.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound);
+
+catalogo.MapGet("/metamodelo", async (IMetamodelo metamodelo, CancellationToken ct) =>
+{
+    var tipos = await metamodelo.ObterAsync(ct);
+    return TypedResults.Ok(new MetamodeloResponse(
+        tipos.Todos.Select(t => new TipoDeAtivoResponse(t.Chave, t.Rotulo, t.Bloco, t.Pai,
+            t.CamposDoTipo.Select(c => new CampoDoTipoResponse(c.Nome, c.Rotulo, c.Tipo, c.Obrigatorio, c.Opcoes ?? [])).ToArray())).ToArray(),
+        CatalogoDeRelacoes.Tipos.Select(r => new TipoDeRelacaoResponse(r.Chave, r.Rotulo, r.DestinosSugeridos)).ToArray(),
+        CatalogoDeRelacoes.Mecanismos.Select(m => new MecanismoResponse(m.Chave, m.Rotulo)).ToArray()));
+})
+    .WithName("consultarMetamodelo")
+    .WithSummary("Tipos de ativo, tipos de relação e mecanismos da empresa")
+    .WithDescription("O que o assistente de cadastro e o formulário de relação leem: os campos de cada tipo, os destinos sugeridos para cada relação e os mecanismos.");
 
 // ── governança ──────────────────────────────────────────────────────────────
 

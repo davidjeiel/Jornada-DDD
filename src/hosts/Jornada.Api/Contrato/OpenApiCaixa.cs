@@ -177,7 +177,7 @@ internal sealed class FiltroDeRespostas : ISchemaFilter
         [typeof(FichaDoAtivoResponse)] = $$"""
             {"id":"{{IdAtivo}}","codigo":"SIS-0001","nome":"Core Bancário","tipoItem":"sistema",
              "status":"publicado","criticidade":"alta","descricao":"Sistema central de contas e lançamentos.",
-             "revisaoAtual":1,"trilha":["Core Bancário"],"atributos":{"plataforma":"mainframe"},
+             "revisaoAtual":1,"trilha":[],"atributos":{"plataforma":"mainframe"},
              "evidencias":[{"id":"01a12128-8290-7d4e-a1f0-0b6a3c2d9e10","tipo":"openapi","titulo":"Contrato OpenAPI v2","url":"https://repositorio.exemplo/core-bancario/openapi.yaml"}],
              "responsaveis":[{"idPessoa":"{{IdPessoa}}","papel":"OwnerTecnico","inicioVigencia":"2026-10-09","fimVigencia":null,"vigente":true}],
              "relacoes":[]}
@@ -188,7 +188,7 @@ internal sealed class FiltroDeRespostas : ISchemaFilter
              "bloqueios":[{"codigo":"OWNER_NAO_DEFINIDO","mensagem":"Owner técnico não definido"}],
              "alertas":["Definir owner tecnico"],
              "politica":{"scoreMinimo":60,"evidenciaMinima":0,"slaHoras":72,"etapas":["tecnica"]},
-             "caminho":[{"passo":"responsaveis","rotulo":"Definir responsáveis","concluido":false,"impedimentos":["OWNER_NAO_DEFINIDO"]}]}
+             "caminho":[{"passo":"responsaveis","rotulo":"Definir responsáveis","concluido":false,"impedimentos":["OWNER_NAO_DEFINIDO"],"pendencias":["Owner técnico não definido"]}]}
             """,
         [typeof(SubmissaoResponse)] = """{"revisao":1,"score":97,"etapasAbertas":["tecnica"]}""",
         [typeof(ValidacaoResponse)] = $$"""

@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, Check, CircleAlert, FilePlus2, LayoutGrid, Search, X } from 'lucide-react';
 import {
-  abrirRevisao, atribuirResponsavel, avaliarPreCheck, obterAtivo, submeterAtivo,
-  type AtivoResumo, type FichaDoAtivo as Ficha, type PreCheck,
+  abrirRevisao, atribuirResponsavel, avaliarPreCheck, submeterAtivo,
+  type AtivoResumo, type PreCheck,
 } from '../api';
 import { Cabecalho, Criticidade, Status } from '../componentes';
 import { Link, navegar } from '../roteador';
-import { FichaDoAtivo } from './FichaDoAtivo';
-import { podeDescontinuar } from './Impacto';
 
 const FILTROS = ['todos', 'dominio', 'subdominio', 'contexto', 'capacidade', 'sistema', 'aplicacao', 'api', 'evento'] as const;
 type Filtro = (typeof FILTROS)[number];
@@ -43,17 +41,13 @@ type Props = {
 export function Catalogo({ ativos, carregando, termo, idSelecionado, papeis, idPessoa, podeEscrever, onAlterado, onErro }: Props) {
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [preCheck, setPreCheck] = useState<PreCheck | null>(null);
-  const [ficha, setFicha] = useState<Ficha | null>(null);
-  const [fichaAberta, setFichaAberta] = useState(false);
   const [acao, setAcao] = useState<'owner' | 'submeter' | 'revisao' | null>(null);
 
   const selecionado = ativos.find((ativo) => ativo.id === idSelecionado) ?? null;
 
   async function carregarDetalhe(id: string) {
     try {
-      const [visao, avaliacao] = await Promise.all([obterAtivo(id), avaliarPreCheck(id)]);
-      setFicha(visao);
-      setPreCheck(avaliacao);
+      setPreCheck(await avaliarPreCheck(id));
     } catch (e) {
       onErro(e instanceof Error ? e.message : 'Não foi possível carregar o detalhe.');
     }
@@ -61,9 +55,7 @@ export function Catalogo({ ativos, carregando, termo, idSelecionado, papeis, idP
 
   // A seleção mora na URL (?ativo=): link direto e o botão voltar funcionam.
   useEffect(() => {
-    setFicha(null);
     setPreCheck(null);
-    setFichaAberta(false);
     if (idSelecionado) void carregarDetalhe(idSelecionado);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idSelecionado]);
@@ -174,7 +166,7 @@ export function Catalogo({ ativos, carregando, termo, idSelecionado, papeis, idP
               </div>
               <div className="detail-section">
                 <span className="panel-label">CAMINHO DE PUBLICAÇÃO</span>
-                {preCheck?.caminho?.slice(0, 3).map((passo) => (
+                {preCheck?.caminho?.map((passo) => (
                   <div className="step" key={passo.passo}>
                     <span className={passo.concluido ? 'step-mark done' : 'step-mark'}>{passo.concluido && <Check size={13} aria-hidden="true" />}</span>
                     <span>{passo.rotulo}</span><small>{passo.concluido ? 'concluído' : 'pendente'}</small>
@@ -193,7 +185,7 @@ export function Catalogo({ ativos, carregando, termo, idSelecionado, papeis, idP
                   <button className="primary-button" disabled={acao !== null || !preCheck?.aprovado} onClick={() => void executarAcao('submeter')}>{acao === 'submeter' ? 'Enviando...' : 'Submeter'}</button>
                 </div>
               )}
-              <button className="text-button" disabled={!ficha} onClick={() => setFichaAberta(true)}>Abrir ficha completa <ArrowUpRight size={15} aria-hidden="true" /></button>
+              <Link className="text-button" href={`/ativos/${selecionado.id}`}>Abrir a ficha do ativo <ArrowUpRight size={15} aria-hidden="true" /></Link>
             </>
           ) : (
             <div className="empty-detail"><span className="detail-placeholder"><LayoutGrid size={22} aria-hidden="true" /></span><h3>Selecione um ativo</h3><p>O pre-check e o caminho de publicação aparecem aqui.</p></div>
@@ -201,17 +193,6 @@ export function Catalogo({ ativos, carregando, termo, idSelecionado, papeis, idP
         </aside>
       </div>
 
-      {fichaAberta && ficha && (
-        <FichaDoAtivo
-          ficha={ficha}
-          ativos={ativos}
-          podeEscrever={podeEscrever}
-          podeDescontinuar={podeEscrever && podeDescontinuar(papeis)}
-          onFechar={() => setFichaAberta(false)}
-          onAlterado={recarregarTudo}
-          onErro={onErro}
-        />
-      )}
     </>
   );
 }

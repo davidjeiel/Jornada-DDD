@@ -95,6 +95,9 @@ internal sealed class DocumentoDeRelacao : DocumentoDoCatalogo
 
     /// <summary>baixa, media, alta ou critica. Ausente (documento anterior ao campo) vale media.</summary>
     public string? Criticidade { get; init; }
+
+    /// <summary>sincrono, assincrono, batch, arquivo ou biblioteca. Ausente: não informado.</summary>
+    public string? Mecanismo { get; init; }
     public DateTimeOffset CriadoEm { get; init; }
 }
 
