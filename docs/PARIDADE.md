@@ -37,8 +37,14 @@ original no título, para facilitar a busca.
   `Acesso:AdministradoresIniciais`: a matrícula listada que pleitear admin numa
   empresa sem admin é aprovada na hora (ADR-0018).
 - **Escopo de concessão.** O painel concede em `global`, `dominio` ou `squad`.
-  No Jornada, por enquanto, em `empresa` (o antigo global) ou `dominio`; squad
-  chega com o cadastro de squads (2b).
+  No Jornada, por enquanto, em `empresa` (o antigo global) ou `dominio`. O
+  cadastro de squads e a pessoa ligada ao squad já existem; o escopo de squad
+  precisa que o ativo tenha squad, o que chega com a ficha (fase 3).
+- **Gestão de acessos.** No painel, salvar o cadastro troca todos os papéis por
+  um papel na empresa inteira, e um papel de domínio some sem ninguém pedir. No
+  Jornada a correção dos dados e os papéis são operações separadas: concede-se e
+  revoga-se cada atribuição. A revogação vale na hora; no painel, o papel
+  revogado ainda vale até a meia-noite.
 - **Visual.** O tema segue o do painel (paleta, tipografia, menu lateral escuro,
   cartões e etiquetas, em `frontend/src/styles.css`). A disposição de cada tela
   acompanha a fase que a porta: até lá, ela pode diferir da do painel.
@@ -79,9 +85,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 67 |
-| 🟡 parcial | 13 |
-| ⬜ pendente | 72 |
+| ✅ coberto | 76 |
+| 🟡 parcial | 12 |
+| ⬜ pendente | 64 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -92,9 +98,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 |---|---|---|---|---|
 | 0 | Fundação, mais o que o domínio já cobria | 29 | 0 | 0 |
 | 1 | Ciclo de vida | 4 | 0 | 0 |
-| 2 | Pessoas e acesso | 34 | 3 | 7 |
+| 2 | Pessoas e acesso | 43 | 2 | 0 |
 | 3 | Ficha e cadastro | 0 | 8 | 14 |
-| 4 | Validação e mesa | 0 | 0 | 9 |
+| 4 | Validação e mesa | 0 | 0 | 8 |
 | 5 | Catálogo e busca | 0 | 1 | 11 |
 | 6 | Mapas e grafo | 0 | 0 | 12 |
 | 7 | Visão executiva | 0 | 0 | 3 |
@@ -111,8 +117,13 @@ A fase 2 foi dividida em dois PRs. O primeiro (2a) traz o cadastro de pessoa,
 o pleito e a concessão, os papéis concedidos no lugar do `X-Papel`, o escopo de
 domínio nos casos de uso, o modo leitura e as telas Seu perfil, Solicitar acesso
 e Pleitos de acesso (ADR-0018). O segundo (2b) traz a gestão de pessoas, os
-squads e a cartilha com a matriz derivada das permissões. Os avisos de pleito
-aberto e decidido entram com as notificações, na fase 8.
+squads e a cartilha com a matriz derivada das permissões (2b): a matriz, as
+etapas por papel e a tabela de ritos saem de `GET /v1/cartilha`, que as lê das
+regras aplicadas, e o `CARTILHA.md` guarda só a prosa. Os dois parciais que
+restam na fase 2 são os avisos de pleito aberto e decidido, que entram com as
+notificações, na fase 8. A gestão de acessos e os squads do painel não têm
+teste próprio lá; no Jornada estão em `GestaoTestes`, no contrato de
+persistência e em `telas/Gestao.test.tsx`.
 
 ### Governança (regras de publicação) — `tests/test_governanca.py` (10)
 
@@ -286,18 +297,18 @@ aberto e decidido entram com as notificações, na fase 8.
 
 | Teste do painel | Fase | Situação | No Jornada |
 |---|---|---|---|
-| `test_cartilha_abre_sem_identificacao` — Quem ainda não se identificou é justamente quem mais precisa do guia. | 2 | ⬜ | Depende da identificação (fase 2). |
+| `test_cartilha_abre_sem_identificacao` — Quem ainda não se identificou é justamente quem mais precisa do guia. | 2 | ✅ | `telas/Cartilha.test.tsx`; `GET /v1/cartilha` não exige `X-Pessoa` |
 | `test_cartilha_nao_escreve_nada` — Página de leitura: nenhum formulário de escrita, para nenhum papel. | 0 | ✅ | `Layout.test.tsx` |
-| `test_cada_perfil_tem_secao_e_atalho` | 2 | ⬜ |  |
-| `test_matriz_reflete_as_permissoes_reais` — Cada célula da matriz é lida de acesso.PERMISSOES, ação por ação. | 2 | ⬜ | A cartilha do Jornada é o `docs/CARTILHA.md`; a matriz derivada do código vem com pessoas e acesso. |
-| `test_matriz_acompanha_mudanca_de_permissao` — Mudou a regra no código, muda a página — sem ninguém editar a cartilha. | 2 | ⬜ |  |
-| `test_curador_nao_aparece_decidindo_validacao` — A segregação de função precisa estar visível, não só aplicada. | 2 | ⬜ |  |
-| `test_consulta_nao_pode_nada_na_matriz` | 2 | ⬜ |  |
-| `test_etapas_por_papel_sai_do_acesso` | 2 | ⬜ |  |
-| `test_ritos_vem_da_tabela_de_politicas` | 4 | ⬜ |  |
+| `test_cada_perfil_tem_secao_e_atalho` | 2 | ✅ | `telas/Cartilha.test.tsx`: seção com âncora, cartão de atalho e lema por perfil |
+| `test_matriz_reflete_as_permissoes_reais` — Cada célula da matriz é lida de acesso.PERMISSOES, ação por ação. | 2 | ✅ | `MatrizRefleteAsPermissoesReais` (cada célula é o `Pode()` da política) e `telas/Cartilha.test.tsx` |
+| `test_matriz_acompanha_mudanca_de_permissao` — Mudou a regra no código, muda a página — sem ninguém editar a cartilha. | 2 | ✅ | A matriz é lida de `PoliticaDeAutorizacao.PapeisQuePodem` a cada chamada; `telas/Cartilha.test.tsx` muda os dados e a página muda |
+| `test_curador_nao_aparece_decidindo_validacao` — A segregação de função precisa estar visível, não só aplicada. | 2 | ✅ | `CuradorNaoApareceDecidindoValidacao` |
+| `test_consulta_nao_pode_nada_na_matriz` | 2 | ✅ | `ConsultaNaoPodeNadaNaMatriz` |
+| `test_etapas_por_papel_sai_do_acesso` | 2 | ✅ | `EtapasPorPapelSaiDoAcesso` |
+| `test_ritos_vem_da_tabela_de_politicas` | 2 | ✅ | `RitosVemDaTabelaDePoliticas` e `telas/Cartilha.test.tsx` (score e prazo de cada rito) |
 | `test_rito_critico_e_mais_apertado_que_o_padrao` — O que a cartilha afirma sobre criticidade precisa ser verdade no banco. | 0 | ✅ | `ApiCriticaEhMaisExigente` |
 | `test_rodape_leva_a_cartilha_em_qualquer_tela` — O rodapé é do site, não da tela: precisa estar em todas. | 0 | ✅ | `Layout.test.tsx` |
 | `test_atalho_fica_ao_lado_do_botao_de_identificacao` — Ao lado de "quem sou eu" fica "o que eu posso fazer". | 0 | ✅ | `Layout.test.tsx` |
 | `test_atalho_se_marca_quando_voce_esta_na_cartilha` | 0 | ✅ | `Layout.test.tsx` |
-| `test_cores_de_perfil_existem_nos_tres_estados_de_tema` — Se a cor só existe no claro, a cartilha fica ilegível de noite. | 2 | 🟡 | `estilos.test.ts` garante todo token nos três estados; as cores por perfil chegam com a matriz da cartilha. |
+| `test_cores_de_perfil_existem_nos_tres_estados_de_tema` — Se a cor só existe no claro, a cartilha fica ilegível de noite. | 2 | ✅ | `estilos.test.ts`: `--perfil-*` e `--perfil-*-bg` nos três estados |
 | `test_rodape_e_atalho_tem_estilo_proprio` | 0 | ✅ | `estilos.test.ts` |

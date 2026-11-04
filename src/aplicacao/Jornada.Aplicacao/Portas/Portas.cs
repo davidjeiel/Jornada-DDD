@@ -194,6 +194,32 @@ public interface IRepositorioDePessoas
     public Task<IReadOnlyList<Pessoa>> ListarAsync(bool incluirInativas = false, CancellationToken ct = default);
 
     public Task AdicionarAsync(Pessoa pessoa, CancellationToken ct = default);
+
+    /// <summary>Exclui o cadastro na confirmação, liberando a matrícula. Só para cadastro sem vínculo nenhum.</summary>
+    public Task RemoverAsync(Pessoa pessoa, CancellationToken ct = default);
+}
+
+/// <summary>
+/// O que amarra uma pessoa ao histórico do catálogo, fora do cadastro dela.
+/// Equivale à parte de <c>acesso.interacoes_pessoa</c> que olha ativos,
+/// revisões, validações e auditoria. Cadastro com vínculo não se exclui: inativa-se.
+/// </summary>
+public interface IConsultaDeVinculos
+{
+    /// <summary>Os nomes dos vínculos encontrados ("responsabilidades em ativos", ...). Vazio: nenhum.</summary>
+    public Task<IReadOnlyList<string>> DaPessoaAsync(Guid idPessoa, CancellationToken ct = default);
+}
+
+/// <summary>Os squads da empresa. A sigla é única na empresa.</summary>
+public interface IRepositorioDeSquads
+{
+    public Task<Squad?> ObterAsync(Guid id, CancellationToken ct = default);
+    public Task<Squad?> ObterPorSiglaAsync(string sigla, CancellationToken ct = default);
+
+    /// <summary>Ativas primeiro, depois por título (<c>ORDER BY ativo DESC, nome</c>).</summary>
+    public Task<IReadOnlyList<Squad>> ListarAsync(CancellationToken ct = default);
+
+    public Task AdicionarAsync(Squad squad, CancellationToken ct = default);
 }
 
 /// <summary>Os pleitos de acesso da empresa (<c>solicitacao_acesso</c>).</summary>

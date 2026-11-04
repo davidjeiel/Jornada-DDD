@@ -14,10 +14,12 @@ import { navegar, useLocal } from './roteador';
 import { Cartilha } from './telas/Cartilha';
 import { Catalogo } from './telas/Catalogo';
 import { EmBreve, NaoEncontrada } from './telas/EmBreve';
+import { GestaoDeAcessos } from './telas/GestaoDeAcessos';
 import { NovoAtivo } from './telas/NovoAtivo';
 import { Perfil } from './telas/Perfil';
 import { Pleitos } from './telas/Pleitos';
 import { SolicitarAcesso } from './telas/SolicitarAcesso';
+import { Squads } from './telas/Squads';
 import { Validacoes } from './telas/Validacoes';
 import { VisaoExecutiva } from './telas/VisaoExecutiva';
 import { empresaDe, registrarPessoas } from './usuarios';
@@ -169,6 +171,12 @@ function App() {
         break;
       case 'pleitos':
         tela = <Pleitos ativos={ativos} onErro={setErro} onDecidido={() => void carregarPerfil()} />;
+        break;
+      case 'gestao-acessos':
+        tela = <GestaoDeAcessos ativos={ativos} idDoAdmin={perfil?.pessoa?.id ?? null} onErro={setErro} />;
+        break;
+      case 'squads':
+        tela = <Squads onErro={setErro} />;
         break;
       case 'cartilha':
         tela = <Cartilha />;

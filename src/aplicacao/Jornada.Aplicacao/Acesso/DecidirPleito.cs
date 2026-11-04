@@ -40,20 +40,14 @@ public sealed class DecidirPleito(
             papel = p;
         }
 
-        var escopo = (cmd.EscopoTipo ?? "").Trim().ToLowerInvariant() switch
-        {
-            "" or "empresa" or "global" => TipoDeEscopo.Empresa,
-            "dominio" => TipoDeEscopo.Dominio,
-            _ => (TipoDeEscopo?)null,
-        };
+        var escopo = Escopos.De(cmd.EscopoTipo);
         if (escopo is null)
             return Resultado<PleitoLegivel>.Recusado("ESCOPO_INVALIDO",
                 $"Escopo desconhecido: {cmd.EscopoTipo}. Use empresa ou dominio.");
 
         if (cmd.Aprovar && escopo == TipoDeEscopo.Dominio && cmd.EscopoId is { } idDominio)
         {
-            var dominio = await ativos.ObterAsync(new Dominio.Catalogo.IdDeAtivo(idDominio), ct);
-            if (dominio is null || !dominio.TipoItem.Equals(AlvoDoAtivo.TipoDominio, StringComparison.OrdinalIgnoreCase))
+            if (!await Escopos.EhDominioAsync(ativos, idDominio, ct))
                 return Resultado<PleitoLegivel>.Recusado("ESCOPO_INVALIDO", "O escopo de domínio tem de apontar para um domínio do catálogo.");
         }
 

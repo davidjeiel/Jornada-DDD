@@ -218,6 +218,13 @@ internal sealed class AcessoDoTenant(BancoDoCatalogo banco, IContextoDeTenantAtu
             _aoConfirmar.Add(aoConfirmar ?? (_ => { }));
         }
 
+        /// <summary>Exclui o documento da partição. Sem ETag: só a exclusão de cadastro sem vínculo usa.</summary>
+        public void Remover(string id)
+        {
+            _lote.DeleteItem(id);
+            _aoConfirmar.Add(_ => { });
+        }
+
         public async Task ExecutarAsync(CancellationToken ct)
         {
             if (Operacoes == 0) return;
@@ -233,6 +240,8 @@ internal sealed class AcessoDoTenant(BancoDoCatalogo banco, IContextoDeTenantAtu
                             ?? resposta.StatusCode;
                 throw causa switch
                 {
+                    HttpStatusCode.NotFound => new ErroDeDominio("CONFLITO_DE_EDICAO",
+                        "O registro já tinha sido excluído por outra requisição. Recarregue e tente de novo."),
                     HttpStatusCode.PreconditionFailed => new ErroDeDominio("CONFLITO_DE_EDICAO",
                         "O ativo foi alterado por outra requisição. Recarregue e tente de novo."),
                     HttpStatusCode.Conflict => new ErroDeDominio("CONFLITO_DE_EDICAO",

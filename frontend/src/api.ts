@@ -111,6 +111,7 @@ export type Pessoa = {
   unidade: string;
   ativa: boolean;
   papeis: string[];
+  idSquad: string | null;
 };
 
 export type PapelConcedido = {
@@ -153,6 +154,27 @@ export type Perfil = {
 };
 
 export type FilaDePleitos = { total: number; pendentes: number; podeConcederAdmin: boolean; pleitos: Pleito[] };
+
+export type Squad = { id: string; sigla: string; titulo: string; descricao: string; ativa: boolean };
+
+/** Um cadastro na gestão de acessos (só admin). */
+export type Cadastro = { pessoa: Pessoa; squad: Squad | null; papeis: PapelConcedido[] };
+
+export type LinhaDaMatriz = { acao: string; rotulo: string; papeis: Record<string, boolean> };
+
+export type Rito = {
+  tipoItem: string; rotulo: string; criticidade: string; etapas: string[];
+  evidenciaMinima: number; scoreMinimo: number; slaHoras: number; revisarACadaDias: number;
+};
+
+/** As tabelas da cartilha, lidas das regras que a API aplica (GET /v1/cartilha). */
+export type DadosDaCartilha = {
+  papeis: string[];
+  matriz: LinhaDaMatriz[];
+  etapasPorPapel: Record<string, string[]>;
+  blocosPorPapel: Record<string, string[]>;
+  ritos: Rito[];
+};
 
 /** Recusa da API no padrão CAIXA (ApiError), com o código para a tela decidir o que fazer. */
 export class ErroDaApi extends Error {
@@ -323,4 +345,62 @@ export function decidirValidacao(id: string, aprovada: boolean, motivo: string):
     method: 'POST',
     body: JSON.stringify({ aprovada, motivo }),
   });
+}
+
+export function consultarCartilha(): Promise<DadosDaCartilha> {
+  return requisicao('/v1/cartilha');
+}
+
+// ── Gestão de acessos (só admin) ─────────────────────────────────────────
+
+export function listarCadastros(busca = ''): Promise<{ total: number; cadastros: Cadastro[] }> {
+  return requisicao(`/v1/gestao/pessoas${busca ? `?busca=${encodeURIComponent(busca)}` : ''}`);
+}
+
+export function consultarVinculos(id: string): Promise<{ podeExcluir: boolean; vinculos: string[] }> {
+  return requisicao(`/v1/gestao/pessoas/${id}/vinculos`);
+}
+
+export function corrigirCadastro(id: string, payload: {
+  nome: string; email: string; unidade: string; idSquad: string | null; ativa: boolean;
+}): Promise<Cadastro> {
+  return requisicao(`/v1/gestao/pessoas/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
+export type PapelNoEscopo = { papel: string; escopoTipo: string; escopoId?: string | null };
+
+export function concederPapel(id: string, payload: PapelNoEscopo): Promise<Cadastro> {
+  return requisicao(`/v1/gestao/pessoas/${id}/papeis`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function revogarPapel(id: string, payload: PapelNoEscopo): Promise<Cadastro> {
+  return requisicao(`/v1/gestao/pessoas/${id}/revogacoes`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function inativarEmLote(ids: string[]): Promise<{ inativados: number }> {
+  return requisicao('/v1/gestao/inativacoes', { method: 'POST', body: JSON.stringify({ ids }) });
+}
+
+export function excluirCadastro(id: string): Promise<void> {
+  return requisicao(`/v1/gestao/pessoas/${id}`, { method: 'DELETE' });
+}
+
+// ── Squads ────────────────────────────────────────────────────────────────
+
+export function listarSquads(busca = ''): Promise<{ total: number; squads: Squad[] }> {
+  return requisicao(`/v1/squads${busca ? `?busca=${encodeURIComponent(busca)}` : ''}`);
+}
+
+export type DadosDoSquad = { sigla: string; titulo: string; descricao: string };
+
+export function cadastrarSquad(payload: DadosDoSquad): Promise<Squad> {
+  return requisicao('/v1/squads', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function alterarSquad(id: string, payload: DadosDoSquad): Promise<Squad> {
+  return requisicao(`/v1/squads/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
+export function inativarSquad(id: string): Promise<Squad> {
+  return requisicao(`/v1/squads/${id}/inativacao`, { method: 'POST' });
 }

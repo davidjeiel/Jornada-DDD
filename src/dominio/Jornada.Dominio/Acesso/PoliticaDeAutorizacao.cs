@@ -200,6 +200,15 @@ public static class PoliticaDeAutorizacao
         return DecisaoDeAutorizacao.Sim;
     }
 
+    // ── a cartilha lê daqui: a matriz da página é a regra aplicada, não uma cópia ──
+
+    /// <summary>Os papéis que permitem a ação, sem escopo nem bloco. De <c>cartilha.matriz</c>.</summary>
+    public static IReadOnlySet<Papel> PapeisQuePodem(Acao acao) => Permissoes[acao].ToHashSet();
+
+    /// <summary>As etapas que o papel decide pela tabela. De <c>cartilha.etapas_por_papel</c>.</summary>
+    public static IReadOnlyList<EtapaValidacao> EtapasDoPapel(Papel papel) =>
+        PapelPorEtapa.Where(e => e.Value.Contains(papel)).Select(e => e.Key).Order().ToArray();
+
     public const string MensagemDoModoLeitura = "Você está em modo de leitura. Troque no seu perfil para editar.";
 
     /// <summary>Decisão de validação e o motivo da recusa. De <c>acesso.pode_decidir</c>.</summary>

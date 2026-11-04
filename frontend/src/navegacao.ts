@@ -39,8 +39,8 @@ export const MENU: ItemDeMenu[] = [
   { secao: 'perfil', caminho: '/perfil', rotulo: 'Seu perfil', inicial: 'PF', grupo: 'Você', descricao: 'Quem você é na ferramenta e o que o seu papel permite.' },
 
   { secao: 'pleitos', caminho: '/pleitos', rotulo: 'Pleitos de acesso', inicial: 'PA', grupo: 'Administração', exige: 'conceder', descricao: 'Fila de pedidos de papel para quem concede acesso.' },
-  { secao: 'squads', caminho: '/squads', rotulo: 'Squads', inicial: 'SQ', grupo: 'Administração', exige: 'conceder', fase: 2, descricao: 'Times e o escopo de papel por squad.' },
-  { secao: 'gestao-acessos', caminho: '/gestao-acessos', rotulo: 'Gestão de acessos', inicial: 'GA', grupo: 'Administração', exige: 'administrar', fase: 2, descricao: 'Concessões e revogações de papel em toda a empresa.' },
+  { secao: 'squads', caminho: '/squads', rotulo: 'Squads', inicial: 'SQ', grupo: 'Administração', exige: 'conceder', descricao: 'Os times da empresa.' },
+  { secao: 'gestao-acessos', caminho: '/gestao-acessos', rotulo: 'Gestão de acessos', inicial: 'GA', grupo: 'Administração', exige: 'administrar', descricao: 'Cadastros, concessões e revogações de papel em toda a empresa.' },
   { secao: 'politicas', caminho: '/politicas', rotulo: 'Políticas', inicial: 'PO', grupo: 'Administração', fase: 4, descricao: 'Rito de validação por tipo e criticidade: etapas, evidência, score e SLA.' },
 ];
 

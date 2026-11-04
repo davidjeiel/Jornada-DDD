@@ -704,6 +704,107 @@ public abstract class ContratoDePersistencia
         Verificar.Vazio(await deFora.Pleitos.ListarAsync(), "outra empresa não enxerga os pleitos");
     }
 
+    [Teste("pessoa excluída some e libera a matrícula")]
+    public async Task PessoaExcluidaLiberaAMatricula()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        Pessoa Nova() => Pessoa.Cadastrar(empresa, DadosDeCadastro.Conferir("C555555", "Ivo Prado", "ivo@empresa.com", "0001"), Relogio);
+        var primeira = Nova();
+        await using (var s = Abrir(empresa))
+        {
+            await s.Pessoas.AdicionarAsync(primeira);
+            await s.Unidade.ConfirmarAsync();
+        }
+        await using (var s = Abrir(empresa))
+        {
+            await s.Pessoas.RemoverAsync(await s.Pessoas.ObterAsync(primeira.Id) ?? throw Ausente("pessoa"));
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        var segunda = Nova();
+        await using (var s = Abrir(empresa))
+        {
+            Verificar.Igual(null, await s.Pessoas.ObterAsync(primeira.Id));
+            Verificar.Igual(null, await s.Pessoas.ObterPorMatriculaAsync(Matricula.De("C555555")));
+            await s.Pessoas.AdicionarAsync(segunda);
+            await s.Unidade.ConfirmarAsync();
+        }
+        await using var nova = Abrir(empresa);
+        Verificar.Igual(segunda.Id, (await nova.Pessoas.ObterPorMatriculaAsync(Matricula.De("C555555")))?.Id);
+    }
+
+    [Teste("squad volta igual, por id e por sigla; trocar a sigla libera a antiga")]
+    public async Task SquadETrocaDeSigla()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var cred = Squad.Criar(empresa, "cred", "Squad Crédito", "Contratos de crédito");
+        await using (var s = Abrir(empresa))
+        {
+            await s.Squads.AdicionarAsync(cred);
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using (var s = Abrir(empresa))
+        {
+            var lida = await s.Squads.ObterPorSiglaAsync("CRED") ?? throw Ausente("squad");
+            Verificar.Igual(cred.Id, lida.Id);
+            Verificar.Igual("Squad Crédito", lida.Titulo);
+            Verificar.Igual("Contratos de crédito", lida.Descricao);
+            Verificar.Verdadeiro(lida.Ativa);
+            lida.Alterar("CREDITO", "Squad Crédito", "Contratos de crédito");
+            lida.Inativar();
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using (var s = Abrir(empresa))
+        {
+            Verificar.Igual(null, await s.Squads.ObterPorSiglaAsync("CRED"), "a sigla antiga não aponta mais para o squad");
+            var renomeada = await s.Squads.ObterPorSiglaAsync("credito") ?? throw Ausente("squad renomeado");
+            Verificar.Falso(renomeada.Ativa);
+            await s.Squads.AdicionarAsync(Squad.Criar(empresa, "CRED", "Novo Crédito", "Reaproveita a sigla"));
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using (var s = Abrir(empresa))
+        {
+            Verificar.Verdadeiro(await Falha(async () =>
+            {
+                await s.Squads.AdicionarAsync(Squad.Criar(empresa, "CREDITO", "Repetido", "x"));
+                await s.Unidade.ConfirmarAsync();
+            }), "a sigla nova está reservada");
+        }
+
+        await using var nova = Abrir(empresa);
+        Verificar.Igual("Novo Crédito,Squad Crédito", string.Join(",", (await nova.Squads.ListarAsync()).Select(q => q.Titulo)),
+            "ativos primeiro");
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Vazio(await deFora.Squads.ListarAsync());
+    }
+
+    [Teste("vínculos da pessoa: responsabilidade, revisão, validação e auditoria, só nesta empresa")]
+    public async Task VinculosDaPessoa()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var dona = Guid.NewGuid();
+        var autora = Guid.NewGuid();
+        var ativo = Ativo.Rascunhar(empresa, Tipos.Obter("sistema"), CodigoDeAtivo.De("SIS-0001"), "Core", Relogio,
+            atributos: new Dictionary<string, string> { ["plataforma"] = "nuvem" });
+        ativo.AtribuirResponsavel(dona, PapelDeOwnership.OwnerTecnico, Relogio);
+        await using (var s = Abrir(empresa))
+        {
+            await s.Ativos.AdicionarAsync(ativo);
+            await s.Trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, "criar", autora, Relogio));
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using var nova = Abrir(empresa);
+        Verificar.Contem(await nova.Vinculos.DaPessoaAsync(dona), "responsabilidades em ativos");
+        Verificar.Contem(await nova.Vinculos.DaPessoaAsync(autora), "eventos de auditoria");
+        Verificar.Vazio(await nova.Vinculos.DaPessoaAsync(Guid.NewGuid()));
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Vazio(await deFora.Vinculos.DaPessoaAsync(dona), "o vínculo de outra empresa não conta");
+    }
+
     private async Task<Ativo> Gravar(IdDeEmpresa empresa, Ativo ativo)
     {
         await using var s = Abrir(empresa);

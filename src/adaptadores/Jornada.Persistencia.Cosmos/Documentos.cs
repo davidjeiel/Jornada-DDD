@@ -35,6 +35,8 @@ internal static class TiposDeDocumento
     public const string Pessoa = "pessoa";
     public const string Matricula = "matricula";
     public const string Pleito = "pleito";
+    public const string Squad = "squad";
+    public const string Sigla = "sigla";
 }
 
 internal sealed class DocumentoDeAtivo : DocumentoDoCatalogo
@@ -155,6 +157,7 @@ internal sealed class DocumentoDePessoa : DocumentoDoCatalogo
     public required string Unidade { get; init; }
     public bool Ativa { get; init; }
     public DateTimeOffset CadastradaEm { get; init; }
+    public Guid? IdSquad { get; init; }
     public List<AtribuicaoEmbutida> Atribuicoes { get; init; } = [];
 }
 
@@ -171,6 +174,24 @@ internal sealed class DocumentoDeMatricula : DocumentoDoCatalogo
     public override string Tipo => TiposDeDocumento.Matricula;
 
     public required string IdPessoa { get; init; }
+}
+
+internal sealed class DocumentoDeSquad : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Squad;
+
+    public required string Sigla { get; init; }
+    public required string Titulo { get; init; }
+    public required string Descricao { get; init; }
+    public bool Ativa { get; init; }
+}
+
+/// <summary>A reserva da sigla do squad (id <c>sigla-CRED</c>), como a da matrícula: sigla repetida derruba o lote.</summary>
+internal sealed class DocumentoDeSigla : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Sigla;
+
+    public required string IdSquad { get; init; }
 }
 
 internal sealed class DocumentoDePleito : DocumentoDoCatalogo

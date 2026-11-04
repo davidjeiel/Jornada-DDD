@@ -65,6 +65,20 @@ só no ambiente local.
   quem não tem papel), `GET /v1/pleitos` (só quem concede) e
   `POST /v1/pleitos/{id}/decisoes`.
 
+### Complemento (2b): gestão de acessos, squads e cartilha
+
+- **Gestão de acessos, só admin** (`/v1/gestao/...`): busca de cadastros,
+  correção de dados, concessão e revogação direta de cada atribuição,
+  inativação (inclusive em lote) e exclusão de cadastro sem vínculo. O admin
+  conectado não se inativa, não se exclui, não revoga os próprios papéis nem
+  concede a si. A revogação encerra a vigência ontem: deixa de valer na hora, e
+  a atribuição fica no histórico.
+- **Squads** (`/v1/squads`), para quem concede: sigla única por empresa, com
+  reserva `sigla-X` no mesmo lote, como a matrícula; trocar a sigla troca a
+  reserva no mesmo lote.
+- **Cartilha** (`GET /v1/cartilha`): a matriz de permissões, as etapas por papel
+  e os ritos saem das regras aplicadas, e o `CARTILHA.md` guarda só a prosa.
+
 ## Consequências
 
 ### Positivas
@@ -90,9 +104,14 @@ só no ambiente local.
   pleito pendente é leitura seguida de escrita. No recadastro com dados
   alterados, o ETag da pessoa protege; com os mesmos dados, não. O painel tem o
   mesmo comportamento.
-- **A concessão não vai para a trilha de auditoria.** O pleito já registra quem
-  decidiu, quando, o quê e a resposta. A trilha por empresa (ADR-0017, "revisitar
-  quando") fica para a gestão de acessos (2b), que revoga papel fora de pleito.
+- **A concessão não vai para a trilha de auditoria.** O pleito registra quem
+  decidiu, quando, o quê e a resposta; a concessão direta registra quem
+  concedeu na atribuição. A revogação e a correção de cadastro feitas na gestão
+  de acessos não deixam rastro de quem as fez: a trilha por empresa (ADR-0017,
+  "revisitar quando") continua pendente.
+- **Cadastro criado pelo pleito nunca é excluível**, porque o pleito é vínculo.
+  O painel tem a mesma regra; na prática a exclusão serve a cadastros da carga
+  ou da migração (fase 10).
 - **Os avisos de pleito aberto e decidido** ficam para a fase 8 (notificações).
 
 ## Alternativas consideradas
@@ -113,6 +132,6 @@ só no ambiente local.
 
 - a identidade corporativa entrar (ADR-0007): `X-Pessoa` dá lugar ao claim do
   token, e o seletor de pessoa some do perfil;
-- houver revogação ou edição de papel fora de pleito (gestão de acessos, 2b);
+- for preciso saber quem revogou um papel ou corrigiu um cadastro (trilha por empresa);
 - uma empresa passar de dezenas de milhares de pessoas;
 - alguma empresa precisar de matrícula ou unidade em outro formato.
