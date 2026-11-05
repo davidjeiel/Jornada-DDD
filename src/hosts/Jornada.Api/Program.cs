@@ -5,6 +5,7 @@ using Jornada.Api.Demonstracao;
 using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Comandos;
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Catalogo.Descobertas;
 using Jornada.Aplicacao.Catalogo.Mapas;
 using Jornada.Aplicacao.Governanca;
 using Jornada.Aplicacao.Notificacoes;
@@ -141,6 +142,8 @@ builder.Services.AddScoped<BuscarNoCatalogo>();
 builder.Services.AddScoped<ConsultarVizinhanca>();
 builder.Services.AddScoped<MontarArvore>();
 builder.Services.AddScoped<Indicadores>();
+builder.Services.AddScoped<ImportarDescobertas>();
+builder.Services.AddScoped<TriarDescobertas>();
 builder.Services.AddScoped<Notificador>();
 builder.Services.AddScoped<CaixaDeNotificacoes>();
 builder.Services.AddScoped<PreferenciasDoNotificado>();
@@ -819,6 +822,51 @@ acesso.MapGet("/cartilha", async (ConsultarCartilha caso, CancellationToken ct) 
     .WithName("consultarCartilha")
     .WithSummary("Tabelas de referência da cartilha")
     .WithDescription("Quem pode fazer o quê, as etapas que cada papel decide, os blocos em que cada papel escreve e o rito de cada tipo de ativo. Tudo lido das políticas que a API aplica, não escrito à mão. Não exige X-Pessoa.");
+
+// ── descobertas: importação com prévia, bandeja e triagem ──
+
+var descobertas = v1.MapGroup("/descobertas").WithTags(OpenApiCaixa.TagCatalogo);
+
+descobertas.MapGet("", async (TriarDescobertas caso, IRelogio relogio, CancellationToken ct) =>
+    TypedResults.Ok(new DescobertasResponse(
+        FontesDeDescoberta.Todas.Select(f => new FonteDeDescobertaResponse(f.Chave, f.Rotulo, f.Ajuda, f.TipoDoPai)).ToArray(),
+        (await caso.BandejaAsync(ct)).Select(a => ItemDoCatalogoResponse.De(a, relogio.Hoje)).ToArray())))
+    .WithName("consultarDescobertas")
+    .WithSummary("As fontes de descoberta e a bandeja")
+    .WithDescription("A bandeja é o que a importação trouxe e ninguém triou: origem automática, em rascunho, o mais recente primeiro (até 200).");
+
+descobertas.MapPost("/previas", async Task<Results<Ok<PlanoDeImportacaoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, DescobertaRequest corpo, ImportarDescobertas caso, CancellationToken ct) =>
+{
+    var r = await caso.PlanejarAsync(corpo.Fonte, corpo.Conteudo, corpo.IdPai is { } p ? new IdDeAtivo(p) : null, ct);
+    return r.Sucesso ? TypedResults.Ok(PlanoDeImportacaoResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("previaDeImportacao")
+    .WithSummary("Mostra o que a importação faria, sem gravar nada")
+    .WithDescription("Do contrato OpenAPI: a API e um endpoint por operação (GET, POST, PUT, PATCH, DELETE). Do inventário Git: um repositório por item. Marca o que já existe pelo tipo e nome. JSON ilegível: 400 CONTEUDO_INVALIDO. Exige poder importar (tech lead, curador ou admin).")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status422UnprocessableEntity);
+
+descobertas.MapPost("/importacoes", async Task<Results<Ok<ImportacaoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, DescobertaRequest corpo, ImportarDescobertas caso, CancellationToken ct) =>
+{
+    var r = await caso.ImportarAsync(corpo.Fonte, corpo.Conteudo, corpo.IdPai is { } p ? new IdDeAtivo(p) : null, ct);
+    return r.Sucesso ? TypedResults.Ok(ImportacaoResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("importarDescobertas")
+    .WithSummary("Importa o que a prévia mostrou")
+    .WithDescription("Cria em rascunho, com origem automática, o que ainda não existe; o que existe fica como está (repositório em rascunho recebe os atributos novos). Os criados caem na bandeja para triagem.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden, StatusCodes.Status422UnprocessableEntity);
+
+descobertas.MapPost("/triagem", async Task<Results<Ok<TriagemResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, TriagemRequest corpo, TriarDescobertas caso, CancellationToken ct) =>
+{
+    var r = await caso.TriarAsync(corpo.Ids.Select(i => new IdDeAtivo(i)).ToArray(), corpo.Acao, ct);
+    return r.Sucesso ? TypedResults.Ok(new TriagemResponse(r.Valor!.Acao, r.Valor.Tratados, r.Valor.Ignorados)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("triarDescobertas")
+    .WithSummary("Aceita ou descarta descobertas, em lote")
+    .WithDescription("aceitar tira da bandeja e passa a contar como cadastro humano, sem mexer no ciclo de vida; descartar arquiva. Cadastro humano e o que já saiu da bandeja são ignorados. Ação desconhecida: 400 ACAO_DE_TRIAGEM_INVALIDA.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden);
 
 // ── notificações: a caixa de quem está identificado ──
 

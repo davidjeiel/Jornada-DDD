@@ -162,6 +162,14 @@ public sealed class RepositorioDeAtivosEmMemoria(
         return trilha;
     }
 
+    public Task<Ativo?> ObterPorNomeAsync(string tipoItem, string nome, CancellationToken ct = default) =>
+        Task.FromResult(_ativos.Values
+            .Where(a => MinhaEmpresa(a)
+                && a.TipoItem.Equals(tipoItem, StringComparison.OrdinalIgnoreCase)
+                && a.Nome.Equals(nome.Trim(), StringComparison.OrdinalIgnoreCase))
+            .OrderBy(a => a.CriadoEm)
+            .FirstOrDefault());
+
     public Task<bool> ExisteNomeDuplicadoAsync(
         string tipoItem, string nome, IdDeAtivo? exceto = null, CancellationToken ct = default) =>
         Task.FromResult(_ativos.Values.Any(a =>

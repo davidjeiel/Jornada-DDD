@@ -579,3 +579,27 @@ export function consultarPreferencias(): Promise<PreferenciasDeNotificacao> {
 export function salvarPreferencias(ativas: { tipo: string; canal: string }[]): Promise<PreferenciasDeNotificacao> {
   return requisicao('/v1/notificacoes/preferencias', { method: 'PUT', body: JSON.stringify({ ativas }) });
 }
+
+export type FonteDeDescoberta = { chave: string; rotulo: string; ajuda: string; tipoDoPai: string };
+export type Descobertas = { fontes: FonteDeDescoberta[]; bandeja: ItemDoCatalogo[] };
+export type AcaoDoPlano = { acao: 'criar' | 'manter' | 'atualizar'; tipo: string; nome: string; detalhe: string };
+export type PlanoDeImportacao = {
+  fonte: string; titulo: string; versao: string; criar: number; manter: number; acoes: AcaoDoPlano[]; idPai: string | null;
+};
+export type PedidoDeDescoberta = { fonte: string; conteudo: string; idPai?: string | null };
+
+export function consultarDescobertas(): Promise<Descobertas> {
+  return requisicao('/v1/descobertas');
+}
+
+export function previaDeImportacao(pedido: PedidoDeDescoberta): Promise<PlanoDeImportacao> {
+  return requisicao('/v1/descobertas/previas', { method: 'POST', body: JSON.stringify(pedido) });
+}
+
+export function importarDescobertas(pedido: PedidoDeDescoberta): Promise<{ criados: number; atualizados: number; mantidos: number; novos: string[] }> {
+  return requisicao('/v1/descobertas/importacoes', { method: 'POST', body: JSON.stringify(pedido) });
+}
+
+export function triarDescobertas(ids: string[], acao: 'aceitar' | 'descartar'): Promise<{ acao: string; tratados: number; ignorados: number }> {
+  return requisicao('/v1/descobertas/triagem', { method: 'POST', body: JSON.stringify({ ids, acao }) });
+}

@@ -91,9 +91,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 142 |
+| ✅ coberto | 152 |
 | 🟡 parcial | 0 |
-| ⬜ pendente | 10 |
+| ⬜ pendente | 0 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -111,7 +111,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | 6 | Mapas e grafo | 12 | 0 | 0 |
 | 7 | Visão executiva | 3 | 0 | 0 |
 | 8 | Notificações | 7 | 0 | 0 |
-| 9 | Descobertas | 0 | 0 | 10 |
+| 9 | Descobertas | 10 | 0 | 0 |
 
 A fase 1 também porta o que o painel faz sem teste próprio: o retrato de cada
 revisão com SHA-256 (`servicos._snapshot`), a comparação entre revisões
@@ -285,16 +285,16 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 
 | Teste do painel | Fase | Situação | No Jornada |
 |---|---|---|---|
-| `test_previa_do_openapi_nao_escreve_nada` | 9 | ⬜ |  |
-| `test_previa_marca_o_que_ja_existe` | 9 | ⬜ |  |
-| `test_importacao_marca_a_origem_e_cai_na_bandeja` | 9 | ⬜ |  |
-| `test_inventario_git_tambem_entra_na_bandeja` | 9 | ⬜ |  |
-| `test_tela_de_descobertas_mostra_previa_antes_de_gravar` | 9 | ⬜ |  |
-| `test_tela_de_descobertas_importa_ao_confirmar` | 9 | ⬜ |  |
-| `test_json_invalido_avisa_em_vez_de_quebrar` | 9 | ⬜ |  |
-| `test_triagem_aceita_e_descarta` | 9 | ⬜ |  |
-| `test_triagem_nao_toca_em_cadastro_humano` | 9 | ⬜ |  |
-| `test_triagem_recusa_acao_desconhecida` | 9 | ⬜ |  |
+| `test_previa_do_openapi_nao_escreve_nada` | 9 | ✅ | `PreviaDoOpenApiNaoEscreveNada` (`POST /v1/descobertas/previas`) |
+| `test_previa_marca_o_que_ja_existe` | 9 | ✅ | `PreviaMarcaOQueJaExiste`; a busca por tipo e nome é a porta `ObterPorNomeAsync`, com contrato nos dois adaptadores |
+| `test_importacao_marca_a_origem_e_cai_na_bandeja` | 9 | ✅ | `ImportacaoMarcaAOrigemECaiNaBandeja` (`POST /v1/descobertas/importacoes`): a API sob a aplicação, os endpoints sob a API |
+| `test_inventario_git_tambem_entra_na_bandeja` | 9 | ✅ | `InventarioGitTambemEntraNaBandeja` |
+| `test_tela_de_descobertas_mostra_previa_antes_de_gravar` | 9 | ✅ | `telas/Descobertas.test.tsx`: a prévia diz "nada foi gravado" e quantos a criar |
+| `test_tela_de_descobertas_importa_ao_confirmar` | 9 | ✅ | `telas/Descobertas.test.tsx`: o botão de importar só aparece depois da prévia |
+| `test_json_invalido_avisa_em_vez_de_quebrar` | 9 | ✅ | `JsonInvalidoAvisaEmVezDeQuebrar` (400 `CONTEUDO_INVALIDO`) e `telas/Descobertas.test.tsx` |
+| `test_triagem_aceita_e_descarta` | 9 | ✅ | `TriagemAceitaEDescarta` (`POST /v1/descobertas/triagem`): aceitar vira cadastro humano sem mexer no ciclo de vida; descartar arquiva |
+| `test_triagem_nao_toca_em_cadastro_humano` | 9 | ✅ | `TriagemNaoTocaEmCadastroHumano` |
+| `test_triagem_recusa_acao_desconhecida` | 9 | ✅ | `TriagemRecusaAcaoDesconhecida` (400 `ACAO_DE_TRIAGEM_INVALIDA`); quem não importa não tria |
 | `test_lote_cria_varias_e_ignora_as_existentes` | 3 | ✅ | `LoteCriaVariasEIgnoraAsExistentes` |
 | `test_lote_ignora_o_proprio_ativo` | 3 | ✅ | `LoteIgnoraOProprioAtivo` |
 | `test_tela_de_lote_marca_o_que_ja_existe` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |

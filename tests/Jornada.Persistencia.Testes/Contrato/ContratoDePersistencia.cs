@@ -612,6 +612,45 @@ public abstract class ContratoDePersistencia
         Verificar.Verdadeiro((await deFora.Preferencias.ObterAsync(pessoa)).QuerReceber(TiposDeNotificacao.RevisaoSubmetida, CanaisDeNotificacao.App));
     }
 
+    [Teste("o ativo é achado pelo tipo e nome, sem diferenciar maiúsculas, só na empresa")]
+    public async Task ObterPorNome()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var api = await Gravar(empresa, Novo(empresa, "api", "API-0001", "API Simulação"));
+        await Gravar(empresa, Novo(empresa, "sistema", "SIS-0001", "Outro"));
+        await using var s = Abrir(empresa);
+        Verificar.Igual(api.Id, (await s.Ativos.ObterPorNomeAsync("api", "  api simulação "))!.Id);
+        Verificar.Igual<Ativo?>(null, await s.Ativos.ObterPorNomeAsync("sistema", "API Simulação"), "outro tipo");
+        Verificar.Igual<Ativo?>(null, await s.Ativos.ObterPorNomeAsync("api", "API Cotação"));
+
+        var novo = Novo(empresa, "endpoint", "END-0001", "GET /simulacoes");
+        await s.Ativos.AdicionarAsync(novo);
+        Verificar.Igual(novo.Id, (await s.Ativos.ObterPorNomeAsync("endpoint", "GET /simulacoes"))!.Id, "a sessão enxerga o que ainda vai gravar");
+
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Igual<Ativo?>(null, await deFora.Ativos.ObterPorNomeAsync("api", "API Simulação"));
+    }
+
+    [Teste("a origem automática persiste, e a triagem que aceita grava manual")]
+    public async Task OrigemDaDescobertaPersiste()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var descoberto = Ativo.Rascunhar(empresa, Tipos.Obter("api"), CodigoDeAtivo.De("API-0001"), "API X", Relogio,
+            origem: OrigemDoAtivo.Automatica);
+        await Gravar(empresa, descoberto);
+        await using (var s = Abrir(empresa))
+        {
+            var lido = (await s.Ativos.ObterAsync(descoberto.Id))!;
+            Verificar.Igual(OrigemDoAtivo.Automatica, lido.Origem);
+            Verificar.Igual(1, (await s.Ativos.BuscarAsync(new FiltroDoCatalogo(Origem: OrigemDoAtivo.Automatica), 10)).Count);
+            lido.AceitarDescoberta(Relogio);
+            await s.Unidade.ConfirmarAsync();
+        }
+        await using var nova = Abrir(empresa);
+        Verificar.Igual(OrigemDoAtivo.Manual, (await nova.Ativos.ObterAsync(descoberto.Id))!.Origem);
+        Verificar.Vazio(await nova.Ativos.BuscarAsync(new FiltroDoCatalogo(Origem: OrigemDoAtivo.Automatica), 10));
+    }
+
     [Teste("cancelamento de etapa persiste")]
     public async Task CancelamentoPersiste()
     {

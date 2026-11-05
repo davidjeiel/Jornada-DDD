@@ -75,6 +75,13 @@ A escolha fica salva no seu navegador — ao voltar, você continua como a mesma
   próxima" marcado, a fila já abre a seguinte.
 - **Minha mesa** — o que você assumiu, a fila livre, os seus rascunhos e o que você
   submeteu e espera decisão.
+- **Descobertas** — traz APIs, endpoints e repositórios de um contrato OpenAPI (JSON) ou de
+  um inventário Git (lista JSON de nome, url e linguagem). Primeiro a **prévia**: o que
+  seria criado e o que já existe, sem gravar nada. Confirmada, a importação cria em
+  rascunho, com origem automática, sob a aplicação escolhida; o que já existe fica como
+  está. O que entrou vai para a **bandeja**, onde alguém aceita (o ativo segue em rascunho
+  e passa a ser cadastro de uma pessoa) ou descarta (arquiva, guardando a trilha).
+  Importar e triar é de tech lead, curador ou administrador.
 - **Notificações** — o sino no topo mostra quantos avisos você ainda não leu. Avisa:
   - quem pode decidir uma etapa, quando ela entra na fila (quem submeteu não é avisado);
   - quem submeteu, quando a revisão é rejeitada, com o parecer;

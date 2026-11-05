@@ -46,7 +46,7 @@ public sealed class Ativo : RaizDeAgregado
     public Guid? CriadoPor { get; private set; }
     public Criticidade Criticidade { get; private set; }
     public StatusCicloVida Status { get; private set; }
-    public OrigemDoAtivo Origem { get; }
+    public OrigemDoAtivo Origem { get; private set; }
     public int RevisaoAtual { get; private set; }
 
     /// <summary>
@@ -290,6 +290,19 @@ public sealed class Ativo : RaizDeAgregado
         FimVigencia = relogio.Hoje;
         Tocar(relogio);
         Registrar(new AtivoDescontinuado(Id, Empresa, motivo));
+    }
+
+    /// <summary>
+    /// Uma pessoa olhou o que a importação trouxe e o assume como cadastro
+    /// (<c>servicos.triar</c>, aceitar). Não mexe no ciclo de vida: o rascunho
+    /// segue rascunho, só sai da bandeja de descobertas.
+    /// </summary>
+    public void AceitarDescoberta(IRelogio relogio)
+    {
+        if (Origem != OrigemDoAtivo.Automatica)
+            throw new ErroDeDominio("NAO_E_DESCOBERTA", "Só um ativo descoberto pela importação é aceito na triagem.");
+        Origem = OrigemDoAtivo.Manual;
+        Tocar(relogio);
     }
 
     public void Arquivar(IRelogio relogio)

@@ -62,6 +62,9 @@ public static class CodigosDeErro
         ["TIPO_DE_NOTIFICACAO_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["CANAL_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["CANAL_INDISPONIVEL"] = StatusCodes.Status400BadRequest,
+        ["CONTEUDO_INVALIDO"] = StatusCodes.Status400BadRequest,
+        ["FONTE_INVALIDA"] = StatusCodes.Status400BadRequest,
+        ["ACAO_DE_TRIAGEM_INVALIDA"] = StatusCodes.Status400BadRequest,
 
         [EmpresaNaoIdentificada] = StatusCodes.Status401Unauthorized,
         // Sem pessoa, a pergunta é "quem é você?": 401, e a tela manda ao perfil.
