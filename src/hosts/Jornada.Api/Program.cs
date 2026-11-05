@@ -303,7 +303,7 @@ catalogo.MapPost("/ativos", async Task<Results<Created<AtivoCriadoResponse>, Jso
         corpo.Tipo, corpo.Nome, corpo.Descricao ?? "",
         CriticidadeExtensoes.De(corpo.Criticidade),
         corpo.IdPai is { } p ? new IdDeAtivo(p) : null,
-        corpo.Atributos), ct);
+        corpo.Atributos, corpo.IdSquad), ct);
 
     return r.Sucesso
         ? TypedResults.Created($"{metadados.PrefixoDasRotas}/ativos/{r.Valor.Valor}", new AtivoCriadoResponse(r.Valor.Valor))
@@ -333,7 +333,7 @@ catalogo.MapPut("/ativos/{id:guid}", async Task<Results<NoContent, JsonHttpResul
 {
     var r = await caso.ExecutarAsync(new ComandoEditarAtivo(
         new IdDeAtivo(id), corpo.Nome, corpo.Descricao ?? "",
-        CriticidadeExtensoes.De(corpo.Criticidade), corpo.Atributos), ct);
+        CriticidadeExtensoes.De(corpo.Criticidade), corpo.Atributos, corpo.IdSquad), ct);
 
     return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
 })
@@ -408,6 +408,23 @@ catalogo.MapGet("/metamodelo", async (IMetamodelo metamodelo, CancellationToken 
     .WithName("consultarMetamodelo")
     .WithSummary("Tipos de ativo, tipos de relação e mecanismos da empresa")
     .WithDescription("O que o assistente de cadastro e o formulário de relação leem: os campos de cada tipo, os destinos sugeridos para cada relação e os mecanismos.");
+
+// O rito antes de cadastrar: o assistente mostra o que o tipo e a criticidade vão exigir.
+v1.MapGroup("").WithTags(OpenApiCaixa.TagGovernanca).MapGet("/ritos", async Task<Results<Ok<RitoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, IPoliticasDeGovernanca politicas, IMetamodelo metamodelo, string tipo, CancellationToken ct, string? criticidade = null) =>
+{
+    var tipos = await metamodelo.ObterAsync(ct);
+    if (!tipos.Existe(tipo)) return Erro(http, "TIPO_DESCONHECIDO", $"Tipo de ativo desconhecido: {tipo}");
+    var crit = CriticidadeExtensoes.De(criticidade);
+    var politica = (await politicas.ObterAsync(ct)).Para(tipo, crit);
+    return TypedResults.Ok(new RitoResponse(tipo, tipos.Obter(tipo).Rotulo, politica.Criticidade,
+        politica.Etapas.Select(e => e.ToString().ToLowerInvariant()).ToArray(),
+        politica.EvidenciaMinima, politica.ScoreMinimo, politica.SlaHoras, politica.PeriodicidadeRevisaoDias));
+})
+    .WithName("consultarRito")
+    .WithSummary("O rito de publicação de um tipo, numa criticidade")
+    .WithDescription("Etapas de validação, evidências, score mínimo, prazo e periodicidade de revisão que a política aplica ao tipo e à criticidade (ausente vale media). criticidade na resposta é a da política aplicada: * quando a linha vale para qualquer criticidade.")
+    .ComErros(StatusCodes.Status400BadRequest);
 
 // ── governança ──────────────────────────────────────────────────────────────
 

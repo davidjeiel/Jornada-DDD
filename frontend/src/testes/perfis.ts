@@ -1,5 +1,5 @@
 // Perfis como a API devolve (GET /v1/perfil), para os testes das telas.
-import type { Perfil, Pleito } from '../api';
+import type { Metamodelo, Perfil, Pleito } from '../api';
 import { ROTULO_DO_PAPEL, type ChaveDePapel } from '../papeis';
 
 const BLOCOS: Record<ChaveDePapel, string[]> = {
@@ -36,3 +36,15 @@ export function pleito(dados: Partial<Pleito> = {}): Pleito {
     ...dados,
   };
 }
+
+/** Um metamodelo com um tipo de cada bloco e uma hierarquia curta, para os testes do assistente. */
+export const metamodeloDeTeste: Metamodelo = {
+  tipos: [
+    { chave: 'dominio', rotulo: 'Domínio', bloco: 'Estrutura DDD', pai: null, campos: [{ nome: 'visao', rotulo: 'Visão de negócio', tipo: 'area', obrigatorio: true, opcoes: [] }, { nome: 'forum', rotulo: 'Fórum', tipo: 'texto', obrigatorio: false, opcoes: [] }] },
+    { chave: 'subdominio', rotulo: 'Subdomínio', bloco: 'Estrutura DDD', pai: 'dominio', campos: [{ nome: 'classificacao', rotulo: 'Classificação', tipo: 'selecao', obrigatorio: true, opcoes: ['core', 'suporte', 'genérico'] }] },
+    { chave: 'sistema', rotulo: 'Sistema', bloco: 'Ativos técnicos', pai: null, campos: [] },
+    { chave: 'api', rotulo: 'API', bloco: 'Ativos técnicos', pai: null, campos: [] },
+  ],
+  relacoes: [],
+  mecanismos: [],
+};

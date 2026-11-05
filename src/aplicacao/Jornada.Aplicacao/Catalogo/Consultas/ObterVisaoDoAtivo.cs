@@ -31,6 +31,7 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
         string Criticidade,
         string Descricao,
         int RevisaoAtual,
+        Guid? IdSquad,
         IReadOnlyList<Ancestral> Trilha,
         IReadOnlyDictionary<string, string> Atributos,
         IReadOnlyList<EvidenciaResumo> Evidencias,
@@ -69,6 +70,7 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
             ativo.Criticidade.Chave(),
             ativo.Descricao,
             ativo.RevisaoAtual,
+            ativo.IdSquad,
             // De servicos.trilha: da raiz até o pai direto, sem o próprio ativo. Raiz: vazia.
             trilha.Where(a => a.Id != ativo.Id).Select(a => new Ancestral(a.Id, a.Codigo.Valor, a.Nome, a.TipoItem)).ToArray(),
             ativo.Atributos,

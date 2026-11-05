@@ -14,7 +14,8 @@ public sealed record PleitoLegivel(PleitoDeAcesso Pleito, Pessoa? Pessoa, string
 internal static class Legibilidade
 {
     /// <summary>"dominio #1" não diz nada a quem lê; o nome do domínio, sim. De <c>acesso.rotulo_escopo</c>.</summary>
-    public static async Task<string> EscopoAsync(IRepositorioDeAtivos ativos, TipoDeEscopo tipo, Guid? id, CancellationToken ct)
+    public static async Task<string> EscopoAsync(
+        IRepositorioDeAtivos ativos, IRepositorioDeSquads squads, TipoDeEscopo tipo, Guid? id, CancellationToken ct)
     {
         if (tipo == TipoDeEscopo.Empresa || id is null) return "todo o catálogo";
         if (tipo == TipoDeEscopo.Dominio)
@@ -22,13 +23,18 @@ internal static class Legibilidade
             var dominio = await ativos.ObterAsync(new IdDeAtivo(id.Value), ct);
             return dominio is null ? $"domínio {id.Value.ToString()[..8]}" : $"domínio {dominio.Nome}";
         }
+        if (tipo == TipoDeEscopo.Squad)
+        {
+            var squad = await squads.ObterAsync(id.Value, ct);
+            return squad is null ? $"squad {id.Value.ToString()[..8]}" : $"squad {squad.Sigla}";
+        }
         return $"{tipo.ToString().ToLowerInvariant()} {id.Value.ToString()[..8]}";
     }
 
     public static async Task<PleitoLegivel> PleitoAsync(
-        IRepositorioDeAtivos ativos, IRepositorioDePessoas pessoas, PleitoDeAcesso pleito, CancellationToken ct) =>
+        IRepositorioDeAtivos ativos, IRepositorioDeSquads squads, IRepositorioDePessoas pessoas, PleitoDeAcesso pleito, CancellationToken ct) =>
         new(pleito, await pessoas.ObterAsync(pleito.IdPessoa, ct),
-            pleito.EscopoTipo is { } tipo ? await EscopoAsync(ativos, tipo, pleito.EscopoId, ct) : null);
+            pleito.EscopoTipo is { } tipo ? await EscopoAsync(ativos, squads, tipo, pleito.EscopoId, ct) : null);
 }
 
 /// <summary>
@@ -39,6 +45,7 @@ public sealed class ConsultarPerfil(
     IRepositorioDePessoas pessoas,
     IRepositorioDePleitos pleitos,
     IRepositorioDeAtivos ativos,
+    IRepositorioDeSquads squads,
     IAtorAtual atorAtual,
     IRelogio relogio)
 {
@@ -60,13 +67,13 @@ public sealed class ConsultarPerfil(
 
         var papeis = new List<PapelLegivel>();
         foreach (var a in ator.Atribuicoes.Where(a => a.Vigente(hoje)).OrderBy(a => a.Papel))
-            papeis.Add(new PapelLegivel(a, await Legibilidade.EscopoAsync(ativos, a.EscopoTipo, a.EscopoId, ct),
+            papeis.Add(new PapelLegivel(a, await Legibilidade.EscopoAsync(ativos, squads, a.EscopoTipo, a.EscopoId, ct),
                 PoliticaDeAutorizacao.BlocosDoPapel(a.Papel)));
 
         var meus = new List<PleitoLegivel>();
         if (pessoa is not null)
             foreach (var p in (await pleitos.ListarAsync(idPessoa: pessoa.Id, ct: ct)).OrderByDescending(p => p.CriadoEm))
-                meus.Add(await Legibilidade.PleitoAsync(ativos, pessoas, p, ct));
+                meus.Add(await Legibilidade.PleitoAsync(ativos, squads, pessoas, p, ct));
 
         // Em modo de leitura nada escreve, nem a concessão: o menu de quem
         // concede some junto, como o pode() dos templates do painel.
@@ -83,6 +90,7 @@ public sealed class ListarPleitos(
     IRepositorioDePleitos pleitos,
     IRepositorioDePessoas pessoas,
     IRepositorioDeAtivos ativos,
+    IRepositorioDeSquads squads,
     IAtorAtual atorAtual,
     IRelogio relogio)
 {
@@ -97,7 +105,7 @@ public sealed class ListarPleitos(
 
         var lista = new List<PleitoLegivel>();
         foreach (var p in await pleitos.ListarAsync(status, ct: ct))
-            lista.Add(await Legibilidade.PleitoAsync(ativos, pessoas, p, ct));
+            lista.Add(await Legibilidade.PleitoAsync(ativos, squads, pessoas, p, ct));
 
         return Resultado<Saida>.Ok(new Saida(lista, lista.Count(p => p.Pleito.Status == StatusDoPleito.Pendente),
             PoliticaDeAutorizacao.PodeConceder(ator, Papel.Admin, relogio.Hoje).Permitido));

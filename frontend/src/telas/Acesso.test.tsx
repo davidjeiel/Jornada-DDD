@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { identidadeInicial } from '../identidade';
-import { perfilDe, pleito } from '../testes/perfis';
+import { metamodeloDeTeste, perfilDe, pleito } from '../testes/perfis';
 import { NovoAtivo } from './NovoAtivo';
 import { Perfil } from './Perfil';
 import { FilaDePleitos } from './Pleitos';
@@ -14,7 +14,7 @@ const assincrono = async () => {};
 
 function novoAtivo(blocos: string[], opcoes: { identificado?: boolean; modoLeitura?: boolean } = {}) {
   return renderToStaticMarkup(
-    <NovoAtivo ativos={[]} blocos={blocos} identificado={opcoes.identificado ?? true} modoLeitura={opcoes.modoLeitura ?? false}
+    <NovoAtivo ativos={[]} metamodelo={metamodeloDeTeste} squads={[]} blocos={blocos} identificado={opcoes.identificado ?? true} modoLeitura={opcoes.modoLeitura ?? false}
       onCadastrado={assincrono} onErro={nada} />,
   );
 }
@@ -89,5 +89,18 @@ describe('novo ativo', () => {
     expect(html).toContain('modo de leitura');
     expect(html).toContain('href="/perfil"');
     expect(html).not.toMatch(/<form\b/);
+  });
+});
+
+describe('escopo de squad', () => {
+  it('a fila oferece conceder nos ativos de um squad, só com squads ativos', () => {
+    const html = renderToStaticMarkup(
+      <FilaDePleitos fila={{ total: 1, pendentes: 1, podeConcederAdmin: false, pleitos: [pleito()] }} dominios={[]}
+        squads={[{ id: 'sq-1', sigla: 'CRED', titulo: 'Squad Crédito', descricao: 'x', ativa: true }, { id: 'sq-2', sigla: 'OLD', titulo: 'Antiga', descricao: 'x', ativa: false }]}
+        decidindo={null} onDecidir={nada} />,
+    );
+    expect(html).toContain('value="squad"');
+    expect(html).toContain('CRED · Squad Crédito');
+    expect(html).not.toContain('Antiga');
   });
 });

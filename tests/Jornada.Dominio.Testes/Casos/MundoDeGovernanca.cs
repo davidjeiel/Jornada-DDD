@@ -23,6 +23,7 @@ internal sealed class MundoDeGovernanca
     private readonly PoliticasPadrao _politicas = new();
 
     public RepositorioDeAtivosEmMemoria Repo => new(_armazem, _tenant);
+    public RepositorioDeAcessoEmMemoria Squads => new(_armazem, _tenant);
 
     public Ativo Ativo(IdDeAtivo id) => Repo.ObterAsync(id).Result!;
 
@@ -63,7 +64,7 @@ internal sealed class MundoDeGovernanca
             Repo, Repo, Cenario.Relogio).ExecutarAsync(new ComandoDecidirValidacao(validacao, aprovada, "teste")).Result);
 
     public Aplicacao.Resultado<bool> Editar(IdDeAtivo id, string nome) =>
-        new EditarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(Curador), Repo, Repo, Cenario.Relogio)
+        new EditarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(Curador), Repo, Repo, Squads, Cenario.Relogio)
             .ExecutarAsync(new ComandoEditarAtivo(id, nome, "Sistema central de contas e lançamentos.",
                 Criticidade.Media, null)).Result;
 
@@ -92,7 +93,7 @@ internal sealed class MundoDeGovernanca
     private IdDeAtivo Cadastrar(string tipo, string nome, Dictionary<string, string> atributos,
                                 PapelDeOwnership owner)
     {
-        var r = new CadastrarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(Curador), Repo, Repo, Cenario.Relogio)
+        var r = new CadastrarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(Curador), Repo, Repo, Squads, Cenario.Relogio)
             .ExecutarAsync(new ComandoCadastrarAtivo(tipo, nome, "Descrição completa do ativo.",
                 Criticidade.Media, null, atributos)).Result;
         Exigir(r);

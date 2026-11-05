@@ -36,10 +36,10 @@ original no título, para facilitar a busca.
   comando (`flask conceder`). No Jornada ele sai da configuração
   `Acesso:AdministradoresIniciais`: a matrícula listada que pleitear admin numa
   empresa sem admin é aprovada na hora (ADR-0018).
-- **Escopo de concessão.** O painel concede em `global`, `dominio` ou `squad`.
-  No Jornada, por enquanto, em `empresa` (o antigo global) ou `dominio`. O
-  cadastro de squads e a pessoa ligada ao squad já existem; o escopo de squad
-  precisa que o ativo tenha squad, o que chega com a ficha (fase 3).
+- **Escopo de concessão.** Como no painel, em `empresa` (o antigo `global`),
+  `dominio` ou `squad`. O papel de squad vale nos ativos daquele squad; squad
+  inativo não recebe ativo novo nem concessão nova, mas os vínculos que já
+  existem continuam valendo.
 - **Gestão de acessos.** No painel, salvar o cadastro troca todos os papéis por
   um papel na empresa inteira, e um papel de domínio some sem ninguém pedir. No
   Jornada a correção dos dados e os papéis são operações separadas: concede-se e
@@ -85,9 +85,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 95 |
-| 🟡 parcial | 6 |
-| ⬜ pendente | 51 |
+| ✅ coberto | 98 |
+| 🟡 parcial | 4 |
+| ⬜ pendente | 50 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -99,7 +99,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | 0 | Fundação, mais o que o domínio já cobria | 29 | 0 | 0 |
 | 1 | Ciclo de vida | 4 | 0 | 0 |
 | 2 | Pessoas e acesso | 43 | 2 | 0 |
-| 3 | Ficha e cadastro | 19 | 2 | 1 |
+| 3 | Ficha e cadastro | 22 | 0 | 0 |
 | 4 | Validação e mesa | 0 | 0 | 8 |
 | 5 | Catálogo e busca | 0 | 1 | 11 |
 | 6 | Mapas e grafo | 0 | 0 | 12 |
@@ -231,7 +231,7 @@ tipo antecipado, o squad do ativo e o escopo de papel por squad.
 | `test_checklist_fica_completo_quando_o_precheck_aprova` | 3 | ✅ | `ChecklistFicaCompletoQuandoOPreCheckAprova` |
 | `test_todo_bloqueio_do_precheck_cai_em_algum_passo` — O checklist não pode esconder um impedimento que a submissão vai levantar. | 0 | ✅ | `ChecklistDerivaDoPreCheck` |
 | `test_checklist_aparece_no_rascunho_e_some_no_publicado` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |
-| `test_wizard_antecipa_o_rito_do_tipo` | 3 | ⬜ |  |
+| `test_wizard_antecipa_o_rito_do_tipo` | 3 | ✅ | `telas/NovoAtivo.test.tsx`: o rito vem de `GET /v1/ritos?tipo=&criticidade=` e aparece ao lado do formulário |
 | `test_painel_do_validador_mostra_evidencias_e_responsaveis` | 4 | ⬜ |  |
 | `test_painel_mostra_o_que_mudou_na_segunda_revisao` | 4 | ⬜ |  |
 | `test_decidir_preserva_a_etapa_e_segue_para_a_proxima` | 4 | ⬜ |  |
@@ -265,8 +265,8 @@ tipo antecipado, o squad do ativo e o escopo de papel por squad.
 | `test_kpis_do_painel_levam_ao_recorte` | 7 | ⬜ |  |
 | `test_queda_de_pendencia_e_lida_como_melhora` — Cair é bom em 'sem responsável': a cor tem de acompanhar o sentido. | 7 | ⬜ |  |
 | `test_variacao_compara_as_duas_ultimas_competencias` | 7 | ⬜ |  |
-| `test_wizard_devolve_o_que_foi_digitado_apos_erro` | 3 | 🟡 | O formulário de novo ativo mantém o que foi digitado após erro; o assistente chega na fase 3. |
-| `test_wizard_preserva_o_pai_escolhido_apos_erro` | 3 | 🟡 | Idem. |
+| `test_wizard_devolve_o_que_foi_digitado_apos_erro` | 3 | ✅ | `telas/NovoAtivo.test.tsx`: o formulário é controlado e a recusa não o limpa (campos do tipo, criticidade, squad e descrição) |
+| `test_wizard_preserva_o_pai_escolhido_apos_erro` | 3 | ✅ | `telas/NovoAtivo.test.tsx` |
 
 ### Escala: descoberta, paginação, mapas — `tests/test_escala.py` (27)
 

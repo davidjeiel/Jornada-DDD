@@ -240,7 +240,7 @@ internal sealed class MundoDeGestao
     public void Responsavel(Guid idPessoa)
     {
         var meta = new MetamodeloPadrao();
-        var id = Exigir(new CadastrarAtivo(Repo, meta, _tenant, new AtorFixo(MundoDeAcesso.Curador), Repo, Repo, Cenario.Relogio)
+        var id = Exigir(new CadastrarAtivo(Repo, meta, _tenant, new AtorFixo(MundoDeAcesso.Curador), Repo, Repo, Acesso, Cenario.Relogio)
             .ExecutarAsync(new ComandoCadastrarAtivo("sistema", $"Sistema {idPessoa:N}", "x")).Result);
         Exigir(new AtribuirResponsavel(Repo, meta, _tenant, new AtorFixo(MundoDeAcesso.Curador), Repo, Repo, Cenario.Relogio)
             .ExecutarAsync(new ComandoAtribuirResponsavel(id, idPessoa, PapelDeOwnership.OwnerTecnico)).Result);

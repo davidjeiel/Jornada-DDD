@@ -21,7 +21,8 @@ public sealed record ComandoCadastrarAtivo(
     string Descricao = "",
     Criticidade Criticidade = Criticidade.Media,
     IdDeAtivo? IdPai = null,
-    IReadOnlyDictionary<string, string>? Atributos = null);
+    IReadOnlyDictionary<string, string>? Atributos = null,
+    Guid? IdSquad = null);
 
 public sealed class CadastrarAtivo(
     IRepositorioDeAtivos ativos,
@@ -30,6 +31,7 @@ public sealed class CadastrarAtivo(
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
     ITrilhaDeAuditoria trilha,
+    IRepositorioDeSquads squads,
     IRelogio relogio)
 {
     public async Task<Resultado<IdDeAtivo>> ExecutarAsync(
@@ -46,7 +48,7 @@ public sealed class CadastrarAtivo(
 
         // Autorização ANTES de qualquer escrita. O alvo carrega o bloco do tipo,
         // que é o que impede alguém de negócio cadastrar um endpoint.
-        var alvo = await AlvoDoAtivo.DoCadastroAsync(ativos, contexto, tipo, cmd.IdPai, ct);
+        var alvo = await AlvoDoAtivo.DoCadastroAsync(ativos, contexto, tipo, cmd.IdPai, ct) with { IdSquad = cmd.IdSquad };
 
         if (!PoliticaDeAutorizacao.Pode(ator, Acao.Cadastrar, alvo, relogio.Hoje))
             return Recusa.Para<IdDeAtivo>(ator, $"Sem permissão para cadastrar ativos do bloco '{tipo.Bloco}'.");
@@ -64,12 +66,15 @@ public sealed class CadastrarAtivo(
                     $"e não de '{pai.TipoItem}'.");
         }
 
+        if (await AlvoDoAtivo.ConferirSquadAsync(squads, cmd.IdSquad, ct) is { } recusa)
+            return Resultado<IdDeAtivo>.Recusado(recusa.Codigo, recusa.Mensagem);
+
         var sequencial = await ativos.ProximoSequencialAsync(tipo.Chave, ct);
         var codigo = CodigoDeAtivo.Gerar(tipo.Prefixo, sequencial);
 
         var ativo = Ativo.Rascunhar(
             contexto.Empresa, tipo, codigo, cmd.Nome, relogio,
-            cmd.Descricao, cmd.Criticidade, cmd.IdPai, contexto.Unidade, cmd.Atributos);
+            cmd.Descricao, cmd.Criticidade, cmd.IdPai, contexto.Unidade, cmd.Atributos, idSquad: cmd.IdSquad);
 
         await ativos.AdicionarAsync(ativo, ct);
         await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.Criar, ator.IdPessoa, relogio,

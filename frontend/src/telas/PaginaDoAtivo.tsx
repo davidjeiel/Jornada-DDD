@@ -4,7 +4,7 @@ import {
   abrirRevisao, analisarImpacto, anexarEvidencia, arquivarAtivo, atribuirResponsavel, avaliarPreCheck, compararRevisoes,
   consultarHistorico, descontinuarAtivo, editarAtivo, obterAtivo, relacionarAtivos, submeterAtivo,
   type Ancestral, type AtivoResumo, type Comparacao, type FichaDoAtivo as Ficha, type Historico as DadosDoHistorico,
-  type Impacto, type Metamodelo, type NovaRelacao, type Pessoa, type PreCheck,
+  type Impacto, type Metamodelo, type NovaRelacao, type Pessoa, type PreCheck, type Squad,
 } from '../api';
 import { Criticidade, Status } from '../componentes';
 import { Link } from '../roteador';
@@ -181,7 +181,7 @@ export function FormularioDeRelacao({ id, ativos, metamodelo, ocupado, onRelacio
 // ── a visão inteira ──────────────────────────────────────────────────────
 
 export type Acoes = {
-  editar: (dados: { nome: string; descricao: string; criticidade: string; atributos: Record<string, string> }) => void;
+  editar: (dados: { nome: string; descricao: string; criticidade: string; atributos: Record<string, string>; idSquad: string | null }) => void;
   submeter: () => void;
   abrirRevisao: () => void;
   atribuir: (idPessoa: string, papel: string) => void;
@@ -199,6 +199,7 @@ type PropsDaVisao = {
   ativos: AtivoResumo[];
   pessoas: Pessoa[];
   metamodelo: Metamodelo | null;
+  squads: Squad[];
   historico: DadosDoHistorico | null;
   comparacao: Comparacao | null;
   impacto: Impacto | null;
@@ -260,7 +261,8 @@ export function VisaoDoAtivo(props: PropsDaVisao) {
   );
 }
 
-function Resumo({ ficha, preCheck, podeEscrever, ocupado, acoes, metamodelo }: PropsDaVisao) {
+function Resumo({ ficha, preCheck, podeEscrever, ocupado, acoes, metamodelo, squads }: PropsDaVisao) {
+  const squad = squads.find((s) => s.id === ficha.idSquad);
   const campos = metamodelo?.tipos.find((t) => t.chave === ficha.tipoItem)?.campos ?? [];
   const rotuloDoCampo = (chave: string) => campos.find((c) => c.nome === chave)?.rotulo ?? chave;
   const chaves = [...new Set([...campos.map((c) => c.nome), ...Object.keys(ficha.atributos)])].filter((c) => c !== 'origem');
@@ -271,6 +273,7 @@ function Resumo({ ficha, preCheck, podeEscrever, ocupado, acoes, metamodelo }: P
     acoes.editar({
       nome: d.get('nome')?.toString() ?? '', descricao: d.get('descricao')?.toString() ?? '', criticidade: d.get('criticidade')?.toString() ?? 'media',
       atributos: Object.fromEntries(chaves.map((c) => [c, d.get(`attr_${c}`)?.toString() ?? ''])),
+      idSquad: d.get('id_squad')?.toString() || null,
     });
   }
 
@@ -282,6 +285,12 @@ function Resumo({ ficha, preCheck, podeEscrever, ocupado, acoes, metamodelo }: P
             <label>Nome<input name="nome" required defaultValue={ficha.nome} /></label>
             <label>Criticidade
               <select name="criticidade" defaultValue={ficha.criticidade}><option value="baixa">baixa</option><option value="media">média</option><option value="alta">alta</option><option value="critica">crítica</option></select>
+            </label>
+            <label>Squad
+              <select name="id_squad" defaultValue={ficha.idSquad ?? ''}>
+                <option value="">sem squad</option>
+                {squads.filter((s) => s.ativa || s.id === ficha.idSquad).map((s) => <option key={s.id} value={s.id}>{s.sigla} · {s.titulo}</option>)}
+              </select>
             </label>
             <label>Descrição<textarea name="descricao" rows={3} required defaultValue={ficha.descricao} /></label>
             {chaves.map((c) => {
@@ -299,6 +308,7 @@ function Resumo({ ficha, preCheck, podeEscrever, ocupado, acoes, metamodelo }: P
         ) : (
           <dl className="dados-do-ativo">
             <div><dt>Descrição</dt><dd>{ficha.descricao || '—'}</dd></div>
+            <div><dt>Squad</dt><dd>{squad ? `${squad.sigla} · ${squad.titulo}` : '—'}</dd></div>
             {chaves.map((c) => <div key={c}><dt>{rotuloDoCampo(c)}</dt><dd>{ficha.atributos[c] || '—'}</dd></div>)}
             <div><dt>Revisão</dt><dd>#{ficha.revisaoAtual}</dd></div>
           </dl>
@@ -431,6 +441,7 @@ type Props = {
   ativos: AtivoResumo[];
   pessoas: Pessoa[];
   metamodelo: Metamodelo | null;
+  squads: Squad[];
   podeEscrever: boolean;
   podeDescontinuar: boolean;
   idPessoa: string | null;
@@ -438,7 +449,7 @@ type Props = {
   onErro: (mensagem: string) => void;
 };
 
-export function PaginaDoAtivo({ id, aba, ativos, pessoas, metamodelo, podeEscrever, podeDescontinuar, idPessoa, onAlterado, onErro }: Props) {
+export function PaginaDoAtivo({ id, aba, ativos, pessoas, metamodelo, squads, podeEscrever, podeDescontinuar, idPessoa, onAlterado, onErro }: Props) {
   const [ficha, setFicha] = useState<Ficha | null>(null);
   const [preCheck, setPreCheck] = useState<PreCheck | null>(null);
   const [impacto, setImpacto] = useState<Impacto | null>(null);
@@ -496,7 +507,7 @@ export function PaginaDoAtivo({ id, aba, ativos, pessoas, metamodelo, podeEscrev
   };
 
   return (
-    <VisaoDoAtivo ficha={ficha} preCheck={preCheck} aba={aba} ativos={ativos} pessoas={pessoas} metamodelo={metamodelo}
+    <VisaoDoAtivo ficha={ficha} preCheck={preCheck} aba={aba} ativos={ativos} pessoas={pessoas} metamodelo={metamodelo} squads={squads}
       historico={historico} comparacao={comparacao} impacto={impacto} podeEscrever={podeEscrever} podeDescontinuar={podeDescontinuar}
       idPessoa={idPessoa} ocupado={ocupado} acoes={acoes} onErro={onErro} />
   );

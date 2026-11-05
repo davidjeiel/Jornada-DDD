@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  consultarMetamodelo, consultarPerfil, definirAoFaltarIdentificacao, definirIdentidade, listarAtivos, listarPessoas, listarValidacoes, obterIdentidade,
-  type AtivoResumo, type Metamodelo, type Perfil as DadosDoPerfil, type Pessoa, type Validacao,
+  consultarMetamodelo, consultarPerfil, definirAoFaltarIdentificacao, definirIdentidade, listarAtivos, listarPessoas, listarSquads, listarValidacoes, obterIdentidade,
+  type AtivoResumo, type Metamodelo, type Perfil as DadosDoPerfil, type Pessoa, type Squad, type Validacao,
 } from './api';
 import { Erro } from './componentes';
 import { gravarIdentidade, type Identidade } from './identidade';
@@ -39,6 +39,7 @@ function App() {
   const [ativos, setAtivos] = useState<AtivoResumo[]>([]);
   const [validacoes, setValidacoes] = useState<Validacao[]>([]);
   const [metamodelo, setMetamodelo] = useState<Metamodelo | null>(null);
+  const [squads, setSquads] = useState<Squad[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
 
@@ -76,7 +77,8 @@ function App() {
 
   async function carregarPerfil() {
     try {
-      const [eu, lista] = await Promise.all([consultarPerfil(), listarPessoas()]);
+      const [eu, lista, times] = await Promise.all([consultarPerfil(), listarPessoas(), listarSquads().catch(() => ({ squads: [] as Squad[] }))]);
+      setSquads(times.squads);
       registrarPessoas(lista.pessoas);
       setPessoas(lista.pessoas);
       setPerfil(eu);
@@ -141,7 +143,7 @@ function App() {
     const [, idDoAtivo, lote] = rotaDoAtivo;
     tela = lote
       ? <RelacoesEmLote id={idDoAtivo} tipo={local.busca.get('tipo') ?? ''} ativos={ativos} metamodelo={metamodelo} onAlterado={carregar} onErro={setErro} />
-      : <PaginaDoAtivo key={idDoAtivo} id={idDoAtivo} aba={abaDaUrl(local.busca.get('aba'))} ativos={ativos} pessoas={pessoas} metamodelo={metamodelo}
+      : <PaginaDoAtivo key={idDoAtivo} id={idDoAtivo} aba={abaDaUrl(local.busca.get('aba'))} ativos={ativos} pessoas={pessoas} metamodelo={metamodelo} squads={squads}
           podeEscrever={podeEscrever} podeDescontinuar={podeEscrever && podeDescontinuar(papeis)} idPessoa={perfil?.pessoa?.id ?? null}
           onAlterado={carregar} onErro={setErro} />;
   } else if (item?.fase !== undefined) {
@@ -155,7 +157,10 @@ function App() {
         tela = <Catalogo ativos={ativos} carregando={carregando} termo={local.busca.get('termo') ?? ''} idSelecionado={local.busca.get('ativo')} papeis={papeis} idPessoa={perfil?.pessoa?.id ?? null} podeEscrever={podeEscrever} onAlterado={carregar} onErro={setErro} />;
         break;
       case 'novo':
-        tela = <NovoAtivo key={blocos.join('|')} ativos={ativos} blocos={blocos} identificado={!!perfil?.identificado} modoLeitura={!!perfil?.modoLeitura} onCadastrado={carregar} onErro={setErro} />;
+        tela = <NovoAtivo key={`${blocos.join('|')}-${metamodelo ? 'm' : ''}`} ativos={ativos} metamodelo={metamodelo} squads={squads} blocos={blocos}
+          identificado={!!perfil?.identificado} modoLeitura={!!perfil?.modoLeitura}
+          tipoInicial={local.busca.get('tipo') ?? undefined} criticidadeInicial={local.busca.get('criticidade') ?? undefined}
+          onCadastrado={carregar} onErro={setErro} />;
         break;
       case 'validacoes':
         tela = <Validacoes validacoes={validacoes} ativos={ativos} podeDecidir={podeDecidir} onAlterado={carregar} onErro={setErro} />;

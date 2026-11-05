@@ -44,7 +44,8 @@ só no ambiente local.
 - **Escopo de domínio de verdade.** `AlvoDoAtivo` sobe a hierarquia até o
   domínio, como o `_dominio_do_item` do painel, e todo caso de uso passa a
   montar o alvo por ali. No cadastro, o domínio é o do pai. A concessão aceita
-  escopo `empresa` ou `dominio`; `squad` chega com o cadastro de squads.
+  escopo `empresa`, `dominio` ou `squad`; o de squad vale nos ativos cujo squad
+  é aquele (`Ativo.IdSquad`, desde a fase 3).
 - **`X-Papel` só em demonstração.** Com `Acesso:ModoDemonstracao=true`, o
   `X-Papel` substitui os papéis concedidos, para curl e apresentações. O
   `local/compose.yaml` liga o modo; o `appsettings.json` o deixa desligado.

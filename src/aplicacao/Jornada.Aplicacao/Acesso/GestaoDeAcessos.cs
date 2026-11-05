@@ -177,14 +177,13 @@ public sealed class GestaoDeAcessos(
         if (!PapelExtensoes.TentarDe(papel, out var p))
             throw new ErroDeDominio("PAPEL_INVALIDO", $"Papel desconhecido: {papel}.");
         var escopo = Escopos.De(escopoTipo)
-            ?? throw new ErroDeDominio("ESCOPO_INVALIDO", $"Escopo desconhecido: {escopoTipo}. Use empresa ou dominio.");
-        if (escopo == TipoDeEscopo.Dominio)
-        {
-            if (escopoId is null)
-                throw new ErroDeDominio("ESCOPO_SEM_ALVO", "O escopo dominio exige um alvo.");
-            if (conferirDominio && !await Escopos.EhDominioAsync(ativos, escopoId.Value, ct))
-                throw new ErroDeDominio("ESCOPO_INVALIDO", "O escopo de domínio tem de apontar para um domínio do catálogo.");
-        }
+            ?? throw new ErroDeDominio("ESCOPO_INVALIDO", $"Escopo desconhecido: {escopoTipo}. Use empresa, dominio ou squad.");
+        if (escopo != TipoDeEscopo.Empresa && escopoId is null)
+            throw new ErroDeDominio("ESCOPO_SEM_ALVO", $"O escopo {escopo.ToString().ToLowerInvariant()} exige um alvo.");
+        if (conferirDominio && escopo == TipoDeEscopo.Dominio && !await Escopos.EhDominioAsync(ativos, escopoId!.Value, ct))
+            throw new ErroDeDominio("ESCOPO_INVALIDO", "O escopo de domínio tem de apontar para um domínio do catálogo.");
+        if (conferirDominio && escopo == TipoDeEscopo.Squad && !await Escopos.EhSquadAtivaAsync(squads, escopoId!.Value, ct))
+            throw new ErroDeDominio("ESCOPO_INVALIDO", "O escopo de squad tem de apontar para uma squad ativa.");
         return (p, escopo);
     }
 
@@ -201,7 +200,7 @@ public sealed class GestaoDeAcessos(
     {
         var papeis = new List<PapelLegivel>();
         foreach (var a in pessoa.Vigentes(relogio.Hoje).OrderBy(a => a.Papel))
-            papeis.Add(new PapelLegivel(a, await Legibilidade.EscopoAsync(ativos, a.EscopoTipo, a.EscopoId, ct),
+            papeis.Add(new PapelLegivel(a, await Legibilidade.EscopoAsync(ativos, squads, a.EscopoTipo, a.EscopoId, ct),
                 PoliticaDeAutorizacao.BlocosDoPapel(a.Papel)));
         return new CadastroLegivel(pessoa, papeis, squad);
     }
@@ -217,8 +216,12 @@ internal static class Escopos
     {
         "" or "empresa" or "global" => TipoDeEscopo.Empresa,
         "dominio" => TipoDeEscopo.Dominio,
+        "squad" => TipoDeEscopo.Squad,
         _ => null,
     };
+
+    public static async Task<bool> EhSquadAtivaAsync(IRepositorioDeSquads squads, Guid id, CancellationToken ct) =>
+        await squads.ObterAsync(id, ct) is { Ativa: true };
 
     public static async Task<bool> EhDominioAsync(IRepositorioDeAtivos ativos, Guid id, CancellationToken ct) =>
         await ativos.ObterAsync(new Dominio.Catalogo.IdDeAtivo(id), ct) is { } a

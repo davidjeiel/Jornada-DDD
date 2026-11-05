@@ -2507,6 +2507,83 @@ paths:
         - Bearer: [ ]
         - X-Empresa: [ ]
           X-Pessoa: [ ]
+  /v1/ritos:
+    get:
+      tags:
+        - Governança
+      summary: 'O rito de publicação de um tipo, numa criticidade'
+      description: 'Etapas de validação, evidências, score mínimo, prazo e periodicidade de revisão que a política aplica ao tipo e à criticidade (ausente vale media). criticidade na resposta é a da política aplicada: * quando a linha vale para qualquer criticidade.'
+      operationId: consultarRito
+      parameters:
+        - name: tipo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: criticidade
+          in: query
+          schema:
+            type: string
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RitoResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   '/v1/ativos/{id}/pre-check':
     get:
       tags:
@@ -3797,6 +3874,11 @@ components:
           nullable: true
           example:
             plataforma: mainframe
+        idSquad:
+          type: string
+          description: O squad que cuida do ativo. Tem de estar ativo.
+          format: uuid
+          nullable: true
       additionalProperties: false
       description: Cadastro de um ativo novo. Ele nasce em rascunho.
     CadastroResponse:
@@ -4107,6 +4189,11 @@ components:
           nullable: true
           example:
             plataforma: mainframe
+        idSquad:
+          type: string
+          description: O squad que cuida do ativo; ausente ou nulo tira o ativo do squad (PUT substitui).
+          format: uuid
+          nullable: true
       additionalProperties: false
       description: 'Estado completo dos campos editáveis (PUT substitui, não mescla).'
     ErroDoLoteResponse:
@@ -4186,6 +4273,11 @@ components:
           type: integer
           description: Número da revisão corrente.
           format: int32
+        idSquad:
+          type: string
+          description: O squad que cuida do ativo; nulo sem squad.
+          format: uuid
+          nullable: true
         trilha:
           type: array
           items:

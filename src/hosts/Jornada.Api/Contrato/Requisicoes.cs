@@ -32,6 +32,9 @@ public sealed record CadastrarAtivoRequest
     /// <summary>Campos específicos do tipo, declarados no metamodelo.</summary>
     /// <example>{"plataforma": "mainframe"}</example>
     public Dictionary<string, string>? Atributos { get; init; }
+
+    /// <summary>O squad que cuida do ativo. Tem de estar ativo.</summary>
+    public Guid? IdSquad { get; init; }
 }
 
 /// <summary>Estado completo dos campos editáveis (PUT substitui, não mescla).</summary>
@@ -49,6 +52,9 @@ public sealed record EditarAtivoRequest
     /// <summary>Atributos informados são gravados; os ausentes ficam como estão.</summary>
     /// <example>{"plataforma": "mainframe"}</example>
     public Dictionary<string, string>? Atributos { get; init; }
+
+    /// <summary>O squad que cuida do ativo; ausente ou nulo tira o ativo do squad (PUT substitui).</summary>
+    public Guid? IdSquad { get; init; }
 }
 
 /// <summary>Define quem responde pelo ativo.</summary>

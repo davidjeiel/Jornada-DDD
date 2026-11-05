@@ -76,6 +76,7 @@ export type FichaDoAtivo = {
   criticidade: string;
   descricao: string;
   revisaoAtual: number;
+  idSquad: string | null;
   trilha: Ancestral[];
   atributos: Record<string, string>;
   evidencias: Evidencia[];
@@ -272,6 +273,7 @@ export function cadastrarAtivo(payload: {
   criticidade: string;
   atributos: Record<string, string>;
   idPai?: string;
+  idSquad?: string;
 }): Promise<{ id: string }> {
   return requisicao('/v1/ativos', { method: 'POST', body: JSON.stringify(payload) });
 }
@@ -281,6 +283,7 @@ export function editarAtivo(id: string, payload: {
   descricao: string;
   criticidade: string;
   atributos: Record<string, string>;
+  idSquad?: string | null;
 }): Promise<void> {
   return requisicao(`/v1/ativos/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
@@ -431,4 +434,9 @@ export function alterarSquad(id: string, payload: DadosDoSquad): Promise<Squad> 
 
 export function inativarSquad(id: string): Promise<Squad> {
   return requisicao(`/v1/squads/${id}/inativacao`, { method: 'POST' });
+}
+
+/** O rito que a política aplica ao tipo e à criticidade (GET /v1/ritos). */
+export function consultarRito(tipo: string, criticidade: string): Promise<Rito> {
+  return requisicao(`/v1/ritos?tipo=${encodeURIComponent(tipo)}&criticidade=${encodeURIComponent(criticidade)}`);
 }
