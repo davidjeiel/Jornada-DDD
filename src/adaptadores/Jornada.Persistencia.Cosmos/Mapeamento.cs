@@ -29,6 +29,7 @@ internal static class Mapeamento
         NomeNormalizado = Normalizar(a.Nome),
         Descricao = a.Descricao,
         IdPai = a.IdPai is { } p ? Texto(p.Valor) : null,
+        IdSquad = a.IdSquad,
         Criticidade = a.Criticidade.Chave(),
         Status = MaquinaDeCicloDeVida.Rotulo(a.Status),
         Origem = a.Origem.ToString(),
@@ -63,7 +64,8 @@ internal static class Mapeamento
         atributos: d.Atributos,
         responsaveis: d.Responsaveis.Select(r => new Responsabilidade(
             r.IdPessoa, Enum.Parse<PapelDeOwnership>(r.Papel), r.InicioVigencia, r.FimVigencia)),
-        evidencias: d.Evidencias.Select(e => new Evidencia(e.Id, e.Tipo, e.Titulo, e.Url)));
+        evidencias: d.Evidencias.Select(e => new Evidencia(e.Id, e.Tipo, e.Titulo, e.Url)),
+        idSquad: d.IdSquad);
 
     public static DocumentoDeValidacao ParaDocumento(ValidacaoEmProcesso v) => new()
     {

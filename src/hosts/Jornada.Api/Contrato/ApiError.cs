@@ -87,6 +87,7 @@ public static class CodigosDeErro
         ["PAPEL_JA_CONCEDIDO"] = StatusCodes.Status409Conflict,
         ["PAPEL_NAO_CONCEDIDO"] = StatusCodes.Status409Conflict,
         ["SIGLA_DUPLICADA"] = StatusCodes.Status409Conflict,
+        ["SQUAD_INATIVA"] = StatusCodes.Status409Conflict,
 
         [ErroInterno] = StatusCodes.Status500InternalServerError,
     };

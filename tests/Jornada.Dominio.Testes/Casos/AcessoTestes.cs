@@ -193,6 +193,26 @@ public sealed class AcessoTestes
         Verificar.Igual("SEM_PERMISSAO", m.Editar(outro, local).Codigo);
     }
 
+    [Teste("concessão com escopo de squad vale nos ativos do squad, e mostra a sigla")]
+    public void ConcessaoComEscopoDeSquad()
+    {
+        var m = new MundoDeAcesso();
+        var cred = m.Squad("CRED");
+        var pedido = m.Pedir(papel: "techlead");
+        Verificar.Igual("ESCOPO_INVALIDO",
+            m.Decidir(pedido.Pleito.Id, MundoDeAcesso.Admin, aprovar: true, escopo: "squad", escopoId: Guid.NewGuid(), resposta: "x").Codigo);
+
+        var decidido = m.Exigir(m.Decidir(pedido.Pleito.Id, MundoDeAcesso.Admin, aprovar: true,
+            escopo: "squad", escopoId: cred.Id, resposta: "Só nos ativos do seu squad."));
+        Verificar.Igual("squad CRED", decidido.EscopoRotulo);
+
+        var quem = m.Como(m.Pessoa(pedido.Pessoa.Id));
+        var doSquad = m.Cadastrar("sistema", "Core de Crédito", squad: cred.Id);
+        var deFora = m.Cadastrar("sistema", "Core de Garantias");
+        Verificar.Verdadeiro(m.Editar(doSquad, quem, squad: cred.Id).Sucesso, "o ativo é do squad");
+        Verificar.Igual("SEM_PERMISSAO", m.Editar(deFora, quem).Codigo, "fora do squad o papel não vale");
+    }
+
     [Teste("pleito já decidido não se decide de novo")]
     public void PleitoJaDecididoNaoSeDecideDeNovo()
     {
@@ -301,6 +321,28 @@ public sealed class AcessoTestes
         Verificar.Falso(PoliticaDeAutorizacao.PodeConceder(leitor, null, Cenario.Relogio.Hoje).Permitido, "nem concede");
     }
 
+    [Teste("o ativo guarda o squad; squad inexistente ou inativo não recebe ativo novo")]
+    public void AtivoGuardaOSquad()
+    {
+        var m = new MundoDeAcesso();
+        var cred = m.Squad("CRED");
+        var gar = m.Squad("GAR");
+        var id = m.Cadastrar("sistema", "Core de Crédito", squad: cred.Id);
+        Verificar.Igual<Guid?>(cred.Id, m.Ativo(id).IdSquad);
+
+        Verificar.Igual("SQUAD_NAO_ENCONTRADA", m.CadastrarComo(MundoDeAcesso.Curador, "sistema", "Fantasma", squad: Guid.NewGuid()).Codigo);
+        m.Exigir(new CadastroDeSquads(m.Acesso, ContextoDeTenantFixo.Para(Cenario.EmpresaA), new AtorFixo(MundoDeAcesso.Curador), m.Repo, Cenario.Relogio)
+            .InativarAsync(gar.Id).Result);
+        Verificar.Igual("SQUAD_INATIVA", m.CadastrarComo(MundoDeAcesso.Curador, "sistema", "Novo", squad: gar.Id).Codigo);
+
+        // Inativar o squad não desfaz o vínculo: editar o ativo com o mesmo squad continua valendo.
+        m.Exigir(new CadastroDeSquads(m.Acesso, ContextoDeTenantFixo.Para(Cenario.EmpresaA), new AtorFixo(MundoDeAcesso.Curador), m.Repo, Cenario.Relogio)
+            .InativarAsync(cred.Id).Result);
+        Verificar.Verdadeiro(m.Editar(id, MundoDeAcesso.Curador, squad: cred.Id).Sucesso);
+        Verificar.Verdadeiro(m.Editar(id, MundoDeAcesso.Curador).Sucesso, "tirar do squad");
+        Verificar.Igual<Guid?>(null, m.Ativo(id).IdSquad);
+    }
+
     [Teste("edição de ativo existente respeita o bloco do tipo")]
     public void EdicaoDeAtivoExistenteRespeitaOBloco()
     {
@@ -323,7 +365,7 @@ internal sealed class MundoDeAcesso(RegrasDeAcesso? regras = null)
     private readonly RegrasDeAcesso _regras = regras ?? RegrasDeAcesso.Nenhuma;
 
     public RepositorioDeAtivosEmMemoria Repo => new(_armazem, _tenant);
-    private RepositorioDeAcessoEmMemoria Acesso => new(_armazem, _tenant);
+    public RepositorioDeAcessoEmMemoria Acesso => new(_armazem, _tenant);
     public IRepositorioDePessoas Pessoas => Acesso;
     public IRepositorioDePleitos Pleitos => Acesso;
 
@@ -341,26 +383,35 @@ internal sealed class MundoDeAcesso(RegrasDeAcesso? regras = null)
 
     public Resultado<PleitoLegivel> Decidir(Guid pleito, Ator quem, bool aprovar, string? resposta = null,
                                             string? papel = null, string? escopo = null, Guid? escopoId = null) =>
-        new DecidirPleito(Pleitos, Pessoas, Repo, new AtorFixo(quem), Repo, Cenario.Relogio)
+        new DecidirPleito(Pleitos, Pessoas, Repo, Acesso, new AtorFixo(quem), Repo, Cenario.Relogio)
             .ExecutarAsync(new ComandoDecidirPleito(pleito, aprovar, resposta, papel, escopo, escopoId)).Result;
 
     public Resultado<ListarPleitos.Saida> Fila(Ator quem) =>
-        new ListarPleitos(Pleitos, Pessoas, Repo, new AtorFixo(quem), Cenario.Relogio).ExecutarAsync().Result;
+        new ListarPleitos(Pleitos, Pessoas, Repo, Acesso, new AtorFixo(quem), Cenario.Relogio).ExecutarAsync().Result;
 
     public ConsultarPerfil.Saida Perfil(Ator quem) =>
-        new ConsultarPerfil(Pessoas, Pleitos, Repo, new AtorFixo(quem), Cenario.Relogio).ExecutarAsync().Result;
+        new ConsultarPerfil(Pessoas, Pleitos, Repo, Acesso, new AtorFixo(quem), Cenario.Relogio).ExecutarAsync().Result;
+
+    public Squad Squad(string sigla) =>
+        Exigir(new CadastroDeSquads(Acesso, _tenant, new AtorFixo(Curador), Repo, Cenario.Relogio)
+            .CriarAsync(sigla, $"Squad {sigla}", "Time de teste.").Result);
 
     public IdDeAtivo Dominio(string nome) => Cadastrar("dominio", nome);
 
     public IdDeAtivo Subdominio(string nome, IdDeAtivo pai) => Cadastrar("subdominio", nome, pai);
 
-    public IdDeAtivo Cadastrar(string tipo, string nome, IdDeAtivo? pai = null) =>
-        Exigir(new CadastrarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(Curador), Repo, Repo, Cenario.Relogio)
-            .ExecutarAsync(new ComandoCadastrarAtivo(tipo, nome, "Descrição do ativo.", Criticidade.Media, pai)).Result);
+    public IdDeAtivo Cadastrar(string tipo, string nome, IdDeAtivo? pai = null, Guid? squad = null) =>
+        Exigir(CadastrarComo(Curador, tipo, nome, pai, squad));
 
-    public Resultado<bool> Editar(IdDeAtivo id, Ator quem) =>
-        new EditarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(quem), Repo, Repo, Cenario.Relogio)
-            .ExecutarAsync(new ComandoEditarAtivo(id, "Nome revisto", "Descrição revista.", Criticidade.Media, null)).Result;
+    public Resultado<IdDeAtivo> CadastrarComo(Ator quem, string tipo, string nome, IdDeAtivo? pai = null, Guid? squad = null) =>
+        new CadastrarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(quem), Repo, Repo, Acesso, Cenario.Relogio)
+            .ExecutarAsync(new ComandoCadastrarAtivo(tipo, nome, "Descrição do ativo.", Criticidade.Media, pai, IdSquad: squad)).Result;
+
+    public Resultado<bool> Editar(IdDeAtivo id, Ator quem, Guid? squad = null) =>
+        new EditarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(quem), Repo, Repo, Acesso, Cenario.Relogio)
+            .ExecutarAsync(new ComandoEditarAtivo(id, "Nome revisto", "Descrição revista.", Criticidade.Media, null, squad)).Result;
+
+    public Ativo Ativo(IdDeAtivo id) => Repo.ObterAsync(id).Result!;
 
     public Resultado<bool> AnexarEvidencia(IdDeAtivo id, Ator quem) =>
         new AnexarEvidencia(Repo, _metamodelo, _tenant, new AtorFixo(quem), Repo, Repo, Cenario.Relogio)

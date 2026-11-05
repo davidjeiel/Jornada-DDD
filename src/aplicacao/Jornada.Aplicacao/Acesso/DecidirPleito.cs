@@ -4,7 +4,7 @@ using Jornada.Dominio.Comum;
 
 namespace Jornada.Aplicacao.Acesso;
 
-/// <param name="EscopoTipo">empresa (padrão) ou dominio. Squad chega com o cadastro de squads.</param>
+/// <param name="EscopoTipo">empresa (padrão), dominio ou squad.</param>
 public sealed record ComandoDecidirPleito(
     Guid IdPleito, bool Aprovar, string? Resposta = null,
     string? PapelConcedido = null, string? EscopoTipo = null, Guid? EscopoId = null);
@@ -18,6 +18,7 @@ public sealed class DecidirPleito(
     IRepositorioDePleitos pleitos,
     IRepositorioDePessoas pessoas,
     IRepositorioDeAtivos ativos,
+    IRepositorioDeSquads squads,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
     IRelogio relogio)
@@ -43,13 +44,15 @@ public sealed class DecidirPleito(
         var escopo = Escopos.De(cmd.EscopoTipo);
         if (escopo is null)
             return Resultado<PleitoLegivel>.Recusado("ESCOPO_INVALIDO",
-                $"Escopo desconhecido: {cmd.EscopoTipo}. Use empresa ou dominio.");
+                $"Escopo desconhecido: {cmd.EscopoTipo}. Use empresa, dominio ou squad.");
 
         if (cmd.Aprovar && escopo == TipoDeEscopo.Dominio && cmd.EscopoId is { } idDominio)
         {
             if (!await Escopos.EhDominioAsync(ativos, idDominio, ct))
                 return Resultado<PleitoLegivel>.Recusado("ESCOPO_INVALIDO", "O escopo de domínio tem de apontar para um domínio do catálogo.");
         }
+        if (cmd.Aprovar && escopo == TipoDeEscopo.Squad && cmd.EscopoId is { } idSquad && !await Escopos.EhSquadAtivaAsync(squads, idSquad, ct))
+            return Resultado<PleitoLegivel>.Recusado("ESCOPO_INVALIDO", "O escopo de squad tem de apontar para uma squad ativa.");
 
         var pessoa = await pessoas.ObterAsync(pleito.IdPessoa, ct)
             ?? throw new InvalidOperationException($"O pleito {pleito.Id} aponta para uma pessoa que não existe.");
@@ -65,6 +68,6 @@ public sealed class DecidirPleito(
         }
 
         await uow.ConfirmarAsync(ct);
-        return Resultado<PleitoLegivel>.Ok(await Legibilidade.PleitoAsync(ativos, pessoas, pleito, ct));
+        return Resultado<PleitoLegivel>.Ok(await Legibilidade.PleitoAsync(ativos, squads, pessoas, pleito, ct));
     }
 }

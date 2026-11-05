@@ -18,13 +18,24 @@ public static class AlvoDoAtivo
     public static async Task<AlvoDaAcao> ResolverAsync(
         IRepositorioDeAtivos ativos, ContextoDeTenant contexto, Ativo ativo, TipoDeAtivo tipo, CancellationToken ct) =>
         new(contexto.Empresa, tipo.Chave, tipo.Bloco,
-            IdDominio: await DominioAsync(ativos, ativo.Id, ct), Unidade: contexto.Unidade);
+            IdDominio: await DominioAsync(ativos, ativo.Id, ct), IdSquad: ativo.IdSquad, Unidade: contexto.Unidade);
 
     /// <summary>Alvo do cadastro: o domínio é o do pai. Um domínio novo não tem domínio, e só papel da empresa o cria.</summary>
     public static async Task<AlvoDaAcao> DoCadastroAsync(
         IRepositorioDeAtivos ativos, ContextoDeTenant contexto, TipoDeAtivo tipo, IdDeAtivo? idPai, CancellationToken ct) =>
         new(contexto.Empresa, tipo.Chave, tipo.Bloco,
             IdDominio: idPai is { } pai ? await DominioAsync(ativos, pai, ct) : null, Unidade: contexto.Unidade);
+
+    /// <summary>O squad informado tem de existir e estar ativo. Nulo: sem squad, sempre vale.</summary>
+    public static async Task<(string Codigo, string Mensagem)?> ConferirSquadAsync(
+        IRepositorioDeSquads squads, Guid? idSquad, CancellationToken ct)
+    {
+        if (idSquad is not { } id) return null;
+        var squad = await squads.ObterAsync(id, ct);
+        if (squad is null) return ("SQUAD_NAO_ENCONTRADA", "Squad não encontrada.");
+        if (!squad.Ativa) return ("SQUAD_INATIVA", $"A squad {squad.Sigla} está inativa e não recebe ativos novos.");
+        return null;
+    }
 
     /// <summary>A que domínio o ativo pertence. A trilha que desenha o breadcrumb responde também pelo escopo.</summary>
     public static async Task<Guid?> DominioAsync(IRepositorioDeAtivos ativos, IdDeAtivo id, CancellationToken ct)

@@ -52,6 +52,7 @@ internal sealed class DocumentoDeAtivo : DocumentoDoCatalogo
     public required string NomeNormalizado { get; init; }
     public required string Descricao { get; init; }
     public string? IdPai { get; init; }
+    public Guid? IdSquad { get; init; }
     public required string Criticidade { get; init; }
     public required string Status { get; init; }
     public required string Origem { get; init; }

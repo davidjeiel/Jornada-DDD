@@ -95,7 +95,10 @@ export function PainelDoCadastro({ cadastro, squads, dominios, vinculos, ehVoce,
     evento.preventDefault();
     const d = new FormData(evento.currentTarget);
     const escopoTipo = d.get('escopoTipo')?.toString() ?? 'empresa';
-    onConceder({ papel: d.get('papel')?.toString() ?? '', escopoTipo, escopoId: escopoTipo === 'dominio' ? d.get('escopoId')?.toString() || null : null });
+    onConceder({
+      papel: d.get('papel')?.toString() ?? '', escopoTipo,
+      escopoId: escopoTipo === 'dominio' ? d.get('escopoId')?.toString() || null : escopoTipo === 'squad' ? d.get('idSquadDoEscopo')?.toString() || null : null,
+    });
   }
 
   return (
@@ -144,10 +147,13 @@ export function PainelDoCadastro({ cadastro, squads, dominios, vinculos, ehVoce,
             <select name="papel" defaultValue="negocio">{PAPEIS.map((p) => <option key={p} value={p}>{ROTULO_DO_PAPEL[p]}</option>)}</select>
           </label>
           <label>Vale em
-            <select name="escopoTipo" defaultValue="empresa"><option value="empresa">todo o catálogo</option><option value="dominio">um domínio</option></select>
+            <select name="escopoTipo" defaultValue="empresa"><option value="empresa">todo o catálogo</option><option value="dominio">um domínio</option><option value="squad">os ativos de um squad</option></select>
           </label>
           <label>Domínio
             <select name="escopoId" defaultValue=""><option value="">—</option>{dominios.map((d) => <option key={d.id} value={d.id}>{d.codigo} · {d.nome}</option>)}</select>
+          </label>
+          <label>Squad do escopo
+            <select name="idSquadDoEscopo" defaultValue=""><option value="">—</option>{squads.filter((s) => s.ativa).map((s) => <option key={s.id} value={s.id}>{s.sigla} · {s.titulo}</option>)}</select>
           </label>
           <div className="modal-actions"><button className="outline-button" disabled={ocupado}>Conceder</button></div>
         </form>

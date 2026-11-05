@@ -114,7 +114,8 @@ public sealed class Ativo : RaizDeAgregado
         Criticidade criticidade = Criticidade.Media,
         IdDeAtivo? idPai = null, IdDeUnidade? unidade = null,
         IReadOnlyDictionary<string, string>? atributos = null,
-        OrigemDoAtivo origem = OrigemDoAtivo.Manual)
+        OrigemDoAtivo origem = OrigemDoAtivo.Manual,
+        Guid? idSquad = null)
     {
         if (string.IsNullOrWhiteSpace(nome))
             throw new ErroDeDominio("NOME_OBRIGATORIO", "Nome do ativo é obrigatório.");
@@ -132,6 +133,7 @@ public sealed class Ativo : RaizDeAgregado
         {
             IdPai = idPai,
             Unidade = unidade,
+            IdSquad = idSquad,
         };
 
         if (atributos is not null)
@@ -168,6 +170,14 @@ public sealed class Ativo : RaizDeAgregado
     {
         ExigirEditavel();
         Criticidade = nova;
+        Tocar(relogio);
+    }
+
+    /// <summary>O squad que cuida do ativo (<c>item_catalogo.id_squad</c>). É o alvo do papel com escopo de squad.</summary>
+    public void DefinirSquad(Guid? idSquad, IRelogio relogio)
+    {
+        ExigirEditavel();
+        IdSquad = idSquad;
         Tocar(relogio);
     }
 
@@ -296,12 +306,14 @@ public sealed class Ativo : RaizDeAgregado
         int? ultimaRevisaoPublicada = null,
         IReadOnlyDictionary<string, string>? atributos = null,
         IEnumerable<Responsabilidade>? responsaveis = null,
-        IEnumerable<Evidencia>? evidencias = null)
+        IEnumerable<Evidencia>? evidencias = null,
+        Guid? idSquad = null)
     {
         var a = new Ativo(id, empresa, tipoItem, codigo, nome, descricao,
                           criticidade, origem, criadoEm)
         {
             IdPai = idPai,
+            IdSquad = idSquad,
             Unidade = unidade,
             Status = status,
             RevisaoAtual = revisaoAtual,

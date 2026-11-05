@@ -42,11 +42,12 @@ public abstract class ContratoDePersistencia
         var empresa = IdDeEmpresa.Novo();
         var unidade = IdDeUnidade.Novo();
         var pessoa = Guid.NewGuid();
+        var squad = Guid.NewGuid();
 
         var ativo = Ativo.Rascunhar(empresa, Tipos.Obter("sistema"), CodigoDeAtivo.De("SIS-0001"),
             "Core Bancário", Relogio, descricao: "Contas e lançamentos.",
             criticidade: Criticidade.Alta, unidade: unidade,
-            atributos: new Dictionary<string, string> { ["plataforma"] = "mainframe" });
+            atributos: new Dictionary<string, string> { ["plataforma"] = "mainframe" }, idSquad: squad);
         ativo.AtribuirResponsavel(pessoa, PapelDeOwnership.OwnerTecnico, Relogio);
         ativo.AnexarEvidencia("adr", "ADR-0001", "https://exemplo/adr-0001", Relogio);
         await Gravar(empresa, ativo);
@@ -56,6 +57,7 @@ public abstract class ContratoDePersistencia
 
         Verificar.Igual(empresa, lido.Empresa);
         Verificar.Igual(unidade, lido.Unidade);
+        Verificar.Igual<Guid?>(squad, lido.IdSquad);
         Verificar.Igual("sistema", lido.TipoItem);
         Verificar.Igual(ativo.Codigo, lido.Codigo);
         Verificar.Igual("Core Bancário", lido.Nome);

@@ -31,7 +31,7 @@ const metamodelo: Metamodelo = {
 function ficha(status = 'rascunho'): FichaDoAtivo {
   return {
     id: ID, codigo: 'CAP-0001', nome: 'Simular Financiamento', tipoItem: 'capacidade', status, criticidade: 'alta',
-    descricao: 'Calcula condições.', revisaoAtual: 1,
+    descricao: 'Calcula condições.', revisaoAtual: 1, idSquad: null,
     trilha: [{ id: 'd-1', codigo: 'DOM-0001', nome: 'Contrato', tipoItem: 'dominio' }, { id: 's-1', codigo: 'SUB-0001', nome: 'Originação', tipoItem: 'subdominio' },
       { id: 'c-1', codigo: 'CTX-0001', nome: 'Simulação', tipoItem: 'contexto' }],
     atributos: { resultado_esperado: 'Proposta simulada' }, evidencias: [], responsaveis: [],
@@ -53,7 +53,7 @@ const preCheck: PreCheck = {
 
 function pagina(aba: Aba = 'resumo', status = 'rascunho', podeEscrever = true) {
   return renderToStaticMarkup(
-    <VisaoDoAtivo ficha={ficha(status)} preCheck={preCheck} aba={aba} ativos={ativos} pessoas={[]} metamodelo={metamodelo}
+    <VisaoDoAtivo ficha={ficha(status)} preCheck={preCheck} aba={aba} ativos={ativos} pessoas={[]} metamodelo={metamodelo} squads={[]}
       historico={null} comparacao={null} impacto={null} podeEscrever={podeEscrever} podeDescontinuar={false} idPessoa={null}
       ocupado={false} acoes={acoes} onErro={nada} />,
   );

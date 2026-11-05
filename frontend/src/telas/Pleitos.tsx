@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { decidirPleito, listarPleitos, type AtivoResumo, type FilaDePleitos as Fila, type Pleito } from '../api';
+import { decidirPleito, listarPleitos, listarSquads, type AtivoResumo, type FilaDePleitos as Fila, type Pleito, type Squad } from '../api';
 import { Cabecalho } from '../componentes';
 import { PAPEIS, ROTULO_DO_PAPEL, rotuloDoPapel, situacaoDoPleito } from '../papeis';
 
@@ -13,6 +13,7 @@ function espera(desde: string): string {
 type PropsDaFila = {
   fila: Fila;
   dominios: AtivoResumo[];
+  squads?: Squad[];
   decidindo: string | null;
   onDecidir: (pleito: Pleito, decisao: Decisao) => void;
 };
@@ -22,7 +23,7 @@ type PropsDaFila = {
  * espera há mais tempo. Admin só aparece entre os papéis a conceder para quem
  * é admin; a API recusa do mesmo jeito se alguém tentar.
  */
-export function FilaDePleitos({ fila, dominios, decidindo, onDecidir }: PropsDaFila) {
+export function FilaDePleitos({ fila, dominios, squads = [], decidindo, onDecidir }: PropsDaFila) {
   const papeis = PAPEIS.filter((p) => p !== 'admin' || fila.podeConcederAdmin);
   const pendentes = fila.pleitos.filter((p) => p.status === 'pendente');
   const decididos = fila.pleitos.filter((p) => p.status !== 'pendente');
@@ -37,7 +38,8 @@ export function FilaDePleitos({ fila, dominios, decidindo, onDecidir }: PropsDaF
       resposta: dados.get('resposta')?.toString() ?? '',
       papelConcedido: dados.get('papelConcedido')?.toString(),
       escopoTipo,
-      escopoId: escopoTipo === 'dominio' ? dados.get('escopoId')?.toString() || undefined : undefined,
+      escopoId: escopoTipo === 'dominio' ? dados.get('escopoId')?.toString() || undefined
+        : escopoTipo === 'squad' ? dados.get('idSquad')?.toString() || undefined : undefined,
     });
   }
 
@@ -65,12 +67,19 @@ export function FilaDePleitos({ fila, dominios, decidindo, onDecidir }: PropsDaF
                 <select name="escopoTipo" defaultValue="empresa">
                   <option value="empresa">todo o catálogo</option>
                   <option value="dominio">um domínio</option>
+                  <option value="squad">os ativos de um squad</option>
                 </select>
               </label>
               <label>Domínio
                 <select name="escopoId" defaultValue="">
                   <option value="">—</option>
                   {dominios.map((d) => <option key={d.id} value={d.id}>{d.codigo} · {d.nome}</option>)}
+                </select>
+              </label>
+              <label>Squad
+                <select name="idSquad" defaultValue="">
+                  <option value="">—</option>
+                  {squads.filter((q) => q.ativa).map((q) => <option key={q.id} value={q.id}>{q.sigla} · {q.titulo}</option>)}
                 </select>
               </label>
               <label className="largo">Resposta
@@ -115,11 +124,14 @@ type Props = { ativos: AtivoResumo[]; onErro: (mensagem: string) => void; onDeci
 export function Pleitos({ ativos, onErro, onDecidido }: Props) {
   const [fila, setFila] = useState<Fila | null>(null);
   const [decidindo, setDecidindo] = useState<string | null>(null);
+  const [squads, setSquads] = useState<Squad[]>([]);
   const dominios = ativos.filter((a) => a.tipo.toLowerCase() === 'dominio');
 
   async function carregar() {
     try {
-      setFila(await listarPleitos());
+      const [pleitos, times] = await Promise.all([listarPleitos(), listarSquads().catch(() => ({ squads: [] as Squad[] }))]);
+      setFila(pleitos);
+      setSquads(times.squads);
     } catch (e) {
       onErro(e instanceof Error ? e.message : 'Não foi possível carregar os pleitos.');
     }
@@ -147,7 +159,7 @@ export function Pleitos({ ativos, onErro, onDecidido }: Props) {
     <>
       <Cabecalho rotulo="ADMINISTRAÇÃO" titulo="Pleitos de acesso"
         texto="Quem espera há mais tempo aparece primeiro. Negar, ou conceder papel diferente do pedido, exige resposta: a pessoa tem direito de saber por quê." />
-      {fila ? <FilaDePleitos fila={fila} dominios={dominios} decidindo={decidindo} onDecidir={decidir} /> : <p className="vazio">Carregando...</p>}
+      {fila ? <FilaDePleitos fila={fila} dominios={dominios} squads={squads} decidindo={decidindo} onDecidir={decidir} /> : <p className="vazio">Carregando...</p>}
     </>
   );
 }

@@ -1,70 +1,171 @@
-import { useState, type FormEvent } from 'react';
-import { cadastrarAtivo, type AtivoResumo } from '../api';
+import { useEffect, useState, type FormEvent } from 'react';
+import { cadastrarAtivo, consultarRito, type AtivoResumo, type Metamodelo, type Rito, type Squad, type TipoDeAtivo } from '../api';
 import { Cabecalho } from '../componentes';
 import { Link, navegar } from '../roteador';
 
-type Formulario = { tipo: string; nome: string; descricao: string; criticidade: string; paiId: string; atributos: Record<string, string> };
+// O assistente de cadastro do painel (/ativo/novo): lê o metamodelo da empresa
+// (GET /v1/metamodelo), oferece só os blocos que o papel escreve
+// (acesso.BLOCOS_POR_PAPEL, via GET /v1/perfil) e antecipa o rito do tipo e da
+// criticidade (GET /v1/ritos) antes de salvar. Recusado, o que foi digitado
+// continua no formulário: o estado não é limpo no erro.
 
-// Os tipos do metamodelo padrão (CatalogoDeTipos.Padrao), por bloco. O
-// assistente que lê o metamodelo da empresa e antecipa o rito do tipo chega na
-// fase 3; o que já vale é o painel: só os blocos que o seu papel escreve
-// (acesso.BLOCOS_POR_PAPEL, que a API devolve em GET /v1/perfil).
-export const BLOCO_ESTRUTURA = 'Estrutura DDD';
-export const BLOCO_TECNICO = 'Ativos técnicos';
+export type Formulario = {
+  tipo: string; nome: string; descricao: string; criticidade: string; paiId: string; idSquad: string; atributos: Record<string, string>;
+};
 
-type Campo = { nome: string; rotulo: string; obrigatorio?: boolean; opcoes?: string[] };
-type TipoDoFormulario = { chave: string; rotulo: string; pai: string | null; bloco: string; campos: Campo[] };
+const CRITICIDADE: Record<string, string> = { baixa: 'baixa', media: 'média', alta: 'alta', critica: 'crítica' };
 
-export const TIPOS: TipoDoFormulario[] = [
-  { chave: 'dominio', rotulo: 'Domínio', pai: null, bloco: BLOCO_ESTRUTURA, campos: [{ nome: 'visao', rotulo: 'Visão de negócio', obrigatorio: true }] },
-  { chave: 'subdominio', rotulo: 'Subdomínio', pai: 'dominio', bloco: BLOCO_ESTRUTURA, campos: [{ nome: 'classificacao', rotulo: 'Classificação', obrigatorio: true, opcoes: ['core', 'suporte', 'genérico'] }] },
-  { chave: 'contexto', rotulo: 'Contexto delimitado', pai: 'subdominio', bloco: BLOCO_ESTRUTURA, campos: [{ nome: 'linguagem_ubiqua', rotulo: 'Termos da linguagem ubíqua' }, { nome: 'estrategia_integracao', rotulo: 'Estratégia de integração', opcoes: ['parceria', 'cliente-fornecedor', 'conformista', 'camada anticorrupção', 'serviço aberto'] }] },
-  { chave: 'capacidade', rotulo: 'Capacidade de negócio', pai: 'contexto', bloco: BLOCO_ESTRUTURA, campos: [{ nome: 'resultado_esperado', rotulo: 'Resultado esperado', obrigatorio: true }, { nome: 'processo_negocio', rotulo: 'Processo de negócio' }] },
-  { chave: 'sistema', rotulo: 'Sistema', pai: null, bloco: BLOCO_TECNICO, campos: [{ nome: 'plataforma', rotulo: 'Plataforma', obrigatorio: true, opcoes: ['mainframe', 'distribuído', 'nuvem', 'híbrido'] }, { nome: 'situacao', rotulo: 'Situação', opcoes: ['legado', 'em modernização', 'estratégico'] }] },
-  { chave: 'aplicacao', rotulo: 'Aplicação', pai: 'sistema', bloco: BLOCO_TECNICO, campos: [{ nome: 'linguagem', rotulo: 'Linguagem principal' }, { nome: 'repositorio_url', rotulo: 'Repositório' }] },
-  { chave: 'repositorio', rotulo: 'Repositório', pai: 'aplicacao', bloco: BLOCO_TECNICO, campos: [{ nome: 'url', rotulo: 'URL', obrigatorio: true }] },
-  { chave: 'api', rotulo: 'API', pai: 'aplicacao', bloco: BLOCO_TECNICO, campos: [{ nome: 'contrato_url', rotulo: 'Contrato OpenAPI', obrigatorio: true }, { nome: 'versao', rotulo: 'Versão' }] },
-  { chave: 'endpoint', rotulo: 'Endpoint', pai: 'api', bloco: BLOCO_TECNICO, campos: [{ nome: 'metodo', rotulo: 'Método', opcoes: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] }, { nome: 'caminho', rotulo: 'Caminho' }] },
-  { chave: 'base_dados', rotulo: 'Base de dados', pai: 'sistema', bloco: BLOCO_TECNICO, campos: [{ nome: 'tecnologia', rotulo: 'Tecnologia' }] },
-  { chave: 'objeto_dado', rotulo: 'Objeto de dado', pai: 'base_dados', bloco: BLOCO_TECNICO, campos: [{ nome: 'classificacao_dado', rotulo: 'Classificação do dado', opcoes: ['público', 'interno', 'confidencial', 'restrito'] }] },
-  { chave: 'evento', rotulo: 'Evento de negócio', pai: 'contexto', bloco: BLOCO_TECNICO, campos: [{ nome: 'schema_url', rotulo: 'Schema' }, { nome: 'mecanismo', rotulo: 'Mecanismo', opcoes: ['sincrono', 'assincrono', 'batch'] }] },
-];
+/** "negocial → tecnica → arquitetural", como o painel escreve o rito. */
+export function etapasDoRito(rito: Rito): string {
+  return rito.etapas.join(' → ');
+}
+
+/** Os tipos que o assistente oferece: os do metamodelo, nos blocos que o papel escreve. */
+export function tiposOferecidos(metamodelo: Metamodelo | null, blocos: string[]): TipoDeAtivo[] {
+  return (metamodelo?.tipos ?? []).filter((t) => blocos.includes(t.bloco));
+}
+
+type PropsDoAssistente = {
+  oferecidos: TipoDeAtivo[];
+  metamodelo: Metamodelo;
+  ativos: AtivoResumo[];
+  squads: Squad[];
+  formulario: Formulario;
+  rito: Rito | null;
+  salvando: boolean;
+  onMudar: (formulario: Formulario) => void;
+  onSalvar: () => void;
+};
+
+/** O formulário controlado: tudo o que aparece vem de `formulario`, e nada se perde num erro. */
+export function AssistenteDeCadastro({ oferecidos, metamodelo, ativos, squads, formulario, rito, salvando, onMudar, onSalvar }: PropsDoAssistente) {
+  const tipo = oferecidos.find((t) => t.chave === formulario.tipo) ?? oferecidos[0];
+  const rotuloDoPai = metamodelo.tipos.find((t) => t.chave === tipo.pai)?.rotulo;
+  const pais = ativos.filter((a) => a.tipo.toLowerCase() === tipo.pai);
+  const faltaPai = !!tipo.pai && (!formulario.paiId || pais.length === 0);
+  const blocos = [...new Set(oferecidos.map((t) => t.bloco))];
+  const mudar = (campos: Partial<Formulario>) => onMudar({ ...formulario, ...campos });
+  const atributo = (nome: string, valor: string) => mudar({ atributos: { ...formulario.atributos, [nome]: valor } });
+
+  function enviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    onSalvar();
+  }
+
+  return (
+    <div className="assistente">
+      <form className="panel screen-panel formulario-pagina" onSubmit={enviar}>
+        <label>Tipo
+          <select name="tipo_item" value={tipo.chave} onChange={(e) => mudar({ tipo: e.target.value, paiId: '', atributos: {} })}>
+            {blocos.map((bloco) => (
+              <optgroup key={bloco} label={bloco}>
+                {oferecidos.filter((t) => t.bloco === bloco).map((t) => <option key={t.chave} value={t.chave}>{t.rotulo}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        {tipo.pai && (
+          <label>{rotuloDoPai}
+            <select name="id_pai" required value={formulario.paiId} onChange={(e) => mudar({ paiId: e.target.value })}>
+              <option value="">Selecione o item pai</option>
+              {pais.map((pai) => <option key={pai.id} value={pai.id}>{pai.codigo} · {pai.nome}</option>)}
+            </select>
+            {pais.length === 0 && <small className="field-hint">Cadastre primeiro um item do tipo {rotuloDoPai} para continuar.</small>}
+          </label>
+        )}
+        <label>Nome<input name="nome" required value={formulario.nome} onChange={(e) => mudar({ nome: e.target.value })} placeholder={tipo.rotulo} /></label>
+        <div className="form-grid">
+          <label>Criticidade
+            <select name="criticidade" value={formulario.criticidade} onChange={(e) => mudar({ criticidade: e.target.value })}>
+              <option value="baixa">baixa</option><option value="media">média</option><option value="alta">alta</option><option value="critica">crítica</option>
+            </select>
+          </label>
+          <label>Squad
+            <select name="id_squad" value={formulario.idSquad} onChange={(e) => mudar({ idSquad: e.target.value })}>
+              <option value="">sem squad</option>
+              {squads.filter((s) => s.ativa).map((s) => <option key={s.id} value={s.id}>{s.sigla} · {s.titulo}</option>)}
+            </select>
+          </label>
+        </div>
+        {tipo.campos.map((campo) => (
+          <label key={campo.nome}>{campo.rotulo}{campo.obrigatorio && ' *'}
+            {campo.opcoes.length > 0
+              ? <select name={`attr_${campo.nome}`} required={campo.obrigatorio} value={formulario.atributos[campo.nome] ?? ''} onChange={(e) => atributo(campo.nome, e.target.value)}><option value="">Selecione</option>{campo.opcoes.map((o) => <option key={o} value={o}>{o}</option>)}</select>
+              : campo.tipo === 'area'
+                ? <textarea name={`attr_${campo.nome}`} required={campo.obrigatorio} rows={3} value={formulario.atributos[campo.nome] ?? ''} onChange={(e) => atributo(campo.nome, e.target.value)} />
+                : <input name={`attr_${campo.nome}`} type={campo.tipo === 'url' ? 'url' : 'text'} required={campo.obrigatorio} value={formulario.atributos[campo.nome] ?? ''} onChange={(e) => atributo(campo.nome, e.target.value)} />}
+          </label>
+        ))}
+        <label>Descrição<textarea name="descricao" required rows={3} value={formulario.descricao} onChange={(e) => mudar({ descricao: e.target.value })} placeholder="Qual o papel deste item na empresa?" /></label>
+        <div className="modal-actions">
+          <Link className="outline-button" href="/catalogo">Cancelar</Link>
+          <button className="primary-button" disabled={salvando || faltaPai}>{salvando ? 'Cadastrando...' : 'Cadastrar ativo'}</button>
+        </div>
+      </form>
+
+      <aside className="panel screen-panel rito" aria-labelledby="rito-titulo">
+        <span className="panel-label" id="rito-titulo">Rito de publicação</span>
+        {rito ? (
+          <>
+            <p><strong>{tipo.rotulo}</strong>{rito.criticidade !== '*' && <> de criticidade <strong>{CRITICIDADE[rito.criticidade] ?? rito.criticidade}</strong></>} passa por:</p>
+            <p className="etapas-do-rito">{etapasDoRito(rito)}</p>
+            <dl className="dados-do-ativo">
+              <div><dt>Score mínimo</dt><dd>{rito.scoreMinimo}%</dd></div>
+              <div><dt>Evidências mínimas</dt><dd>{rito.evidenciaMinima}</dd></div>
+              <div><dt>Prazo por etapa</dt><dd>{rito.slaHoras}h</dd></div>
+              <div><dt>Revisar a cada</dt><dd>{rito.revisarACadaDias} dias</dd></div>
+            </dl>
+            <p className="discreto">O ativo nasce em rascunho. Responsáveis e evidências você completa na ficha, antes de submeter.</p>
+          </>
+        ) : <p className="vazio">Consultando o rito...</p>}
+      </aside>
+    </div>
+  );
+}
 
 type Props = {
   ativos: AtivoResumo[];
+  metamodelo: Metamodelo | null;
+  squads: Squad[];
   /** Blocos em que o papel concedido escreve. Vazio: sem papel de escrita, ou em modo leitura. */
   blocos: string[];
   identificado: boolean;
   modoLeitura: boolean;
+  /** O que veio na URL (?tipo=api&criticidade=critica), como o assistente do painel aceita. */
+  tipoInicial?: string;
+  criticidadeInicial?: string;
   onCadastrado: () => Promise<void>;
   onErro: (mensagem: string) => void;
 };
 
-export function NovoAtivo({ ativos, blocos, identificado, modoLeitura, onCadastrado, onErro }: Props) {
-  const oferecidos = TIPOS.filter((t) => blocos.includes(t.bloco));
-  const [formulario, setFormulario] = useState<Formulario>(() => ({
-    tipo: oferecidos[0]?.chave ?? 'dominio', nome: '', descricao: '', criticidade: 'media', paiId: '', atributos: {},
-  }));
+export function NovoAtivo({ ativos, metamodelo, squads, blocos, identificado, modoLeitura, tipoInicial, criticidadeInicial, onCadastrado, onErro }: Props) {
+  const oferecidos = tiposOferecidos(metamodelo, blocos);
+  const [formulario, setFormulario] = useState<Formulario>({
+    tipo: tipoInicial ?? '', nome: '', descricao: '', criticidade: criticidadeInicial ?? 'media', paiId: '', idSquad: '', atributos: {},
+  });
+  const [rito, setRito] = useState<Rito | null>(null);
   const [salvando, setSalvando] = useState(false);
-
   const tipo = oferecidos.find((t) => t.chave === formulario.tipo) ?? oferecidos[0];
-  const rotuloDoPai = TIPOS.find((t) => t.chave === tipo?.pai)?.rotulo;
-  const pais = ativos.filter((ativo) => ativo.tipo.toLowerCase() === tipo?.pai);
-  const campos = tipo?.campos ?? [];
-  const faltaPai = !!tipo?.pai && (!formulario.paiId || pais.length === 0);
 
-  async function salvar(evento: FormEvent<HTMLFormElement>) {
-    evento.preventDefault();
+  useEffect(() => {
+    if (!tipo) return;
+    let vigente = true;
+    setRito(null);
+    consultarRito(tipo.chave, formulario.criticidade).then((r) => { if (vigente) setRito(r); }).catch(() => {});
+    return () => { vigente = false; };
+  }, [tipo?.chave, formulario.criticidade]);
+
+  async function salvar() {
     if (!tipo) return;
     setSalvando(true);
     onErro('');
     try {
       const { id } = await cadastrarAtivo({
         tipo: tipo.chave, nome: formulario.nome, descricao: formulario.descricao, criticidade: formulario.criticidade,
-        atributos: { origem: 'mesa-do-catalogo', ...formulario.atributos }, idPai: formulario.paiId || undefined,
+        atributos: { origem: 'mesa-do-catalogo', ...formulario.atributos }, idPai: formulario.paiId || undefined, idSquad: formulario.idSquad || undefined,
       });
       await onCadastrado();
-      navegar(`/catalogo?ativo=${id}`);
+      navegar(`/ativos/${id}`);
     } catch (e) {
       // O que foi digitado continua no formulário: só a mensagem muda.
       onErro(e instanceof Error ? e.message : 'Não foi possível cadastrar o ativo.');
@@ -73,7 +174,9 @@ export function NovoAtivo({ ativos, blocos, identificado, modoLeitura, onCadastr
     }
   }
 
-  if (!tipo) {
+  if (!metamodelo && blocos.length > 0) return <><Cabecalho rotulo="TRABALHAR" titulo="Novo ativo" /><p className="vazio">Carregando os tipos de ativo...</p></>;
+
+  if (!tipo || !metamodelo) {
     // Sem bloco de escrita, o assistente manda pedir papel (test_sem_papel_o_wizard_manda_pleitear).
     return (
       <>
@@ -89,48 +192,11 @@ export function NovoAtivo({ ativos, blocos, identificado, modoLeitura, onCadastr
     );
   }
 
-  const grupos = [BLOCO_ESTRUTURA, BLOCO_TECNICO].filter((b) => blocos.includes(b));
-
   return (
     <>
-      <Cabecalho rotulo="TRABALHAR" titulo="Novo ativo" texto="O ativo nasce em rascunho, com código gerado pelo tipo. Depois, no catálogo, você completa responsáveis e evidências e submete." />
-      <form className="panel screen-panel formulario-pagina" onSubmit={salvar}>
-        <label>Tipo
-          <select value={tipo.chave} onChange={(e) => setFormulario({ ...formulario, tipo: e.target.value, paiId: '', atributos: {} })}>
-            {grupos.map((bloco) => (
-              <optgroup key={bloco} label={bloco}>
-                {oferecidos.filter((t) => t.bloco === bloco).map((t) => <option key={t.chave} value={t.chave}>{t.rotulo}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-        {tipo?.pai && (
-          <label>{rotuloDoPai}
-            <select required value={formulario.paiId} onChange={(e) => setFormulario({ ...formulario, paiId: e.target.value })}>
-              <option value="">Selecione o item pai</option>
-              {pais.map((pai) => <option key={pai.id} value={pai.id}>{pai.codigo} · {pai.nome}</option>)}
-            </select>
-            {pais.length === 0 && <small className="field-hint">Cadastre primeiro um item do tipo {rotuloDoPai} para continuar.</small>}
-          </label>
-        )}
-        <label>Nome<input required value={formulario.nome} onChange={(e) => setFormulario({ ...formulario, nome: e.target.value })} placeholder={tipo?.rotulo ?? 'Nome do ativo'} /></label>
-        <div className="form-grid">
-          <label>Criticidade<select value={formulario.criticidade} onChange={(e) => setFormulario({ ...formulario, criticidade: e.target.value })}><option>baixa</option><option>media</option><option>alta</option><option>critica</option></select></label>
-          <label>Estado inicial<input value="Rascunho" disabled /></label>
-        </div>
-        {campos.map((campo) => (
-          <label key={campo.nome}>{campo.rotulo}
-            {campo.opcoes
-              ? <select required={campo.obrigatorio} value={formulario.atributos[campo.nome] ?? ''} onChange={(e) => setFormulario({ ...formulario, atributos: { ...formulario.atributos, [campo.nome]: e.target.value } })}><option value="">Selecione</option>{campo.opcoes.map((opcao) => <option key={opcao}>{opcao}</option>)}</select>
-              : <textarea required={campo.obrigatorio} rows={3} value={formulario.atributos[campo.nome] ?? ''} onChange={(e) => setFormulario({ ...formulario, atributos: { ...formulario.atributos, [campo.nome]: e.target.value } })} />}
-          </label>
-        ))}
-        <label>Descrição<textarea required rows={3} value={formulario.descricao} onChange={(e) => setFormulario({ ...formulario, descricao: e.target.value })} placeholder="Qual o papel deste item na empresa?" /></label>
-        <div className="modal-actions">
-          <Link className="outline-button" href="/catalogo">Cancelar</Link>
-          <button className="primary-button" disabled={salvando || faltaPai}>{salvando ? 'Cadastrando...' : 'Cadastrar ativo'}</button>
-        </div>
-      </form>
+      <Cabecalho rotulo="TRABALHAR" titulo="Novo ativo" texto="O ativo nasce em rascunho, com código gerado pelo tipo. Ao lado, o rito que ele vai seguir até a publicação." />
+      <AssistenteDeCadastro oferecidos={oferecidos} metamodelo={metamodelo} ativos={ativos} squads={squads}
+        formulario={{ ...formulario, tipo: tipo.chave }} rito={rito} salvando={salvando} onMudar={setFormulario} onSalvar={() => void salvar()} />
     </>
   );
 }

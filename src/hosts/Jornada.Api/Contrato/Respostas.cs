@@ -58,6 +58,7 @@ public sealed record AncestralResponse(Guid Id, string Codigo, string Nome, stri
 /// <param name="Criticidade">baixa, media, alta ou critica.</param>
 /// <param name="Descricao">Para que serve o ativo.</param>
 /// <param name="RevisaoAtual">Número da revisão corrente.</param>
+/// <param name="IdSquad">O squad que cuida do ativo; nulo sem squad.</param>
 /// <param name="Trilha">Da raiz até o pai direto, sem o próprio ativo. Vazia num ativo raiz.</param>
 /// <param name="Atributos">Campos específicos do tipo.</param>
 /// <param name="Evidencias">Evidências anexadas.</param>
@@ -72,6 +73,7 @@ public sealed record FichaDoAtivoResponse(
     string Criticidade,
     string Descricao,
     int RevisaoAtual,
+    Guid? IdSquad,
     IReadOnlyList<AncestralResponse> Trilha,
     IReadOnlyDictionary<string, string> Atributos,
     IReadOnlyList<EvidenciaResponse> Evidencias,
@@ -80,7 +82,7 @@ public sealed record FichaDoAtivoResponse(
 {
     public static FichaDoAtivoResponse De(ObterVisaoDoAtivo.Saida s) => new(
         s.Id.Valor, s.Codigo, s.Nome, s.TipoItem, s.Status, s.Criticidade, s.Descricao,
-        s.RevisaoAtual, s.Trilha.Select(a => new AncestralResponse(a.Id.Valor, a.Codigo, a.Nome, a.TipoItem)).ToArray(), s.Atributos,
+        s.RevisaoAtual, s.IdSquad, s.Trilha.Select(a => new AncestralResponse(a.Id.Valor, a.Codigo, a.Nome, a.TipoItem)).ToArray(), s.Atributos,
         s.Evidencias.Select(e => new EvidenciaResponse(e.Id, e.Tipo, e.Titulo, e.Url)).ToArray(),
         s.Responsaveis.Select(r => new ResponsavelResponse(
             r.IdPessoa, r.Papel, r.InicioVigencia, r.FimVigencia, r.Vigente)).ToArray(),

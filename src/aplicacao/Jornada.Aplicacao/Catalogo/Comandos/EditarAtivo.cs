@@ -11,7 +11,8 @@ public sealed record ComandoEditarAtivo(
     string Nome,
     string Descricao,
     Criticidade Criticidade,
-    IReadOnlyDictionary<string, string>? Atributos);
+    IReadOnlyDictionary<string, string>? Atributos,
+    Guid? IdSquad = null);
 
 /// <summary>
 /// Fecha a fatia funcional: até aqui só era possível cadastrar. Editar é a
@@ -25,6 +26,7 @@ public sealed class EditarAtivo(
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
     ITrilhaDeAuditoria trilha,
+    IRepositorioDeSquads squads,
     IRelogio relogio)
 {
     public async Task<Resultado<bool>> ExecutarAsync(ComandoEditarAtivo cmd, CancellationToken ct = default)
@@ -44,11 +46,16 @@ public sealed class EditarAtivo(
         if (!ativo.Editavel)
             return Resultado<bool>.Recusado("ATIVO_NAO_EDITAVEL", ativo.MotivoDeNaoEditavel);
 
+        // Squad inativo só passa se já era o do ativo: inativar não desfaz vínculo.
+        if (cmd.IdSquad != ativo.IdSquad && await AlvoDoAtivo.ConferirSquadAsync(squads, cmd.IdSquad, ct) is { } recusa)
+            return Resultado<bool>.Recusado(recusa.Codigo, recusa.Mensagem);
+
         var antes = Campos(ativo, cmd.Atributos?.Keys);
 
         ativo.Renomear(cmd.Nome, relogio);
         ativo.Descrever(cmd.Descricao, relogio);
         ativo.ReclassificarCriticidade(cmd.Criticidade, relogio);
+        ativo.DefinirSquad(cmd.IdSquad, relogio);
 
         if (cmd.Atributos is not null)
             foreach (var (chave, valor) in cmd.Atributos)
@@ -75,6 +82,7 @@ public sealed class EditarAtivo(
             ["nome"] = ativo.Nome,
             ["descricao"] = ativo.Descricao,
             ["criticidade"] = ativo.Criticidade.Chave(),
+            ["squad"] = ativo.IdSquad?.ToString() ?? "",
         };
         foreach (var chave in atributos ?? [])
             campos[$"atributo:{chave}"] = ativo.Atributos.GetValueOrDefault(chave) ?? "";

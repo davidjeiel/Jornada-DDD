@@ -79,6 +79,12 @@ direto (Domínio › Subdomínio › Contexto), com cada degrau clicável. Embai
 - **Evidências**: os ADRs, contratos e links anexados;
 - **Histórico**: as revisões, com o hash de cada uma, e a trilha de auditoria.
 
+Para cadastrar, **Novo ativo** oferece os tipos dos blocos que o seu papel escreve, com os
+campos de cada tipo, e mostra ao lado o **rito de publicação** daquele tipo e criticidade:
+as etapas, o score mínimo, as evidências e o prazo. Escolha também o **squad** que cuida do
+ativo: um papel concedido "nos ativos de um squad" vale exatamente nesses ativos. Se a
+ferramenta recusar o cadastro, o que você digitou continua no formulário.
+
 A aba aberta fica no endereço: depois de salvar, você continua nela. Sem papel de escrita,
 ou em modo de leitura, os formulários somem e ficam só os dados.
 

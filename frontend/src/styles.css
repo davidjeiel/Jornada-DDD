@@ -724,3 +724,12 @@ fieldset.atributos legend { padding: 0 6px; color: var(--muted); font-size: 12.5
 @media (max-width: 860px) {
   .resumo-do-ativo { grid-template-columns: 1fr; }
 }
+
+/* Assistente de cadastro: o formulário e, ao lado, o rito que o tipo vai seguir. */
+.assistente { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 20px; align-items: start; }
+.assistente .rito { position: sticky; top: 16px; }
+.etapas-do-rito { font-weight: 600; }
+@media (max-width: 860px) {
+  .assistente { grid-template-columns: 1fr; }
+  .assistente .rito { position: static; }
+}
