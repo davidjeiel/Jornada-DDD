@@ -10,7 +10,7 @@ import type { Perfil } from './api';
 
 const curadora = perfilDe('curador');
 
-function pagina(secao: Secao, opcoes: { perfil?: Perfil | null; compacto?: boolean } = {}) {
+function pagina(secao: Secao, opcoes: { perfil?: Perfil | null; compacto?: boolean; naoLidas?: number } = {}) {
   return renderToStaticMarkup(
     <Layout
       secao={secao}
@@ -20,6 +20,7 @@ function pagina(secao: Secao, opcoes: { perfil?: Perfil | null; compacto?: boole
       onAlternarTema={() => {}}
       menuCompacto={opcoes.compacto ?? false}
       onAlternarMenu={() => {}}
+      naoLidas={opcoes.naoLidas ?? 0}
       termo=""
       onBuscar={() => {}}
     >

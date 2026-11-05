@@ -59,6 +59,9 @@ public static class CodigosDeErro
         ["TIPO_DE_RELACAO_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["MECANISMO_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["COMPETENCIA_INVALIDA"] = StatusCodes.Status400BadRequest,
+        ["TIPO_DE_NOTIFICACAO_INVALIDO"] = StatusCodes.Status400BadRequest,
+        ["CANAL_INVALIDO"] = StatusCodes.Status400BadRequest,
+        ["CANAL_INDISPONIVEL"] = StatusCodes.Status400BadRequest,
 
         [EmpresaNaoIdentificada] = StatusCodes.Status401Unauthorized,
         // Sem pessoa, a pergunta é "quem é você?": 401, e a tela manda ao perfil.
@@ -72,6 +75,7 @@ public static class CodigosDeErro
         ["VALIDACAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["REVISAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["PLEITO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
+        ["NOTIFICACAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["PESSOA_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["SQUAD_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["DESTINO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,

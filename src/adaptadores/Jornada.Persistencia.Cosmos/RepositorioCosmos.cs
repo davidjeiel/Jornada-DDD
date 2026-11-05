@@ -21,7 +21,8 @@ namespace Jornada.Persistencia.Cosmos;
 /// consequências negativas).
 /// </summary>
 public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRelacoes,
-    IRepositorioDeValidacoes, IUnidadeDeTrabalho, IRepositorioDeRevisoes, ITrilhaDeAuditoria, IRepositorioDeIndicadores
+    IRepositorioDeValidacoes, IUnidadeDeTrabalho, IRepositorioDeRevisoes, ITrilhaDeAuditoria, IRepositorioDeIndicadores,
+    IRepositorioDeNotificacoes, IRepositorioDePreferencias
 {
     private readonly AcessoDoTenant _acesso;
     private readonly Dictionary<IdDeAtivo, Rastreado<Ativo>> _ativos = [];
@@ -353,6 +354,7 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
             LoteDe(registro.Ativo).Criar(Mapeamento.ParaDocumento(registro));
 
         AgendarAcesso(LoteNa(AcessoDoTenant.ParticaoDeAcesso));
+        AgendarNotificacoes(LoteNa);
 
         foreach (var lote in lotes.Values)
             await lote.ExecutarAsync(ct);

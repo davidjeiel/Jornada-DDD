@@ -3,6 +3,7 @@ using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Governanca;
+using Jornada.Dominio.Notificacoes;
 using Jornada.Dominio.Tenancy;
 using Jornada.Dominio.Testes.Harness;
 
@@ -543,6 +544,72 @@ public abstract class ContratoDePersistencia
         Verificar.Igual(4.0, serie[1].Valores["sem_owner"]);
         await using var deFora = Abrir(IdDeEmpresa.Novo());
         Verificar.Vazio(await deFora.Indicadores.ListarAsync());
+    }
+
+    [Teste("a notificação vai no lote do ativo ou no de acesso, e volta com leitura e envio")]
+    public async Task NotificacoesPersistem()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var x = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0001", "X"));
+        var pessoa = Guid.NewGuid();
+        Guid doAtivo, doPleito;
+        await using (var s = Abrir(empresa))
+        {
+            var a = Notificacao.Criar(empresa, pessoa, TiposDeNotificacao.RevisaoSubmetida, "X aguarda validação", "corpo",
+                "/validacoes", x.Id, Guid.NewGuid(), "revisao_submetida:1", Relogio);
+            var b = Notificacao.Criar(empresa, pessoa, TiposDeNotificacao.AcessoDecidido, "Acesso concedido", "", "/perfil",
+                null, null, "pleito-decidido-1", Relogio);
+            await s.Notificacoes.AdicionarAsync(a);
+            await s.Notificacoes.AdicionarAsync(b);
+            Verificar.Verdadeiro(await s.Notificacoes.ExisteChaveAsync("revisao_submetida:1"), "a sessão enxerga o que ainda vai gravar");
+            await s.Unidade.ConfirmarAsync();
+            (doAtivo, doPleito) = (a.Id, b.Id);
+        }
+
+        await using (var s = Abrir(empresa))
+        {
+            Verificar.Igual(2, (await s.Notificacoes.DaPessoaAsync(pessoa)).Count);
+            Verificar.Igual(2, await s.Notificacoes.ContarNaoLidasAsync(pessoa));
+            Verificar.Verdadeiro(await s.Notificacoes.ExisteChaveAsync("pleito-decidido-1"));
+            Verificar.Falso(await s.Notificacoes.ExisteChaveAsync("outra"));
+            Verificar.Igual(2, (await s.Notificacoes.PendentesDeEnvioAsync()).Count);
+
+            var lida = (await s.Notificacoes.ObterAsync(doAtivo))!;
+            Verificar.Igual(x.Id, lida.Ativo!.Value);
+            Verificar.Igual("/validacoes", lida.Url);
+            lida.MarcarLida(Relogio.Agora);
+            foreach (var n in await s.Notificacoes.PendentesDeEnvioAsync()) n.MarcarEnviada(Relogio.Agora);
+            await s.Unidade.ConfirmarAsync();
+        }
+
+        await using var nova = Abrir(empresa);
+        Verificar.Igual(1, await nova.Notificacoes.ContarNaoLidasAsync(pessoa));
+        Verificar.Igual(doPleito, (await nova.Notificacoes.DaPessoaAsync(pessoa, apenasNaoLidas: true)).Single().Id);
+        Verificar.Vazio(await nova.Notificacoes.PendentesDeEnvioAsync(), "as duas saíram");
+        Verificar.Verdadeiro((await nova.Notificacoes.ObterAsync(doAtivo))!.Lida);
+
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Vazio(await deFora.Notificacoes.DaPessoaAsync(pessoa));
+        Verificar.Igual<Notificacao?>(null, await deFora.Notificacoes.ObterAsync(doAtivo));
+    }
+
+    [Teste("as preferências voltam como foram guardadas, e sem nada vale o padrão")]
+    public async Task PreferenciasPersistem()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var pessoa = Guid.NewGuid();
+        await using (var s = Abrir(empresa))
+        {
+            Verificar.Verdadeiro((await s.Preferencias.ObterAsync(pessoa)).QuerReceber(TiposDeNotificacao.SlaVencido, CanaisDeNotificacao.App));
+            await s.Preferencias.SalvarAsync(new PreferenciasDeNotificacao(pessoa,
+                new HashSet<string> { PreferenciasDeNotificacao.Chave(TiposDeNotificacao.SlaVencido, CanaisDeNotificacao.App) }));
+        }
+        await using var nova = Abrir(empresa);
+        var p = await nova.Preferencias.ObterAsync(pessoa);
+        Verificar.Verdadeiro(p.QuerReceber(TiposDeNotificacao.SlaVencido, CanaisDeNotificacao.App));
+        Verificar.Falso(p.QuerReceber(TiposDeNotificacao.RevisaoSubmetida, CanaisDeNotificacao.App));
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Verdadeiro((await deFora.Preferencias.ObterAsync(pessoa)).QuerReceber(TiposDeNotificacao.RevisaoSubmetida, CanaisDeNotificacao.App));
     }
 
     [Teste("cancelamento de etapa persiste")]

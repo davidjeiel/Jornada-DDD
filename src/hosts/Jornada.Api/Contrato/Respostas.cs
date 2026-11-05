@@ -2,10 +2,12 @@ using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Consultas;
 using Jornada.Aplicacao.Catalogo.Mapas;
 using Jornada.Aplicacao.Governanca;
+using Jornada.Aplicacao.Notificacoes;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Governanca;
+using Jornada.Dominio.Notificacoes;
 
 namespace Jornada.Api.Contrato;
 
@@ -635,3 +637,76 @@ public sealed record IndicadoresResponse(
     public static IndicadoresResponse De(Indicadores.Saida s) => new(
         s.Atuais, s.Variacao, Indicadores.QuantoMenosMelhor.Order().ToArray(), s.Serie.Select(FotografiaResponse.De).ToArray());
 }
+
+/// <summary>Um aviso da caixa.</summary>
+/// <param name="Id">Identificador do aviso.</param>
+/// <param name="Tipo">revisao_submetida, sla_vencendo, sla_vencido, revisao_rejeitada, ativo_publicado, acesso_solicitado ou acesso_decidido.</param>
+/// <param name="Rotulo">O tipo, por extenso.</param>
+/// <param name="Urgente">Se o tipo pede ação.</param>
+/// <param name="Titulo">A primeira linha do aviso.</param>
+/// <param name="Corpo">O detalhe: o parecer, o prazo, a justificativa.</param>
+/// <param name="Url">Para onde o aviso leva, na interface.</param>
+/// <param name="IdAtivo">O ativo do aviso, se houver.</param>
+/// <param name="CriadaEm">Quando o aviso foi gerado.</param>
+/// <param name="LidaEm">Quando foi lido; nulo enquanto não.</param>
+public sealed record NotificacaoResponse(
+    Guid Id, string Tipo, string Rotulo, bool Urgente, string Titulo, string Corpo, string? Url,
+    Guid? IdAtivo, DateTimeOffset CriadaEm, DateTimeOffset? LidaEm)
+{
+    public static NotificacaoResponse De(Notificacao n)
+    {
+        var tipo = TiposDeNotificacao.Obter(n.Tipo);
+        return new(n.Id, n.Tipo, tipo.Rotulo, tipo.Urgente, n.Titulo, n.Corpo, n.Url, n.Ativo?.Valor, n.CriadaEm, n.LidaEm);
+    }
+}
+
+/// <summary>A caixa de avisos.</summary>
+/// <param name="NaoLidas">Quantos avisos ainda não lidos (a bolha do sino).</param>
+/// <param name="Itens">Os avisos, do mais recente para o mais antigo.</param>
+public sealed record CaixaResponse(int NaoLidas, IReadOnlyList<NotificacaoResponse> Itens);
+
+/// <summary>A bolha do sino.</summary>
+/// <param name="NaoLidas">Avisos não lidos; zero sem pessoa identificada.</param>
+public sealed record ContagemDeNotificacoesResponse(int NaoLidas);
+
+/// <summary>Quantos avisos foram marcados como lidos.</summary>
+/// <param name="Marcadas">Quantos mudaram agora.</param>
+public sealed record LeituraResponse(int Marcadas);
+
+/// <summary>Um tipo de aviso e os canais em que a pessoa o recebe.</summary>
+/// <param name="Tipo">A chave do tipo.</param>
+/// <param name="Rotulo">O tipo, por extenso.</param>
+/// <param name="Urgente">Se o tipo pede ação.</param>
+/// <param name="Canais">Canal → ligado.</param>
+public sealed record PreferenciaDoTipoResponse(string Tipo, string Rotulo, bool Urgente, IReadOnlyDictionary<string, bool> Canais);
+
+/// <summary>Um canal de entrega.</summary>
+/// <param name="Chave">app, email ou teams.</param>
+/// <param name="Rotulo">O canal, por extenso.</param>
+/// <param name="Disponivel">Se já entrega. Hoje só o app.</param>
+public sealed record CanalResponse(string Chave, string Rotulo, bool Disponivel);
+
+/// <summary>As preferências de notificação.</summary>
+/// <param name="Canais">Os canais, e quais já entregam.</param>
+/// <param name="Tipos">Cada tipo de aviso e os canais ligados.</param>
+public sealed record PreferenciasResponse(IReadOnlyList<CanalResponse> Canais, IReadOnlyList<PreferenciaDoTipoResponse> Tipos)
+{
+    public static PreferenciasResponse De(PreferenciasDeNotificacao p) => new(
+        CanaisDeNotificacao.Todos.Select(c => new CanalResponse(c.Chave, c.Rotulo, CanaisDeNotificacao.Disponiveis.Contains(c.Chave))).ToArray(),
+        TiposDeNotificacao.Todos.Select(t => new PreferenciaDoTipoResponse(t.Chave, t.Rotulo, t.Urgente,
+            CanaisDeNotificacao.Todos.ToDictionary(c => c.Chave, c => p.QuerReceber(t.Chave, c.Chave)))).ToArray());
+}
+
+/// <summary>O resultado de um despacho da outbox.</summary>
+/// <param name="Despachadas">Quantas saíram agora.</param>
+/// <param name="PorCanal">Canal → quantas.</param>
+/// <param name="SemCanalDisponivel">Quantas esperam um canal que ainda não entrega.</param>
+public sealed record DespachoResponse(int Despachadas, IReadOnlyDictionary<string, int> PorCanal, int SemCanalDisponivel)
+{
+    public static DespachoResponse De(DespacharNotificacoes.Saida s) => new(s.Despachadas, s.PorCanal, s.SemCanalDisponivel);
+}
+
+/// <summary>O resultado de uma rodada do vigia de SLA.</summary>
+/// <param name="SlaVencendo">Avisos de prazo vencendo em menos de 24h.</param>
+/// <param name="SlaVencido">Avisos de prazo vencido.</param>
+public sealed record VigiaDeSlaResponse(int SlaVencendo, int SlaVencido);

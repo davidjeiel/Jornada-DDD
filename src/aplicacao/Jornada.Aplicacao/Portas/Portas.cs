@@ -2,6 +2,7 @@ using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Governanca;
+using Jornada.Dominio.Notificacoes;
 using Jornada.Dominio.Tenancy;
 
 namespace Jornada.Aplicacao.Portas;
@@ -317,4 +318,38 @@ public interface IRepositorioDeIndicadores
 
     /// <summary>Da competência mais antiga para a mais recente.</summary>
     public Task<IReadOnlyList<FotografiaDosIndicadores>> ListarAsync(CancellationToken ct = default);
+}
+
+/// <summary>
+/// A caixa de notificações da empresa. <see cref="AdicionarAsync"/> entra na
+/// unidade de trabalho, no lote do fato que gerou o aviso (o ativo, ou a
+/// partição de acesso quando não há ativo): é a outbox do painel.
+/// As lidas e enviadas também são gravadas na confirmação.
+/// </summary>
+public interface IRepositorioDeNotificacoes
+{
+    public Task AdicionarAsync(Notificacao notificacao, CancellationToken ct = default);
+    public Task<Notificacao?> ObterAsync(Guid id, CancellationToken ct = default);
+    public Task<bool> ExisteChaveAsync(string chaveUnica, CancellationToken ct = default);
+
+    /// <summary>A caixa da pessoa, da mais recente para a mais antiga.</summary>
+    public Task<IReadOnlyList<Notificacao>> DaPessoaAsync(Guid idPessoa, bool apenasNaoLidas = false, int limite = 50, CancellationToken ct = default);
+    public Task<int> ContarNaoLidasAsync(Guid idPessoa, CancellationToken ct = default);
+
+    /// <summary>O que ainda não saiu, da mais antiga para a mais recente.</summary>
+    public Task<IReadOnlyList<Notificacao>> PendentesDeEnvioAsync(int limite = 200, CancellationToken ct = default);
+}
+
+/// <summary>As preferências de notificação. Gravadas direto, fora da unidade de trabalho.</summary>
+public interface IRepositorioDePreferencias
+{
+    /// <summary>O que a pessoa guardou, ou o padrão se nunca guardou.</summary>
+    public Task<PreferenciasDeNotificacao> ObterAsync(Guid idPessoa, CancellationToken ct = default);
+    public Task SalvarAsync(PreferenciasDeNotificacao preferencias, CancellationToken ct = default);
+}
+
+/// <summary>As empresas com dados na plataforma. Para as tarefas de fundo, que rodam em cada uma.</summary>
+public interface IEmpresasDaPlataforma
+{
+    public Task<IReadOnlyList<IdDeEmpresa>> ListarAsync(CancellationToken ct = default);
 }

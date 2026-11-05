@@ -3,6 +3,7 @@ using Jornada.Aplicacao;
 using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Comandos;
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Notificacoes;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -135,6 +136,11 @@ public sealed class AcessoTestes
         Verificar.Igual<Guid?>(MundoDeAcesso.Curador.IdPessoa, decidido.Pleito.DecididoPor);
         Verificar.Verdadeiro(PoliticaDeAutorizacao.Pode(m.Como(m.Pessoa(pedido.Pessoa.Id)), Acao.Importar,
             Cenario.Alvo("api"), Cenario.Relogio.Hoje), "tech lead importa");
+
+        var aviso = m.Notificacoes.DaPessoaAsync(pedido.Pessoa.Id).Result.Single();
+        Verificar.Igual(Dominio.Notificacoes.TiposDeNotificacao.AcessoDecidido, aviso.Tipo);
+        Verificar.Verdadeiro(aviso.Titulo.StartsWith("Acesso concedido"), "o aviso na caixa");
+        Verificar.Igual("Bem-vindo.", aviso.Corpo);
     }
 
     [Teste("negar exige motivo e não concede nada")]
@@ -148,6 +154,10 @@ public sealed class AcessoTestes
         Verificar.Igual(StatusDoPleito.Negado, negado.Pleito.Status);
         Verificar.Vazio(m.Pessoa(pedido.Pessoa.Id).Atribuicoes);
         Verificar.Verdadeiro(negado.Pleito.Resposta.Contains("gestor"));
+
+        var aviso = m.Notificacoes.DaPessoaAsync(pedido.Pessoa.Id).Result.Single();
+        Verificar.Igual("Seu pleito de acesso foi negado", aviso.Titulo, "a tentativa sem motivo não deixou aviso");
+        Verificar.Igual("Peça ao seu gestor primeiro.", aviso.Corpo);
     }
 
     [Teste("conceder papel diferente do pleiteado exige explicar a troca")]
@@ -368,6 +378,9 @@ internal sealed class MundoDeAcesso(RegrasDeAcesso? regras = null)
     public RepositorioDeAcessoEmMemoria Acesso => new(_armazem, _tenant);
     public IRepositorioDePessoas Pessoas => Acesso;
     public IRepositorioDePleitos Pleitos => Acesso;
+    public RepositorioDeNotificacoesEmMemoria Notificacoes => new(_armazem, _tenant);
+    public RepositorioDePreferenciasEmMemoria Preferencias => new(_armazem, _tenant);
+    public Notificador Notificador => new(Notificacoes, Preferencias, Pessoas, _tenant, Cenario.Relogio);
 
     public Pessoa Pessoa(Guid id) => Pessoas.ObterAsync(id).Result!;
 
@@ -376,14 +389,14 @@ internal sealed class MundoDeAcesso(RegrasDeAcesso? regras = null)
     public Resultado<SolicitarAcesso.Saida> Solicitar(
         string matricula = "C123456", string nome = "Davi Souza", string email = "davi@empresa.com",
         string unidade = "0427", string papel = "techlead", string justificativa = "Vou cadastrar APIs.") =>
-        new SolicitarAcesso(Pessoas, Pleitos, _tenant, Repo, _regras, Cenario.Relogio)
+        new SolicitarAcesso(Pessoas, Pleitos, _tenant, Repo, _regras, Notificador, Cenario.Relogio)
             .ExecutarAsync(new ComandoSolicitarAcesso(matricula, nome, email, unidade, papel, justificativa)).Result;
 
     public SolicitarAcesso.Saida Pedir(string papel = "techlead") => Exigir(Solicitar(papel: papel));
 
     public Resultado<PleitoLegivel> Decidir(Guid pleito, Ator quem, bool aprovar, string? resposta = null,
                                             string? papel = null, string? escopo = null, Guid? escopoId = null) =>
-        new DecidirPleito(Pleitos, Pessoas, Repo, Acesso, new AtorFixo(quem), Repo, Cenario.Relogio)
+        new DecidirPleito(Pleitos, Pessoas, Repo, Acesso, new AtorFixo(quem), Repo, Notificador, Cenario.Relogio)
             .ExecutarAsync(new ComandoDecidirPleito(pleito, aprovar, resposta, papel, escopo, escopoId)).Result;
 
     public Resultado<ListarPleitos.Saida> Fila(Ator quem) =>

@@ -246,3 +246,20 @@ public sealed record SquadRequest
     /// <example>Originação e manutenção de contratos de crédito.</example>
     public required string Descricao { get; init; }
 }
+
+/// <summary>Um tipo de aviso ligado num canal.</summary>
+public sealed record PreferenciaRequest
+{
+    /// <example>revisao_submetida</example>
+    public required string Tipo { get; init; }
+
+    /// <summary>Hoje só app; email e teams dependem da identidade corporativa.</summary>
+    /// <example>app</example>
+    public required string Canal { get; init; }
+}
+
+/// <summary>As preferências de notificação. O que não vier ligado fica desligado.</summary>
+public sealed record SalvarPreferenciasRequest
+{
+    public required IReadOnlyList<PreferenciaRequest> Ativas { get; init; }
+}

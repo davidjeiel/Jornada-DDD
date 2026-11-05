@@ -3,6 +3,7 @@ using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
+using Jornada.Dominio.Notificacoes;
 using Jornada.Dominio.Tenancy;
 
 namespace Jornada.Adaptadores.Memoria;
@@ -30,9 +31,13 @@ public sealed class ArmazemEmMemoria
     internal ConcurrentDictionary<Guid, PleitoDeAcesso> Pleitos { get; } = new();
     internal ConcurrentDictionary<Guid, Squad> Squads { get; } = new();
     internal ConcurrentDictionary<(IdDeEmpresa Empresa, string Competencia), FotografiaDosIndicadores> Fotografias { get; } = new();
+    internal ConcurrentDictionary<Guid, Notificacao> Notificacoes { get; } = new();
+    internal ConcurrentDictionary<(IdDeEmpresa Empresa, Guid Pessoa), PreferenciasDeNotificacao> Preferencias { get; } = new();
 
     public void Limpar()
     {
+        Notificacoes.Clear();
+        Preferencias.Clear();
         Fotografias.Clear();
         Squads.Clear();
         Pessoas.Clear();
@@ -445,4 +450,65 @@ public sealed class RepositorioDeIndicadoresEmMemoria(ArmazemEmMemoria armazem, 
             .Select(f => f.Value)
             .OrderBy(f => f.Competencia, StringComparer.Ordinal)
             .ToArray());
+}
+
+/// <summary>
+/// A caixa de notificações em memória. Como as validações aqui, o aviso é
+/// gravado ao adicionar; a transação da outbox é a do adaptador Cosmos.
+/// </summary>
+public sealed class RepositorioDeNotificacoesEmMemoria(ArmazemEmMemoria armazem, IContextoDeTenantAtual tenant) : IRepositorioDeNotificacoes
+{
+    private IdDeEmpresa Empresa => tenant.Atual.Empresa;
+    private IEnumerable<Notificacao> Minhas => armazem.Notificacoes.Values.Where(n => n.Empresa == Empresa);
+
+    public Task AdicionarAsync(Notificacao notificacao, CancellationToken ct = default)
+    {
+        if (notificacao.Empresa != Empresa)
+            throw new ErroDeDominio("TENANT_INVALIDO", "Tentativa de gravar notificação de outra empresa.");
+        armazem.Notificacoes[notificacao.Id] = notificacao;
+        return Task.CompletedTask;
+    }
+
+    public Task<Notificacao?> ObterAsync(Guid id, CancellationToken ct = default) =>
+        Task.FromResult(armazem.Notificacoes.TryGetValue(id, out var n) && n.Empresa == Empresa ? n : null);
+
+    public Task<bool> ExisteChaveAsync(string chaveUnica, CancellationToken ct = default) =>
+        Task.FromResult(Minhas.Any(n => n.ChaveUnica == chaveUnica));
+
+    public Task<IReadOnlyList<Notificacao>> DaPessoaAsync(Guid idPessoa, bool apenasNaoLidas = false, int limite = 50, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<Notificacao>>(Minhas
+            .Where(n => n.IdPessoa == idPessoa && (!apenasNaoLidas || !n.Lida))
+            .OrderByDescending(n => n.CriadaEm).ThenByDescending(n => n.Id)
+            .Take(limite).ToArray());
+
+    public Task<int> ContarNaoLidasAsync(Guid idPessoa, CancellationToken ct = default) =>
+        Task.FromResult(Minhas.Count(n => n.IdPessoa == idPessoa && !n.Lida));
+
+    public Task<IReadOnlyList<Notificacao>> PendentesDeEnvioAsync(int limite = 200, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<Notificacao>>(Minhas
+            .Where(n => n.EnviadaEm is null)
+            .OrderBy(n => n.CriadaEm).ThenBy(n => n.Id)
+            .Take(limite).ToArray());
+}
+
+/// <summary>As preferências de notificação em memória.</summary>
+public sealed class RepositorioDePreferenciasEmMemoria(ArmazemEmMemoria armazem, IContextoDeTenantAtual tenant) : IRepositorioDePreferencias
+{
+    public Task<PreferenciasDeNotificacao> ObterAsync(Guid idPessoa, CancellationToken ct = default) =>
+        Task.FromResult(armazem.Preferencias.TryGetValue((tenant.Atual.Empresa, idPessoa), out var p)
+            ? p : PreferenciasDeNotificacao.Padrao(idPessoa));
+
+    public Task SalvarAsync(PreferenciasDeNotificacao preferencias, CancellationToken ct = default)
+    {
+        armazem.Preferencias[(tenant.Atual.Empresa, preferencias.IdPessoa)] = preferencias;
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>As empresas com alguém cadastrado, em memória.</summary>
+public sealed class EmpresasEmMemoria(ArmazemEmMemoria armazem) : IEmpresasDaPlataforma
+{
+    public Task<IReadOnlyList<IdDeEmpresa>> ListarAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<IdDeEmpresa>>(armazem.Pessoas.Values.Select(p => p.Empresa)
+            .Concat(armazem.Ativos.Values.Select(a => a.Empresa)).Distinct().ToArray());
 }

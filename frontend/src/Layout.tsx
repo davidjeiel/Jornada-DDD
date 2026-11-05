@@ -4,6 +4,7 @@ import { CARTILHA, itensVisiveis, type Grupo, type ItemDeMenu, type Secao } from
 import { estadoDoTema, type Tema } from './preferencias';
 import { Link } from './roteador';
 import { sugerirAtivos, type Perfil, type Sugestao } from './api';
+import { BolhaDoSino } from './telas/Notificacoes';
 
 const GRUPOS: (Grupo | undefined)[] = [undefined, 'Trabalhar', 'Você', 'Administração'];
 
@@ -18,10 +19,12 @@ type Props = {
   onAlternarMenu: () => void;
   termo: string;
   onBuscar: (termo: string) => void;
+  /** Avisos não lidos de quem está identificado: a bolha do sino. */
+  naoLidas: number;
   children: ReactNode;
 };
 
-export function Layout({ secao, perfil, nomeDaEmpresa, tema, onAlternarTema, menuCompacto, onAlternarMenu, termo, onBuscar, children }: Props) {
+export function Layout({ secao, perfil, nomeDaEmpresa, tema, onAlternarTema, menuCompacto, onAlternarMenu, termo, onBuscar, naoLidas, children }: Props) {
   const itens = itensVisiveis(perfil ?? { podeConceder: false, podeAdministrar: false });
   const nome = perfil?.pessoa?.nome ?? 'Quem é você?';
   const papel = perfil?.papeis.map((p) => p.rotulo).join(', ') || (perfil?.identificado ? 'Sem papel: só consulta' : 'Não identificado');
@@ -116,8 +119,9 @@ export function Layout({ secao, perfil, nomeDaEmpresa, tema, onAlternarTema, men
               <button type="button" className="tema" onClick={onAlternarTema} title={`${estadoTema.rotulo} — clique para alternar`} aria-live="polite">
                 <span className="glifo" aria-hidden="true">{estadoTema.glifo}</span><span className="tema-rotulo">{estadoTema.rotulo}</span>
               </button>
-              <Link className="sino" href="/notificacoes" aria-label="Notificações">
-                <Bell size={15} aria-hidden="true" /> <span className="rotulo-topo">Notificações</span>
+              <Link className={secao === 'notificacoes' ? 'sino ativo' : 'sino'} href="/notificacoes"
+                aria-label={naoLidas > 0 ? `Notificações: ${naoLidas} não lida(s)` : 'Notificações'}>
+                <Bell size={15} aria-hidden="true" /> <span className="rotulo-topo">Notificações</span> <BolhaDoSino naoLidas={naoLidas} />
               </Link>
               <Link className={secao === 'perfil' ? 'quem ativo' : 'quem'} href="/perfil" title="Seu perfil: quem assina o que você fizer">
                 <span className="quem-texto">

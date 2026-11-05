@@ -35,7 +35,7 @@ export const MENU: ItemDeMenu[] = [
   { secao: 'descobertas', caminho: '/descobertas', rotulo: 'Descobertas', inicial: 'DE', grupo: 'Trabalhar', fase: 9, descricao: 'Importação de OpenAPI e inventário Git, com prévia e triagem.' },
   { secao: 'validacoes', caminho: '/validacoes', rotulo: 'Validações', inicial: 'VL', grupo: 'Trabalhar', descricao: 'Fila de etapas de validação aguardando decisão.' },
 
-  { secao: 'notificacoes', caminho: '/notificacoes', rotulo: 'Notificações', inicial: 'NT', grupo: 'Você', fase: 8, descricao: 'Caixa de avisos de submissão, decisão e SLA.' },
+  { secao: 'notificacoes', caminho: '/notificacoes', rotulo: 'Notificações', inicial: 'NT', grupo: 'Você', descricao: 'Caixa de avisos de submissão, decisão e SLA.' },
   { secao: 'perfil', caminho: '/perfil', rotulo: 'Seu perfil', inicial: 'PF', grupo: 'Você', descricao: 'Quem você é na ferramenta e o que o seu papel permite.' },
 
   { secao: 'pleitos', caminho: '/pleitos', rotulo: 'Pleitos de acesso', inicial: 'PA', grupo: 'Administração', exige: 'conceder', descricao: 'Fila de pedidos de papel para quem concede acesso.' },
