@@ -355,6 +355,7 @@ function Relacoes({ ficha, ativos, metamodelo, podeEscrever, podeDescontinuar, i
       {podeEscrever && editavel(ficha.status) && (
         <FormularioDeRelacao id={ficha.id} ativos={ativos} metamodelo={metamodelo} ocupado={ocupado} onRelacionar={acoes.relacionar} onErro={onErro} />
       )}
+      <p><Link href={`/ativos/${ficha.id}/grafo`}>Ver o grafo de relações deste ativo</Link></p>
       {impacto && <QuemDepende impacto={impacto} />}
       {impacto && podeDescontinuar && podeSerDescontinuado(ficha.status) && (
         <CartaoDeDescontinuacao key={ficha.status} impacto={impacto} onDescontinuar={acoes.descontinuar} />

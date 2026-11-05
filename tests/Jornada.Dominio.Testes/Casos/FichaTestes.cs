@@ -231,7 +231,7 @@ internal sealed class MundoDaFicha
         new RelacionarEmLote(Relacionador(quem))
             .ExecutarAsync(new ComandoRelacionarEmLote(origem, destinos, tipo, Criticidade.Media, mecanismo)).Result;
 
-    private IdDeAtivo Cadastrar(string tipo, string nome, IdDeAtivo? pai, Dictionary<string, string> atributos) =>
+    public IdDeAtivo Cadastrar(string tipo, string nome, IdDeAtivo? pai, Dictionary<string, string> atributos) =>
         Exigir(new CadastrarAtivo(Repo, _meta, _tenant, _curador, Repo, Repo, new RepositorioDeAcessoEmMemoria(_armazem, _tenant), Cenario.Relogio)
             .ExecutarAsync(new ComandoCadastrarAtivo(tipo, nome, $"Descrição completa de {nome}.", Criticidade.Media, pai, atributos)).Result);
 

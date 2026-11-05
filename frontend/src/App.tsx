@@ -15,6 +15,8 @@ import { Cartilha } from './telas/Cartilha';
 import { Catalogo } from './telas/Catalogo';
 import { EmBreve, NaoEncontrada } from './telas/EmBreve';
 import { GestaoDeAcessos } from './telas/GestaoDeAcessos';
+import { Grafo } from './telas/Grafo';
+import { Mapas } from './telas/Mapas';
 import { Mesa } from './telas/Mesa';
 import { NovoAtivo } from './telas/NovoAtivo';
 import { abaDaUrl, PaginaDoAtivo } from './telas/PaginaDoAtivo';
@@ -138,12 +140,15 @@ function App() {
   const item = itemDaSecao(secao);
 
   // /ativos/{id} e /ativos/{id}/relacoes-lote: dentro de um ativo, o menu continua no catálogo.
-  const rotaDoAtivo = /^\/ativos\/([0-9a-f-]{36})(\/relacoes-lote)?\/?$/i.exec(local.caminho);
+  const rotaDoAtivo = /^\/ativos\/([0-9a-f-]{36})(\/relacoes-lote|\/grafo)?\/?$/i.exec(local.caminho);
 
   let tela;
   if (rotaDoAtivo) {
-    const [, idDoAtivo, lote] = rotaDoAtivo;
-    tela = lote
+    const [, idDoAtivo, subpagina] = rotaDoAtivo;
+    tela = subpagina === '/grafo'
+      ? <Grafo id={idDoAtivo} saltos={Math.min(Math.max(Number(local.busca.get('saltos')) || 1, 1), 3)}
+          tipos={(local.busca.get('tipos') ?? '').split(',').filter(Boolean)} metamodelo={metamodelo} onErro={setErro} />
+      : subpagina
       ? <RelacoesEmLote id={idDoAtivo} tipo={local.busca.get('tipo') ?? ''} ativos={ativos} metamodelo={metamodelo} onAlterado={carregar} onErro={setErro} />
       : <PaginaDoAtivo key={idDoAtivo} id={idDoAtivo} aba={abaDaUrl(local.busca.get('aba'))} ativos={ativos} pessoas={pessoas} metamodelo={metamodelo} squads={squads}
           podeEscrever={podeEscrever} podeDescontinuar={podeEscrever && podeDescontinuar(papeis)} idPessoa={perfil?.pessoa?.id ?? null}
@@ -168,6 +173,9 @@ function App() {
       case 'validacoes':
         tela = <Validacoes aba={local.busca.get('etapa') ?? ''} selecionada={local.busca.get('validacao')} idPessoa={perfil?.pessoa?.id ?? null}
           podeDecidir={podeDecidir} onAlterado={carregar} onErro={setErro} />;
+        break;
+      case 'mapas':
+        tela = <Mapas visao={local.busca.get('visao') === 'tecnica' ? 'tecnica' : 'negocio'} onErro={setErro} />;
         break;
       case 'mesa':
         tela = <Mesa key={identidade.pessoaId ?? ''} onErro={setErro} />;

@@ -91,9 +91,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 118 |
+| ✅ coberto | 130 |
 | 🟡 parcial | 3 |
-| ⬜ pendente | 31 |
+| ⬜ pendente | 19 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -108,7 +108,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | 3 | Ficha e cadastro | 22 | 0 | 0 |
 | 4 | Validação e mesa | 8 | 0 | 0 |
 | 5 | Catálogo e busca | 12 | 0 | 0 |
-| 6 | Mapas e grafo | 0 | 0 | 12 |
+| 6 | Mapas e grafo | 12 | 0 | 0 |
 | 7 | Visão executiva | 0 | 0 | 3 |
 | 8 | Notificações | 0 | 1 | 6 |
 | 9 | Descobertas | 0 | 0 | 10 |
@@ -182,12 +182,12 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 | `test_rejeicao_avisa_o_autor` | 8 | ⬜ |  |
 | `test_vigia_de_sla_nao_repete_o_alerta_no_mesmo_dia` | 8 | ⬜ |  |
 | `test_sino_mostra_a_contagem_de_nao_lidas` | 8 | 🟡 | O sino está no topo de toda tela; a contagem chega com as notificações. |
-| `test_vizinhanca_de_um_salto_traz_so_os_vizinhos_diretos` | 6 | ⬜ |  |
-| `test_vizinhanca_de_dois_saltos_nao_repete_nos` | 6 | ⬜ |  |
-| `test_teto_marca_truncado` | 6 | ⬜ |  |
-| `test_filtro_por_tipo_de_relacao_reduz_o_grafo` | 6 | ⬜ |  |
-| `test_layout_poe_o_centro_no_meio` | 6 | ⬜ |  |
-| `test_tela_do_grafo_responde_e_avisa_o_corte` | 6 | ⬜ |  |
+| `test_vizinhanca_de_um_salto_traz_so_os_vizinhos_diretos` | 6 | ✅ | `VizinhancaDeUmSalto` (`GET /v1/ativos/{id}/vizinhanca`) |
+| `test_vizinhanca_de_dois_saltos_nao_repete_nos` | 6 | ✅ | `VizinhancaDeDoisSaltosNaoRepeteNos` |
+| `test_teto_marca_truncado` | 6 | ✅ | `TetoMarcaTruncado` |
+| `test_filtro_por_tipo_de_relacao_reduz_o_grafo` | 6 | ✅ | `FiltroPorTipoDeRelacaoReduzOGrafo` |
+| `test_layout_poe_o_centro_no_meio` | 6 | ✅ | `telas/Mapas.test.tsx` (`grafo.ts`: o layout em anéis vai para o front, que desenha o SVG) |
+| `test_tela_do_grafo_responde_e_avisa_o_corte` | 6 | ✅ | `telas/Mapas.test.tsx`: SVG, "Quem depende deste ativo" e o aviso de corte |
 | `test_tema_noturno_tem_os_tres_estados` — Escolha explícita clara, escura e o padrão do sistema. | 0 | ✅ | `preferencias.test.ts` |
 | `test_paleta_e_toda_por_token` — Nenhuma cor fixa fora da declaração dos tokens: senão um tema quebra o outro. | 0 | ✅ | `estilos.test.ts` |
 | `test_menu_recolhivel_tem_controle_e_iniciais` | 0 | ✅ | `Layout.test.tsx`, `navegacao.test.ts` |
@@ -305,13 +305,13 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 | `test_ordenacao_desconhecida_cai_no_padrao` | 5 | ✅ | `OrdenacaoDesconhecidaCaiNoPadrao` |
 | `test_catalogo_mostra_total_e_paginacao` | 5 | ✅ | `telas/Busca.test.tsx` |
 | `test_filtro_de_origem_separa_o_que_a_maquina_trouxe` | 5 | ✅ | `FiltroDeOrigemSeparaOQueAMaquinaTrouxe`, o contrato de persistência e `telas/Busca.test.tsx` |
-| `test_arvore_de_negocio_desce_quatro_niveis` | 6 | ⬜ |  |
-| `test_arvore_tecnica_usa_a_mesma_mecanica` | 6 | ⬜ |  |
-| `test_arvore_conta_implementacoes_da_capacidade` | 6 | ⬜ |  |
-| `test_mapa_tem_as_duas_visoes` | 6 | ⬜ |  |
-| `test_analise_agrupa_os_consumidores` | 6 | ⬜ |  |
+| `test_arvore_de_negocio_desce_quatro_niveis` | 6 | ✅ | `ArvoreDeNegocioDesceQuatroNiveis` (`GET /v1/mapa/arvore`) e `telas/Mapas.test.tsx` |
+| `test_arvore_tecnica_usa_a_mesma_mecanica` | 6 | ✅ | `ArvoreTecnicaUsaAMesmaMecanica` |
+| `test_arvore_conta_implementacoes_da_capacidade` | 6 | ✅ | `ArvoreContaImplementacoesDaCapacidade` e `telas/Mapas.test.tsx` |
+| `test_mapa_tem_as_duas_visoes` | 6 | ✅ | `telas/Mapas.test.tsx`: abas Negócio e Técnica e a busca na árvore (`filtro-arvore`) |
+| `test_analise_agrupa_os_consumidores` | 6 | ✅ | `AnaliseAgrupaOsConsumidores` (`AnalisarImpacto`, desde a fase 1) |
 | `test_tela_mostra_quem_depende_antes_de_descontinuar` | 1 | ✅ | `telas/Impacto.test.tsx` (aba Relações da ficha) |
-| `test_ativo_sem_consumidor_diz_isso_claramente` | 6 | ⬜ |  |
+| `test_ativo_sem_consumidor_diz_isso_claramente` | 6 | ✅ | `telas/Mapas.test.tsx` (`QuemDepende`) |
 
 ### Cartilha — `tests/test_cartilha.py` (15)
 
