@@ -501,3 +501,21 @@ export type Sugestao = { id: string; codigo: string; nome: string; tipo: string;
 export function sugerirAtivos(termo: string): Promise<{ termo: string; itens: Sugestao[] }> {
   return requisicao(`/v1/busca/sugestoes?termo=${encodeURIComponent(termo)}`);
 }
+
+// ── Mapas e grafo (fase 6) ───────────────────────────────────────────────
+
+export type NoDaVizinhanca = { ativo: AtivoResumo; salto: number };
+export type Aresta = { origem: string; destino: string; tipo: string; criticidade: string; mecanismo: string | null };
+export type Vizinhanca = { centro: string; saltos: number; nos: NoDaVizinhanca[]; arestas: Aresta[]; truncado: boolean; teto: number };
+
+export function consultarVizinhanca(id: string, saltos = 1, tipos: string[] = []): Promise<Vizinhanca> {
+  const busca = new URLSearchParams({ saltos: String(saltos) });
+  if (tipos.length) busca.set('tipos', tipos.join(','));
+  return requisicao(`/v1/ativos/${id}/vizinhanca?${busca.toString()}`);
+}
+
+export type NoDaArvore = { ativo: AtivoResumo; implementacoes: number; filhos: NoDaArvore[] };
+
+export function consultarArvore(visao: 'negocio' | 'tecnica'): Promise<{ visao: string; raizes: NoDaArvore[] }> {
+  return requisicao(`/v1/mapa/arvore?visao=${visao}`);
+}

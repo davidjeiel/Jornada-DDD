@@ -768,3 +768,27 @@ a.validation-row > :not(:first-child) { flex: none; width: auto; }
 .sugestoes { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); box-shadow: 0 12px 28px -14px var(--shadow); }
 .sugestoes a { display: block; padding: 7px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
 .sugestoes a:hover, .sugestoes a:focus { background: var(--surface-hover); }
+
+/* Mapas: a árvore e o grafo de relações. */
+.busca-na-arvore { display: block; max-width: 360px; margin-bottom: 12px; }
+.busca-na-arvore input { display: block; width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--field-border); border-radius: 7px; background: var(--field-bg); color: var(--ink); }
+.arvore, .arvore ul { margin: 0; padding-left: 18px; list-style: none; }
+.arvore { padding-left: 0; }
+.arvore li { margin: 4px 0; }
+.arvore summary { cursor: pointer; }
+.arvore li.folha { padding-left: 14px; }
+.alerta-texto { color: var(--pending-ink); }
+.grafo { display: block; width: 100%; height: auto; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.grafo .aresta line { stroke: var(--line); stroke-width: 1.4; }
+.grafo .aresta.criticidade-alta line, .grafo .aresta.criticidade-critica line { stroke: var(--danger); stroke-width: 2; }
+.grafo .aresta text { fill: var(--muted); font-size: 10px; text-anchor: middle; }
+.grafo .ponta { fill: var(--muted); }
+.grafo .no circle { fill: var(--brand-weak); stroke: var(--brand); stroke-width: 1.5; }
+.grafo .no.centro circle { fill: var(--brand); }
+.grafo .no.salto-2 circle, .grafo .no.salto-3 circle { fill: var(--paper); }
+.grafo .no text { fill: var(--ink); font-size: 11px; text-anchor: middle; }
+.grafo a:hover circle { stroke-width: 3; }
+.controles-do-grafo { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.controles-do-grafo select { display: block; margin-top: 4px; padding: 6px 8px; border: 1px solid var(--field-border); border-radius: 7px; background: var(--field-bg); color: var(--ink); }
+.controles-do-grafo fieldset { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.controles-do-grafo label.caixa-de-marcar { display: inline-flex; align-items: center; gap: 6px; margin: 0; }

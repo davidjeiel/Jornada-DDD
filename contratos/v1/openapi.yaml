@@ -1905,6 +1905,180 @@ paths:
         - Bearer: [ ]
         - X-Empresa: [ ]
           X-Pessoa: [ ]
+  '/v1/ativos/{id}/vizinhanca':
+    get:
+      tags:
+        - Catálogo
+      summary: A vizinhança do ativo no grafo de relações
+      description: 'Os ativos a até saltos relações de distância (1 a 3), nos dois sentidos, e as arestas entre eles. tipos filtra por tipo de relação, separados por vírgula. teto limita os nós (padrão 150, máximo 500); passou do teto, truncado é true.'
+      operationId: consultarVizinhanca
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: saltos
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 1
+        - name: tipos
+          in: query
+          schema:
+            type: string
+        - name: teto
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 150
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VizinhancaResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/mapa/arvore:
+    get:
+      tags:
+        - Catálogo
+      summary: 'A árvore do catálogo, de negócio ou técnica'
+      description: 'negocio: Domínio → Subdomínio → Contexto → Capacidade, com quantos ativos implementam cada capacidade. tecnica: Sistema → Aplicação → API → Endpoint e Base de dados → Objeto de dado. Arquivados ficam de fora.'
+      operationId: consultarArvore
+      parameters:
+        - name: visao
+          in: query
+          schema:
+            type: string
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArvoreResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   /v1/busca/sugestoes:
     get:
       tags:
@@ -4376,6 +4550,50 @@ components:
           example: '2026-10-09T10:37:00-03:00'
       additionalProperties: false
       description: Erro no padrão CAIXA. Toda resposta 4xx e 5xx desta API usa este formato.
+    ArestaResponse:
+      required:
+        - origem
+        - destino
+        - tipo
+        - criticidade
+      type: object
+      properties:
+        origem:
+          type: string
+          description: Quem aponta.
+          format: uuid
+        destino:
+          type: string
+          description: Para quem aponta.
+          format: uuid
+        tipo:
+          type: string
+          description: 'implementa, expoe, consome, produz, depende_de ou persiste_em.'
+        criticidade:
+          type: string
+          description: A criticidade da dependência.
+        mecanismo:
+          type: string
+          description: 'Como a relação acontece, quando informado.'
+          nullable: true
+      additionalProperties: false
+      description: 'Uma aresta da vizinhança, na direção real.'
+    ArvoreResponse:
+      required:
+        - visao
+        - raizes
+      type: object
+      properties:
+        visao:
+          type: string
+          description: negocio (a partir do domínio) ou tecnica (a partir do sistema).
+        raizes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NoDaArvoreResponse'
+          description: 'Os nós de raiz, cada um com os descendentes.'
+      additionalProperties: false
+      description: Uma árvore do mapa.
     AtivoCriadoResponse:
       required:
         - id
@@ -5330,6 +5548,40 @@ components:
             $ref: '#/components/schemas/MecanismoResponse'
       additionalProperties: false
       description: 'O metamodelo da empresa: tipos de ativo, tipos de relação e mecanismos.'
+    NoDaArvoreResponse:
+      required:
+        - ativo
+        - implementacoes
+        - filhos
+      type: object
+      properties:
+        ativo:
+          $ref: '#/components/schemas/AtivoResumoResponse'
+        implementacoes:
+          type: integer
+          description: Quantos ativos implementam esta capacidade (0 nos demais tipos).
+          format: int32
+        filhos:
+          type: array
+          items:
+            $ref: '#/components/schemas/NoDaArvoreResponse'
+          description: 'Os filhos, por nome.'
+      additionalProperties: false
+      description: Um nó da árvore do catálogo.
+    NoDaVizinhancaResponse:
+      required:
+        - ativo
+        - salto
+      type: object
+      properties:
+        ativo:
+          $ref: '#/components/schemas/AtivoResumoResponse'
+        salto:
+          type: integer
+          description: 'A distância até o centro, em relações (0 é o centro).'
+          format: int32
+      additionalProperties: false
+      description: Um nó da vizinhança.
     PaginaDoCatalogoResponse:
       required:
         - itens
@@ -6248,6 +6500,43 @@ components:
           description: '"papéis atribuídos", "pleitos de acesso", "responsabilidades em ativos"...'
       additionalProperties: false
       description: O que amarra o cadastro ao histórico.
+    VizinhancaResponse:
+      required:
+        - centro
+        - saltos
+        - nos
+        - arestas
+        - truncado
+        - teto
+      type: object
+      properties:
+        centro:
+          type: string
+          description: O ativo pedido.
+          format: uuid
+        saltos:
+          type: integer
+          description: A profundidade aplicada (1 a 3).
+          format: int32
+        nos:
+          type: array
+          items:
+            $ref: '#/components/schemas/NoDaVizinhancaResponse'
+          description: 'Os ativos alcançados, do centro para fora.'
+        arestas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArestaResponse'
+          description: As relações entre os nós devolvidos.
+        truncado:
+          type: boolean
+          description: 'A expansão parou no teto: há mais ativos do que os mostrados.'
+        teto:
+          type: integer
+          description: O máximo de nós.
+          format: int32
+      additionalProperties: false
+      description: A vizinhança de um ativo no grafo de relações.
   securitySchemes:
     Bearer:
       type: http

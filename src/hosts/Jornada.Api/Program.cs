@@ -5,6 +5,7 @@ using Jornada.Api.Demonstracao;
 using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Comandos;
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Catalogo.Mapas;
 using Jornada.Aplicacao.Governanca;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
@@ -128,6 +129,8 @@ builder.Services.AddScoped<CompararRevisoes>();
 builder.Services.AddScoped<AvaliarPreCheck>();
 builder.Services.AddScoped<ObterVisaoDoAtivo>();
 builder.Services.AddScoped<BuscarNoCatalogo>();
+builder.Services.AddScoped<ConsultarVizinhanca>();
+builder.Services.AddScoped<MontarArvore>();
 builder.Services.AddScoped<SolicitarAcesso>();
 builder.Services.AddScoped<DecidirPleito>();
 builder.Services.AddScoped<ListarPleitos>();
@@ -340,6 +343,40 @@ catalogo.MapGet("/catalogo", async Task<Results<Ok<PaginaDoCatalogoResponse>, Js
     .WithName("buscarNoCatalogo")
     .WithSummary("Busca no catálogo, com filtros, ordem e página")
     .WithDescription("termo procura em nome, código e descrição. Filtros: tipo, status, squad, criticidade, semOwner (sem responsável vigente) e origem (manual ou automatica). ordenar: tipo (padrão), nome, status, criticidade, atualizado ou codigo; desconhecida vira tipo. pagina fora do intervalo devolve a última; porPagina vai de 1 a 200. total é o do recorte inteiro.")
+    .ComErros(StatusCodes.Status400BadRequest);
+
+catalogo.MapGet("/ativos/{id:guid}/vizinhanca", async Task<Results<Ok<VizinhancaResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, ConsultarVizinhanca caso, CancellationToken ct, int saltos = 1, string? tipos = null, int teto = ConsultarVizinhanca.TetoPadrao) =>
+{
+    var filtro = (tipos ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(t => t.ToLowerInvariant()).ToArray();
+    var desconhecido = filtro.FirstOrDefault(t => CatalogoDeRelacoes.Tipos.All(r => r.Chave != t));
+    if (desconhecido is not null)
+        return Erro(http, "TIPO_DE_RELACAO_INVALIDO", $"Tipo de relação inválido: {desconhecido}.");
+    var r = await caso.ExecutarAsync(new IdDeAtivo(id), saltos, filtro, Math.Clamp(teto, 1, 500), ct);
+    return r.Sucesso ? TypedResults.Ok(VizinhancaResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("consultarVizinhanca")
+    .WithSummary("A vizinhança do ativo no grafo de relações")
+    .WithDescription("Os ativos a até saltos relações de distância (1 a 3), nos dois sentidos, e as arestas entre eles. tipos filtra por tipo de relação, separados por vírgula. teto limita os nós (padrão 150, máximo 500); passou do teto, truncado é true.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status404NotFound);
+
+catalogo.MapGet("/mapa/arvore", async Task<Results<Ok<ArvoreResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, MontarArvore caso, CancellationToken ct, string? visao = null) =>
+{
+    var raiz = (visao ?? "negocio").ToLowerInvariant() switch
+    {
+        "negocio" => "dominio",
+        "tecnica" => "sistema",
+        _ => null,
+    };
+    if (raiz is null) return Erro(http, CodigosDeErro.RequisicaoInvalida, "visao deve ser negocio ou tecnica.");
+    var raizes = await caso.ExecutarAsync(raiz, ct);
+    return TypedResults.Ok(new ArvoreResponse(raiz == "dominio" ? "negocio" : "tecnica", raizes.Select(NoDaArvoreResponse.De).ToArray()));
+})
+    .WithName("consultarArvore")
+    .WithSummary("A árvore do catálogo, de negócio ou técnica")
+    .WithDescription("negocio: Domínio → Subdomínio → Contexto → Capacidade, com quantos ativos implementam cada capacidade. tecnica: Sistema → Aplicação → API → Endpoint e Base de dados → Objeto de dado. Arquivados ficam de fora.")
     .ComErros(StatusCodes.Status400BadRequest);
 
 catalogo.MapGet("/busca/sugestoes", async (BuscarNoCatalogo caso, CancellationToken ct, string? termo = null) =>

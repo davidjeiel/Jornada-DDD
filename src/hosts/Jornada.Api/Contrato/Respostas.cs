@@ -1,5 +1,6 @@
 using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Catalogo.Mapas;
 using Jornada.Aplicacao.Governanca;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
@@ -568,3 +569,47 @@ public sealed record SugestaoResponse(Guid Id, string Codigo, string Nome, strin
 
 /// <summary>As sugestões para o termo: até 8, nenhuma com menos de 2 letras.</summary>
 public sealed record SugestoesResponse(string Termo, IReadOnlyList<SugestaoResponse> Itens);
+
+/// <summary>Um nó da vizinhança.</summary>
+/// <param name="Ativo">O ativo.</param>
+/// <param name="Salto">A distância até o centro, em relações (0 é o centro).</param>
+public sealed record NoDaVizinhancaResponse(AtivoResumoResponse Ativo, int Salto);
+
+/// <summary>Uma aresta da vizinhança, na direção real.</summary>
+/// <param name="Origem">Quem aponta.</param>
+/// <param name="Destino">Para quem aponta.</param>
+/// <param name="Tipo">implementa, expoe, consome, produz, depende_de ou persiste_em.</param>
+/// <param name="Criticidade">A criticidade da dependência.</param>
+/// <param name="Mecanismo">Como a relação acontece, quando informado.</param>
+public sealed record ArestaResponse(Guid Origem, Guid Destino, string Tipo, string Criticidade, string? Mecanismo);
+
+/// <summary>A vizinhança de um ativo no grafo de relações.</summary>
+/// <param name="Centro">O ativo pedido.</param>
+/// <param name="Saltos">A profundidade aplicada (1 a 3).</param>
+/// <param name="Nos">Os ativos alcançados, do centro para fora.</param>
+/// <param name="Arestas">As relações entre os nós devolvidos.</param>
+/// <param name="Truncado">A expansão parou no teto: há mais ativos do que os mostrados.</param>
+/// <param name="Teto">O máximo de nós.</param>
+public sealed record VizinhancaResponse(Guid Centro, int Saltos, IReadOnlyList<NoDaVizinhancaResponse> Nos, IReadOnlyList<ArestaResponse> Arestas, bool Truncado, int Teto)
+{
+    public static VizinhancaResponse De(ConsultarVizinhanca.Saida s) => new(
+        s.Centro.Valor, s.Saltos,
+        s.Nos.Select(n => new NoDaVizinhancaResponse(AtivoResumoResponse.De(n.Ativo), n.Salto)).ToArray(),
+        s.Arestas.Select(a => new ArestaResponse(a.Origem.Valor, a.Destino.Valor, a.Tipo, a.Criticidade.Chave(), a.Mecanismo)).ToArray(),
+        s.Truncado, s.Teto);
+}
+
+/// <summary>Um nó da árvore do catálogo.</summary>
+/// <param name="Ativo">O ativo.</param>
+/// <param name="Implementacoes">Quantos ativos implementam esta capacidade (0 nos demais tipos).</param>
+/// <param name="Filhos">Os filhos, por nome.</param>
+public sealed record NoDaArvoreResponse(AtivoResumoResponse Ativo, int Implementacoes, IReadOnlyList<NoDaArvoreResponse> Filhos)
+{
+    public static NoDaArvoreResponse De(MontarArvore.No n) =>
+        new(AtivoResumoResponse.De(n.Ativo), n.Implementacoes, n.Filhos.Select(De).ToArray());
+}
+
+/// <summary>Uma árvore do mapa.</summary>
+/// <param name="Visao">negocio (a partir do domínio) ou tecnica (a partir do sistema).</param>
+/// <param name="Raizes">Os nós de raiz, cada um com os descendentes.</param>
+public sealed record ArvoreResponse(string Visao, IReadOnlyList<NoDaArvoreResponse> Raizes);

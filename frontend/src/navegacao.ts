@@ -28,7 +28,7 @@ export type ItemDeMenu = {
 export const MENU: ItemDeMenu[] = [
   { secao: 'painel', caminho: '/', rotulo: 'Visão executiva', inicial: 'VE', descricao: 'Indicadores do catálogo e da governança.' },
   { secao: 'catalogo', caminho: '/catalogo', rotulo: 'Catálogo de ativos', inicial: 'CA', descricao: 'Todos os ativos da empresa, com busca e filtros.' },
-  { secao: 'mapas', caminho: '/mapas', rotulo: 'Mapas', inicial: 'MP', fase: 6, descricao: 'Árvores de negócio e técnica, vizinhança e análise de consumidores.' },
+  { secao: 'mapas', caminho: '/mapas', rotulo: 'Mapas', inicial: 'MP', descricao: 'Árvores de negócio e técnica, vizinhança e análise de consumidores.' },
 
   { secao: 'mesa', caminho: '/mesa', rotulo: 'Minha mesa', inicial: 'MM', grupo: 'Trabalhar', descricao: 'O que é seu: rascunhos, validações assumidas e pendências.' },
   { secao: 'novo', caminho: '/novo', rotulo: 'Novo ativo', inicial: 'NA', grupo: 'Trabalhar', descricao: 'Cadastro de um ativo em rascunho.' },

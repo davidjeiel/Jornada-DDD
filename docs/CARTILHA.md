@@ -62,6 +62,12 @@ A escolha fica salva no seu navegador — ao voltar, você continua como a mesma
   e ordene como quiser. Cada filtro ativo vira um chip que se remove sozinho, o total é
   o do recorte inteiro, e o recorte volta na sua próxima visita até você **limpar**. A
   busca do topo sugere ativos a partir de duas letras.
+- **Mapas** — as duas árvores do catálogo: a de negócio (Domínio › Subdomínio › Contexto ›
+  Capacidade, com quantos ativos implementam cada capacidade) e a técnica (Sistema ›
+  Aplicação › API › Endpoint), com busca dentro da árvore. As relações que cruzam as
+  árvores ficam no **grafo** de cada ativo (na aba Relações da ficha): a vizinhança em
+  anéis por distância, de 1 a 3 saltos, filtrável por tipo de relação. Se o grafo passar
+  do teto, a tela avisa que foi cortado.
 - **Validações** — a fila de etapas abertas, com uma aba por etapa e a contagem de cada
   uma, a mais crítica primeiro e o tempo até o prazo. Ao abrir uma etapa, o painel mostra
   as evidências, os responsáveis e **o que mudou** desde a revisão anterior. **Assuma** a
