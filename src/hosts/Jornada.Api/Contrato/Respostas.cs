@@ -613,3 +613,25 @@ public sealed record NoDaArvoreResponse(AtivoResumoResponse Ativo, int Implement
 /// <param name="Visao">negocio (a partir do domínio) ou tecnica (a partir do sistema).</param>
 /// <param name="Raizes">Os nós de raiz, cada um com os descendentes.</param>
 public sealed record ArvoreResponse(string Visao, IReadOnlyList<NoDaArvoreResponse> Raizes);
+
+/// <summary>A fotografia dos indicadores numa competência.</summary>
+/// <param name="Competencia">O mês, AAAA-MM.</param>
+/// <param name="Valores">Indicador → valor naquele mês.</param>
+/// <param name="GeradaEm">Quando a fotografia foi tirada.</param>
+public sealed record FotografiaResponse(string Competencia, IReadOnlyDictionary<string, double> Valores, DateTimeOffset GeradaEm)
+{
+    public static FotografiaResponse De(FotografiaDosIndicadores f) => new(f.Competencia, f.Valores, f.GeradaEm);
+}
+
+/// <summary>Os indicadores da visão executiva.</summary>
+/// <param name="Atuais">Indicador → valor agora. Cobertura e APIs governadas são porcentagens.</param>
+/// <param name="Variacao">Indicador → diferença entre as duas últimas fotografias; ausente com menos de duas.</param>
+/// <param name="QuantoMenosMelhor">Os indicadores em que cair é melhora (sem responsável, pendências, SLA vencido, dependências críticas).</param>
+/// <param name="Serie">As fotografias, da mais antiga para a mais recente.</param>
+public sealed record IndicadoresResponse(
+    IReadOnlyDictionary<string, double> Atuais, IReadOnlyDictionary<string, double> Variacao,
+    IReadOnlyList<string> QuantoMenosMelhor, IReadOnlyList<FotografiaResponse> Serie)
+{
+    public static IndicadoresResponse De(Indicadores.Saida s) => new(
+        s.Atuais, s.Variacao, Indicadores.QuantoMenosMelhor.Order().ToArray(), s.Serie.Select(FotografiaResponse.De).ToArray());
+}

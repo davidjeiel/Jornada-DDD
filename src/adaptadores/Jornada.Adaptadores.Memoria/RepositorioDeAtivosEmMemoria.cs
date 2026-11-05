@@ -29,9 +29,11 @@ public sealed class ArmazemEmMemoria
     internal ConcurrentDictionary<Guid, Pessoa> Pessoas { get; } = new();
     internal ConcurrentDictionary<Guid, PleitoDeAcesso> Pleitos { get; } = new();
     internal ConcurrentDictionary<Guid, Squad> Squads { get; } = new();
+    internal ConcurrentDictionary<(IdDeEmpresa Empresa, string Competencia), FotografiaDosIndicadores> Fotografias { get; } = new();
 
     public void Limpar()
     {
+        Fotografias.Clear();
         Squads.Clear();
         Pessoas.Clear();
         Pleitos.Clear();
@@ -189,6 +191,12 @@ public sealed class RepositorioDeAtivosEmMemoria(
         }
         return Task.FromResult(false);
     }
+
+    public Task<IReadOnlyList<RelacaoResumo>> ListarArestasAsync(string? tipo = null, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<RelacaoResumo>>(MinhasRelacoes
+            .Where(r => tipo is null || r.Tipo == tipo)
+            .Select(r => new RelacaoResumo(r.Origem, r.Destino, r.Tipo, r.Criticidade, r.Mecanismo))
+            .ToArray());
 
     public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default)
     {
@@ -417,5 +425,24 @@ public sealed class RepositorioDeAcessoEmMemoria(ArmazemEmMemoria armazem, ICont
         Task.FromResult<IReadOnlyList<PleitoDeAcesso>>(armazem.Pleitos.Values
             .Where(p => p.Empresa == Empresa && (status is null || p.Status == status) && (idPessoa is null || p.IdPessoa == idPessoa))
             .OrderBy(p => p.Status == StatusDoPleito.Pendente ? 0 : 1).ThenBy(p => p.CriadoEm).ThenBy(p => p.Id)
+            .ToArray());
+}
+
+/// <summary>As fotografias dos indicadores em memória, por empresa.</summary>
+public sealed class RepositorioDeIndicadoresEmMemoria(ArmazemEmMemoria armazem, IContextoDeTenantAtual tenant) : IRepositorioDeIndicadores
+{
+    private IdDeEmpresa Empresa => tenant.Atual.Empresa;
+
+    public Task GravarAsync(FotografiaDosIndicadores fotografia, CancellationToken ct = default)
+    {
+        armazem.Fotografias[(Empresa, fotografia.Competencia)] = fotografia;
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<FotografiaDosIndicadores>> ListarAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<FotografiaDosIndicadores>>(armazem.Fotografias
+            .Where(f => f.Key.Empresa == Empresa)
+            .Select(f => f.Value)
+            .OrderBy(f => f.Competencia, StringComparer.Ordinal)
             .ToArray());
 }

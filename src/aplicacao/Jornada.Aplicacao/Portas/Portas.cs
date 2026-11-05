@@ -99,6 +99,9 @@ public interface IRepositorioDeRelacoes
     /// </summary>
     public Task<bool> TemCaminhoDeDependenciaAsync(IdDeAtivo de, IdDeAtivo ate, CancellationToken ct = default);
 
+    /// <summary>Todas as arestas da empresa, numa consulta só; <paramref name="tipo"/> restringe a um tipo. Para os indicadores.</summary>
+    public Task<IReadOnlyList<RelacaoResumo>> ListarArestasAsync(string? tipo = null, CancellationToken ct = default);
+
     /// <summary>Todas as arestas em que o ativo aparece, como origem OU destino.</summary>
     public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default);
 }
@@ -298,4 +301,20 @@ public interface IRepositorioDePleitos
     /// <summary>Pendentes primeiro e, dentro de cada grupo, quem espera há mais tempo primeiro.</summary>
     public Task<IReadOnlyList<PleitoDeAcesso>> ListarAsync(
         StatusDoPleito? status = null, Guid? idPessoa = null, CancellationToken ct = default);
+}
+
+/// <summary>
+/// A fotografia mensal dos indicadores (<c>snapshot_indicador</c>): o valor de
+/// cada indicador numa competência (AAAA-MM). É o que permite dizer se a
+/// situação melhorou, em vez de mostrar um número sozinho.
+/// </summary>
+public sealed record FotografiaDosIndicadores(string Competencia, IReadOnlyDictionary<string, double> Valores, DateTimeOffset GeradaEm);
+
+/// <summary>As fotografias da empresa. Gravar de novo a mesma competência substitui a anterior.</summary>
+public interface IRepositorioDeIndicadores
+{
+    public Task GravarAsync(FotografiaDosIndicadores fotografia, CancellationToken ct = default);
+
+    /// <summary>Da competência mais antiga para a mais recente.</summary>
+    public Task<IReadOnlyList<FotografiaDosIndicadores>> ListarAsync(CancellationToken ct = default);
 }

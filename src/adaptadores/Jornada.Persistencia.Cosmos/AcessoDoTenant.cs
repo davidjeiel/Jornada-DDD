@@ -35,6 +35,16 @@ internal sealed class AcessoDoTenant(BancoDoCatalogo banco, IContextoDeTenantAtu
     /// </summary>
     public const string ParticaoDeAcesso = "acesso";
 
+    /// <summary>A partição das fotografias mensais dos indicadores: <c>[empresa, "indicadores"]</c>.</summary>
+    public const string ParticaoDeIndicadores = "indicadores";
+
+    /// <summary>Grava ou substitui um documento avulso, fora de lote. Hoje só a fotografia dos indicadores, que não depende de nada.</summary>
+    public async Task GravarAsync<T>(T documento, CancellationToken ct) where T : DocumentoDoCatalogo
+    {
+        Conferir(documento, null);
+        await _catalogo.UpsertItemAsync(documento, Chave(documento.IdAtivo), cancellationToken: ct);
+    }
+
     public IdDeEmpresa Empresa => tenant.Atual.Empresa;
 
     private string EmpresaTexto => Mapeamento.Texto(Empresa.Valor);

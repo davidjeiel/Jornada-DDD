@@ -510,6 +510,41 @@ public abstract class ContratoDePersistencia
         Verificar.Igual(2, (await s.Ativos.BuscarAsync(new FiltroDoCatalogo(Hoje: hoje), 2)).Count, "o teto vale");
     }
 
+    [Teste("todas as arestas da empresa, ou só as de um tipo")]
+    public async Task ListarArestas()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var x = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0001", "X"));
+        var y = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0002", "Y"));
+        await using var s = Abrir(empresa);
+        await s.Relacoes.RelacionarAsync(x.Id, y.Id, "depende_de", Criticidade.Critica);
+        await s.Relacoes.RelacionarAsync(y.Id, x.Id, "consome");
+        Verificar.Igual(2, (await s.Relacoes.ListarArestasAsync()).Count);
+        var dependencia = (await s.Relacoes.ListarArestasAsync("depende_de")).Single();
+        Verificar.Igual((x.Id, y.Id, Criticidade.Critica), (dependencia.Origem, dependencia.Destino, dependencia.Criticidade));
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Vazio(await deFora.Relacoes.ListarArestasAsync());
+    }
+
+    [Teste("a fotografia dos indicadores volta igual, e a mesma competência é substituída")]
+    public async Task FotografiaDosIndicadores()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        await using (var s = Abrir(empresa))
+        {
+            await s.Indicadores.GravarAsync(new FotografiaDosIndicadores("2026-08", new Dictionary<string, double> { ["cobertura"] = 70 }, Relogio.Agora));
+            await s.Indicadores.GravarAsync(new FotografiaDosIndicadores("2026-07", new Dictionary<string, double> { ["cobertura"] = 60 }, Relogio.Agora));
+            await s.Indicadores.GravarAsync(new FotografiaDosIndicadores("2026-08", new Dictionary<string, double> { ["cobertura"] = 72, ["sem_owner"] = 4 }, Relogio.Agora));
+        }
+        await using var nova = Abrir(empresa);
+        var serie = await nova.Indicadores.ListarAsync();
+        Verificar.Igual("2026-07,2026-08", string.Join(",", serie.Select(f => f.Competencia)), "da mais antiga para a mais recente");
+        Verificar.Igual(72.0, serie[1].Valores["cobertura"]);
+        Verificar.Igual(4.0, serie[1].Valores["sem_owner"]);
+        await using var deFora = Abrir(IdDeEmpresa.Novo());
+        Verificar.Vazio(await deFora.Indicadores.ListarAsync());
+    }
+
     [Teste("cancelamento de etapa persiste")]
     public async Task CancelamentoPersiste()
     {

@@ -58,6 +58,7 @@ public static class CodigosDeErro
         ["SIGLA_INVALIDA"] = StatusCodes.Status400BadRequest,
         ["TIPO_DE_RELACAO_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["MECANISMO_INVALIDO"] = StatusCodes.Status400BadRequest,
+        ["COMPETENCIA_INVALIDA"] = StatusCodes.Status400BadRequest,
 
         [EmpresaNaoIdentificada] = StatusCodes.Status401Unauthorized,
         // Sem pessoa, a pergunta é "quem é você?": 401, e a tela manda ao perfil.

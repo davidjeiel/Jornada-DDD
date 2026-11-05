@@ -2079,6 +2079,158 @@ paths:
         - Bearer: [ ]
         - X-Empresa: [ ]
           X-Pessoa: [ ]
+  /v1/indicadores:
+    get:
+      tags:
+        - Catálogo
+      summary: Os indicadores da visão executiva e a variação no mês
+      description: 'Domínios e capacidades em vigor, cobertura de capacidades por implementação (%), publicados sem responsável, APIs e APIs governadas (%), etapas pendentes e vencidas, publicados e dependências críticas. variacao compara as duas últimas fotografias mensais.'
+      operationId: consultarIndicadores
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndicadoresResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/indicadores/fotografias:
+    post:
+      tags:
+        - Catálogo
+      summary: Tira a fotografia mensal dos indicadores
+      description: 'Só admin. Grava os indicadores de agora na competência (padrão: o mês corrente, AAAA-MM); a mesma competência é substituída. É o que alimenta a variação no mês.'
+      operationId: fotografarIndicadores
+      parameters:
+        - name: competencia
+          in: query
+          schema:
+            type: string
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '201':
+          description: Recurso criado.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FotografiaResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   /v1/busca/sugestoes:
     get:
       tags:
@@ -5238,6 +5390,28 @@ components:
           description: 'Etapas abertas por etapa (negocial, tecnica, arquitetural) e as "minhas".'
       additionalProperties: false
       description: 'A fila de validação: a mais crítica primeiro, e, na mesma criticidade, o prazo mais próximo.'
+    FotografiaResponse:
+      required:
+        - competencia
+        - valores
+        - geradaEm
+      type: object
+      properties:
+        competencia:
+          type: string
+          description: 'O mês, AAAA-MM.'
+        valores:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          description: Indicador → valor naquele mês.
+        geradaEm:
+          type: string
+          description: Quando a fotografia foi tirada.
+          format: date-time
+      additionalProperties: false
+      description: A fotografia dos indicadores numa competência.
     HistoricoResponse:
       required:
         - revisoes
@@ -5325,6 +5499,38 @@ components:
             format: uuid
       additionalProperties: false
       description: Cadastros a inativar de uma vez. O do administrador conectado é ignorado.
+    IndicadoresResponse:
+      required:
+        - atuais
+        - variacao
+        - quantoMenosMelhor
+        - serie
+      type: object
+      properties:
+        atuais:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          description: Indicador → valor agora. Cobertura e APIs governadas são porcentagens.
+        variacao:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          description: Indicador → diferença entre as duas últimas fotografias; ausente com menos de duas.
+        quantoMenosMelhor:
+          type: array
+          items:
+            type: string
+          description: 'Os indicadores em que cair é melhora (sem responsável, pendências, SLA vencido, dependências críticas).'
+        serie:
+          type: array
+          items:
+            $ref: '#/components/schemas/FotografiaResponse'
+          description: 'As fotografias, da mais antiga para a mais recente.'
+      additionalProperties: false
+      description: Os indicadores da visão executiva.
     ItemDaFilaResponse:
       required:
         - validacao
