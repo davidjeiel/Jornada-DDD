@@ -30,6 +30,7 @@ internal static class Mapeamento
         Descricao = a.Descricao,
         IdPai = a.IdPai is { } p ? Texto(p.Valor) : null,
         IdSquad = a.IdSquad,
+        CriadoPor = a.CriadoPor,
         Criticidade = a.Criticidade.Chave(),
         Status = MaquinaDeCicloDeVida.Rotulo(a.Status),
         Origem = a.Origem.ToString(),
@@ -65,7 +66,8 @@ internal static class Mapeamento
         responsaveis: d.Responsaveis.Select(r => new Responsabilidade(
             r.IdPessoa, Enum.Parse<PapelDeOwnership>(r.Papel), r.InicioVigencia, r.FimVigencia)),
         evidencias: d.Evidencias.Select(e => new Evidencia(e.Id, e.Tipo, e.Titulo, e.Url)),
-        idSquad: d.IdSquad);
+        idSquad: d.IdSquad,
+        criadoPor: d.CriadoPor);
 
     public static DocumentoDeValidacao ParaDocumento(ValidacaoEmProcesso v) => new()
     {
@@ -78,6 +80,9 @@ internal static class Mapeamento
         Status = v.Status.ToString(),
         IdDecisor = v.IdDecisor,
         Motivo = v.Motivo,
+        AbertaEm = v.AbertaEm,
+        Prazo = v.Prazo,
+        AtribuidaA = v.AtribuidaA,
     };
 
     public static ValidacaoEmProcesso ParaDominio(DocumentoDeValidacao d) => ValidacaoEmProcesso.Reidratar(
@@ -89,7 +94,10 @@ internal static class Mapeamento
         d.IdSubmissor,
         Enum.Parse<StatusDaValidacao>(d.Status),
         d.IdDecisor,
-        d.Motivo);
+        d.Motivo,
+        d.AbertaEm,
+        d.Prazo,
+        d.AtribuidaA);
 
     public static DocumentoDeEvento ParaDocumento(EventoDeDominio evento, IdDeEmpresa empresa, IdDeAtivo ativo) => new()
     {

@@ -52,10 +52,15 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
 
     public async Task<IReadOnlyList<Ativo>> ListarAsync(
         string? tipoItem = null, StatusCicloVida? status = null,
-        int limite = 200, CancellationToken ct = default)
+        int limite = 200, Guid? criadoPor = null, CancellationToken ct = default)
     {
         var filtros = new List<string> { "true" };
         var parametros = new Dictionary<string, object?>();
+        if (criadoPor is { } autor)
+        {
+            filtros.Add("c.criadoPor = @criadoPor");
+            parametros["@criadoPor"] = Mapeamento.Texto(autor);
+        }
 
         if (!string.IsNullOrWhiteSpace(tipoItem))
         {

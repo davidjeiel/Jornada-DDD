@@ -5,7 +5,7 @@ import { marked } from 'marked';
 // lê das regras que aplica. Uma cartilha que repete a regra à mão envelhece
 // em silêncio na primeira mudança, e uma cartilha errada é pior que nenhuma.
 import cartilhaMd from '../../../docs/CARTILHA.md?raw';
-import { consultarCartilha, type DadosDaCartilha } from '../api';
+import { consultarCartilha, type DadosDaCartilha, type Rito } from '../api';
 import { Cabecalho } from '../componentes';
 
 type TokenMarked = ReturnType<typeof marked.lexer>[number];
@@ -96,26 +96,33 @@ export function TabelasDeReferencia({ dados }: { dados: DadosDaCartilha }) {
       </div>
 
       <h3>O rito de cada tipo de ativo</h3>
-      <div className="rolagem">
-        <table className="tabela">
-          <thead>
-            <tr><th scope="col">Tipo</th><th scope="col">Etapas de validação</th><th scope="col">Evidências mínimas</th><th scope="col">Score mínimo</th><th scope="col">Prazo por etapa</th><th scope="col">Revisar a cada</th></tr>
-          </thead>
-          <tbody>
-            {dados.ritos.map((r) => (
-              <tr key={`${r.tipoItem}-${r.criticidade}`}>
-                <td>{r.rotulo}{r.criticidade !== '*' && <strong> {CRITICIDADE[r.criticidade] ?? r.criticidade}</strong>}</td>
-                <td><Etapas etapas={r.etapas} /></td>
-                <td>{r.evidenciaMinima}</td>
-                <td>{r.scoreMinimo}%</td>
-                <td>{r.slaHoras}h</td>
-                <td>{r.revisarACadaDias} dias</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <TabelaDeRitos ritos={dados.ritos} />
     </>
+  );
+}
+
+/** O rito de cada tipo e criticidade, como a política aplica. A cartilha e a página Políticas mostram esta tabela. */
+export function TabelaDeRitos({ ritos }: { ritos: Rito[] }) {
+  return (
+    <div className="rolagem">
+      <table className="tabela">
+        <thead>
+          <tr><th scope="col">Tipo</th><th scope="col">Etapas de validação</th><th scope="col">Evidências mínimas</th><th scope="col">Score mínimo</th><th scope="col">Prazo por etapa</th><th scope="col">Revisar a cada</th></tr>
+        </thead>
+        <tbody>
+          {ritos.map((r) => (
+            <tr key={`${r.tipoItem}-${r.criticidade}`}>
+              <td>{r.rotulo}{r.criticidade !== '*' && <strong> {CRITICIDADE[r.criticidade] ?? r.criticidade}</strong>}</td>
+              <td><Etapas etapas={r.etapas} /></td>
+              <td>{r.evidenciaMinima}</td>
+              <td>{r.scoreMinimo}%</td>
+              <td>{r.slaHoras}h</td>
+              <td>{r.revisarACadaDias} dias</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

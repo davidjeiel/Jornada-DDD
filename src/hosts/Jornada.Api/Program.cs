@@ -5,10 +5,12 @@ using Jornada.Api.Demonstracao;
 using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Comandos;
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Governanca;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
+using Jornada.Dominio.Governanca;
 using Jornada.Dominio.Tenancy;
 using Jornada.Persistencia.Cosmos;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -111,6 +113,10 @@ builder.Services.AddScoped<AtribuirResponsavel>();
 builder.Services.AddScoped<AnexarEvidencia>();
 builder.Services.AddScoped<RelacionarAtivos>();
 builder.Services.AddScoped<RelacionarEmLote>();
+builder.Services.AddScoped<ConsultarFila>();
+builder.Services.AddScoped<AtribuirValidacao>();
+builder.Services.AddScoped<PainelDoValidador>();
+builder.Services.AddScoped<MinhaMesa>();
 builder.Services.AddScoped<SubmeterAtivo>();
 builder.Services.AddScoped<AbrirRevisao>();
 builder.Services.AddScoped<DecidirValidacao>();
@@ -542,6 +548,62 @@ governanca.MapGet("/validacoes", async (IRepositorioDeValidacoes repo, Guid? ati
     .WithName("listarValidacoes")
     .WithSummary("Lista as validações da empresa")
     .WithDescription("Abertas primeiro. O parâmetro ativo restringe a um ativo.");
+
+governanca.MapGet("/validacoes/fila", async Task<Results<Ok<FilaDeValidacaoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, ConsultarFila caso, CancellationToken ct, string? etapa = null, bool minhas = false, bool livres = false) =>
+{
+    EtapaValidacao? filtro = null;
+    if (!string.IsNullOrWhiteSpace(etapa))
+    {
+        if (!Enum.TryParse<EtapaValidacao>(etapa, ignoreCase: true, out var e))
+            return Erro(http, CodigosDeErro.RequisicaoInvalida, "etapa deve ser negocial, tecnica ou arquitetural.");
+        filtro = e;
+    }
+    var r = await caso.ExecutarAsync(filtro, minhas, livres, ct);
+    return TypedResults.Ok(new FilaDeValidacaoResponse(r.Itens.Select(ItemDaFilaResponse.De).ToArray(), r.Contagem));
+})
+    .WithName("consultarFilaDeValidacao")
+    .WithSummary("Fila de validação, a mais crítica primeiro")
+    .WithDescription("Só etapas abertas, ordenadas por criticidade do ativo e prazo. etapa filtra pela aba; minhas=true só as que você assumiu; livres=true só as que ninguém assumiu. contagem traz o total aberto por etapa e o das minhas.");
+
+governanca.MapPost("/validacoes/{id:guid}/atribuicao", async Task<Results<Ok<ValidacaoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, AtribuirValidacao caso, CancellationToken ct) =>
+{
+    var r = await caso.AssumirAsync(id, ct);
+    return r.Sucesso ? TypedResults.Ok(ValidacaoResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("assumirValidacao")
+    .WithSummary("Assume a análise de uma etapa")
+    .WithDescription("Marca você como quem está analisando, para dois validadores não duplicarem trabalho. Já assumida por outra pessoa: 409 VALIDACAO_JA_ASSUMIDA.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
+governanca.MapDelete("/validacoes/{id:guid}/atribuicao", async Task<Results<Ok<ValidacaoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, AtribuirValidacao caso, CancellationToken ct) =>
+{
+    var r = await caso.LiberarAsync(id, ct);
+    return r.Sucesso ? TypedResults.Ok(ValidacaoResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("liberarValidacao")
+    .WithSummary("Devolve a etapa à fila livre")
+    .WithDescription("Só quem assumiu libera; de outra pessoa, 409 VALIDACAO_JA_ASSUMIDA.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
+governanca.MapGet("/validacoes/{id:guid}/painel", async Task<Results<Ok<PainelDoValidadorResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, PainelDoValidador caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(id, ct);
+    return r.Sucesso ? TypedResults.Ok(PainelDoValidadorResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("consultarPainelDoValidador")
+    .WithSummary("Tudo o que o validador precisa para decidir a etapa")
+    .WithDescription("A etapa, a ficha do ativo (evidências, responsáveis, trilha), o pré-check e o que mudou desde a revisão anterior.")
+    .ComErros(StatusCodes.Status404NotFound);
+
+governanca.MapGet("/mesa", async (MinhaMesa caso, CancellationToken ct) =>
+    TypedResults.Ok(MesaResponse.De(await caso.ExecutarAsync(ct))))
+    .WithName("consultarMesa")
+    .WithSummary("Minha mesa: o que é meu")
+    .WithDescription("As etapas que você assumiu, a fila livre, o que você cadastrou e ainda está com você (rascunho ou em revisão), e o que você cadastrou e aguarda decisão.");
 
 governanca.MapPost("/validacoes/{id:guid}/decisoes", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
     HttpContext http, Guid id, DecidirValidacaoRequest corpo, DecidirValidacao caso, CancellationToken ct) =>

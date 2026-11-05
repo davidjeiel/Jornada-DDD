@@ -193,7 +193,8 @@ internal sealed class FiltroDeRespostas : ISchemaFilter
         [typeof(SubmissaoResponse)] = """{"revisao":1,"score":97,"etapasAbertas":["tecnica"]}""",
         [typeof(ValidacaoResponse)] = $$"""
             {"id":"{{IdValidacao}}","ativo":"{{IdAtivo}}","revisao":1,"etapa":"tecnica","status":"aberta",
-             "submetidaPor":"20000000-0000-0000-0000-000000000001","decididaPor":null,"motivo":null}
+             "submetidaPor":"20000000-0000-0000-0000-000000000001","decididaPor":null,"motivo":null,
+             "abertaEm":"2026-11-05T12:00:00+00:00","prazo":"2026-11-07T12:00:00+00:00","atribuidaA":null}
             """,
         [typeof(SaudeResponse)] = """{"situacao":"ok"}""",
     };

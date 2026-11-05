@@ -15,12 +15,14 @@ import { Cartilha } from './telas/Cartilha';
 import { Catalogo } from './telas/Catalogo';
 import { EmBreve, NaoEncontrada } from './telas/EmBreve';
 import { GestaoDeAcessos } from './telas/GestaoDeAcessos';
+import { Mesa } from './telas/Mesa';
 import { NovoAtivo } from './telas/NovoAtivo';
 import { abaDaUrl, PaginaDoAtivo } from './telas/PaginaDoAtivo';
 import { podeDescontinuar } from './telas/Impacto';
 import { RelacoesEmLote } from './telas/RelacoesEmLote';
 import { Perfil } from './telas/Perfil';
 import { Pleitos } from './telas/Pleitos';
+import { Politicas } from './telas/Politicas';
 import { SolicitarAcesso } from './telas/SolicitarAcesso';
 import { Squads } from './telas/Squads';
 import { Validacoes } from './telas/Validacoes';
@@ -163,7 +165,14 @@ function App() {
           onCadastrado={carregar} onErro={setErro} />;
         break;
       case 'validacoes':
-        tela = <Validacoes validacoes={validacoes} ativos={ativos} podeDecidir={podeDecidir} onAlterado={carregar} onErro={setErro} />;
+        tela = <Validacoes aba={local.busca.get('etapa') ?? ''} selecionada={local.busca.get('validacao')} idPessoa={perfil?.pessoa?.id ?? null}
+          podeDecidir={podeDecidir} onAlterado={carregar} onErro={setErro} />;
+        break;
+      case 'mesa':
+        tela = <Mesa key={identidade.pessoaId ?? ''} onErro={setErro} />;
+        break;
+      case 'politicas':
+        tela = <Politicas onErro={setErro} />;
         break;
       case 'perfil':
         tela = (

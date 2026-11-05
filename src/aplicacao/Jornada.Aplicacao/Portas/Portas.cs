@@ -28,9 +28,10 @@ public interface IRepositorioDeAtivos
 
     public Task<Ativo?> ObterPorCodigoAsync(CodigoDeAtivo codigo, CancellationToken ct = default);
 
+    /// <param name="criadoPor">Só os cadastrados por esta pessoa (a "Minha mesa").</param>
     public Task<IReadOnlyList<Ativo>> ListarAsync(
         string? tipoItem = null, StatusCicloVida? status = null,
-        int limite = 200, CancellationToken ct = default);
+        int limite = 200, Guid? criadoPor = null, CancellationToken ct = default);
 
     public Task AdicionarAsync(Ativo ativo, CancellationToken ct = default);
 
@@ -109,7 +110,7 @@ public enum StatusDaValidacao { Aberta, Aprovada, Reprovada, Cancelada }
 
 public sealed class ValidacaoEmProcesso(
     Guid id, IdDeAtivo ativo, IdDeEmpresa empresa, int revisao,
-    EtapaValidacao etapa, Guid idSubmissor)
+    EtapaValidacao etapa, Guid idSubmissor, DateTimeOffset? abertaEm = null, DateTimeOffset? prazo = null)
 {
     public Guid Id { get; } = id;
     public IdDeAtivo Ativo { get; } = ativo;
@@ -117,15 +118,26 @@ public sealed class ValidacaoEmProcesso(
     public int Revisao { get; } = revisao;
     public EtapaValidacao Etapa { get; } = etapa;
     public Guid IdSubmissor { get; } = idSubmissor;
+
+    /// <summary>Quando a etapa abriu. Nulo em etapa anterior a este campo.</summary>
+    public DateTimeOffset? AbertaEm { get; } = abertaEm;
+
+    /// <summary>Até quando a etapa deve ser decidida: abertura + SLA da política (<c>validacao.prazo</c>).</summary>
+    public DateTimeOffset? Prazo { get; } = prazo;
+
     public StatusDaValidacao Status { get; private set; } = StatusDaValidacao.Aberta;
     public Guid? IdDecisor { get; private set; }
     public string? Motivo { get; private set; }
+
+    /// <summary>Quem está analisando (<c>validacao.atribuido_a</c>). Nulo: na fila livre.</summary>
+    public Guid? AtribuidaA { get; private set; }
 
     public void Decidir(bool aprovada, Guid idDecisor, string? motivo)
     {
         Status = aprovada ? StatusDaValidacao.Aprovada : StatusDaValidacao.Reprovada;
         IdDecisor = idDecisor;
         Motivo = motivo;
+        AtribuidaA = null;
     }
 
     /// <summary>Encerra a etapa sem decisão, porque a revisão já foi reprovada em outra etapa.</summary>
@@ -133,6 +145,29 @@ public sealed class ValidacaoEmProcesso(
     {
         Status = StatusDaValidacao.Cancelada;
         Motivo = motivo;
+        AtribuidaA = null;
+    }
+
+    /// <summary>
+    /// Marca quem está analisando, para dois validadores não duplicarem
+    /// trabalho (<c>governanca.assumir_validacao</c>). Assumir de novo o que já é
+    /// seu não muda nada; o que está com outra pessoa é recusado.
+    /// </summary>
+    public void Assumir(Guid idPessoa)
+    {
+        if (Status != StatusDaValidacao.Aberta)
+            throw new ErroDeDominio("VALIDACAO_JA_DECIDIDA", "Validação já concluída.");
+        if (AtribuidaA is { } outra && outra != idPessoa)
+            throw new ErroDeDominio("VALIDACAO_JA_ASSUMIDA", "Esta validação já está com outra pessoa.");
+        AtribuidaA = idPessoa;
+    }
+
+    /// <summary>Devolve à fila livre. Só quem assumiu libera (<c>liberar_validacao</c>).</summary>
+    public void Liberar(Guid idPessoa)
+    {
+        if (AtribuidaA is { } dono && dono != idPessoa)
+            throw new ErroDeDominio("VALIDACAO_JA_ASSUMIDA", "Só quem assumiu a validação pode liberá-la.");
+        AtribuidaA = null;
     }
 
     /// <summary>
@@ -141,12 +176,14 @@ public sealed class ValidacaoEmProcesso(
     /// </summary>
     public static ValidacaoEmProcesso Reidratar(
         Guid id, IdDeAtivo ativo, IdDeEmpresa empresa, int revisao, EtapaValidacao etapa,
-        Guid idSubmissor, StatusDaValidacao status, Guid? idDecisor, string? motivo) =>
-        new(id, ativo, empresa, revisao, etapa, idSubmissor)
+        Guid idSubmissor, StatusDaValidacao status, Guid? idDecisor, string? motivo,
+        DateTimeOffset? abertaEm = null, DateTimeOffset? prazo = null, Guid? atribuidaA = null) =>
+        new(id, ativo, empresa, revisao, etapa, idSubmissor, abertaEm, prazo)
         {
             Status = status,
             IdDecisor = idDecisor,
             Motivo = motivo,
+            AtribuidaA = atribuidaA,
         };
 }
 

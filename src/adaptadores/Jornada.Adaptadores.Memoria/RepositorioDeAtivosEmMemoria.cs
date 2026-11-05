@@ -100,9 +100,10 @@ public sealed class RepositorioDeAtivosEmMemoria(
 
     public Task<IReadOnlyList<Ativo>> ListarAsync(
         string? tipoItem = null, StatusCicloVida? status = null,
-        int limite = 200, CancellationToken ct = default)
+        int limite = 200, Guid? criadoPor = null, CancellationToken ct = default)
     {
         IEnumerable<Ativo> q = _ativos.Values.Where(MinhaEmpresa);
+        if (criadoPor is { } autor) q = q.Where(a => a.CriadoPor == autor);
 
         if (!string.IsNullOrWhiteSpace(tipoItem))
             q = q.Where(a => a.TipoItem.Equals(tipoItem, StringComparison.OrdinalIgnoreCase));

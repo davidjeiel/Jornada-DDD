@@ -57,7 +57,13 @@ A escolha fica salva no seu navegador — ao voltar, você continua como a mesma
   caminho até a publicação.
 - **Catálogo** — o mapa dos quatro níveis da Estrutura DDD, a lista completa de ativos, e o
   cadastro de item novo.
-- **Governança** — a fila de validações abertas, com os botões **Aprovar** e **Ajustes**.
+- **Validações** — a fila de etapas abertas, com uma aba por etapa e a contagem de cada
+  uma, a mais crítica primeiro e o tempo até o prazo. Ao abrir uma etapa, o painel mostra
+  as evidências, os responsáveis e **o que mudou** desde a revisão anterior. **Assuma** a
+  análise para os outros saberem que está com você, e decida com parecer; com "ir para a
+  próxima" marcado, a fila já abre a seguinte.
+- **Minha mesa** — o que você assumiu, a fila livre, os seus rascunhos e o que você
+  submeteu e espera decisão.
 - **Indicadores** — uma leitura agregada: publicados, validações abertas, composição por
   tipo.
 
