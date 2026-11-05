@@ -41,6 +41,9 @@ public sealed class Ativo : RaizDeAgregado
     public string Descricao { get; private set; }
     public IdDeAtivo? IdPai { get; private set; }
     public Guid? IdSquad { get; private set; }
+
+    /// <summary>Quem cadastrou (<c>item_catalogo.criado_por</c>). Nulo em ativo anterior a este campo.</summary>
+    public Guid? CriadoPor { get; private set; }
     public Criticidade Criticidade { get; private set; }
     public StatusCicloVida Status { get; private set; }
     public OrigemDoAtivo Origem { get; }
@@ -115,7 +118,8 @@ public sealed class Ativo : RaizDeAgregado
         IdDeAtivo? idPai = null, IdDeUnidade? unidade = null,
         IReadOnlyDictionary<string, string>? atributos = null,
         OrigemDoAtivo origem = OrigemDoAtivo.Manual,
-        Guid? idSquad = null)
+        Guid? idSquad = null,
+        Guid? criadoPor = null)
     {
         if (string.IsNullOrWhiteSpace(nome))
             throw new ErroDeDominio("NOME_OBRIGATORIO", "Nome do ativo é obrigatório.");
@@ -134,6 +138,7 @@ public sealed class Ativo : RaizDeAgregado
             IdPai = idPai,
             Unidade = unidade,
             IdSquad = idSquad,
+            CriadoPor = criadoPor,
         };
 
         if (atributos is not null)
@@ -307,13 +312,15 @@ public sealed class Ativo : RaizDeAgregado
         IReadOnlyDictionary<string, string>? atributos = null,
         IEnumerable<Responsabilidade>? responsaveis = null,
         IEnumerable<Evidencia>? evidencias = null,
-        Guid? idSquad = null)
+        Guid? idSquad = null,
+        Guid? criadoPor = null)
     {
         var a = new Ativo(id, empresa, tipoItem, codigo, nome, descricao,
                           criticidade, origem, criadoEm)
         {
             IdPai = idPai,
             IdSquad = idSquad,
+            CriadoPor = criadoPor,
             Unidade = unidade,
             Status = status,
             RevisaoAtual = revisaoAtual,

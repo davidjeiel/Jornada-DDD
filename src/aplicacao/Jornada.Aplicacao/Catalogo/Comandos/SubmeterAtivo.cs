@@ -80,9 +80,10 @@ public sealed class SubmeterAtivo(
 
         foreach (var etapa in checagem.Politica.Etapas)
         {
+            // O prazo de cada etapa é o SLA da política, contado da submissão (governanca.gerar_validacoes).
             await validacoes.AdicionarAsync(new ValidacaoEmProcesso(
                 Guid.CreateVersion7(), ativo.Id, contexto.Empresa, ativo.RevisaoAtual,
-                etapa, ator.IdPessoa), ct);
+                etapa, ator.IdPessoa, relogio.Agora, relogio.Agora.AddHours(checagem.Politica.SlaHoras)), ct);
         }
         await uow.ConfirmarAsync(ct);
 

@@ -28,6 +28,9 @@ export type Validacao = {
   submetidaPor: string;
   decididaPor: string | null;
   motivo: string | null;
+  abertaEm: string | null;
+  prazo: string | null;
+  atribuidaA: string | null;
 };
 
 export type Evidencia = { id: string; tipo: string; titulo: string; url: string | null };
@@ -439,4 +442,41 @@ export function inativarSquad(id: string): Promise<Squad> {
 /** O rito que a política aplica ao tipo e à criticidade (GET /v1/ritos). */
 export function consultarRito(tipo: string, criticidade: string): Promise<Rito> {
   return requisicao(`/v1/ritos?tipo=${encodeURIComponent(tipo)}&criticidade=${encodeURIComponent(criticidade)}`);
+}
+
+// ── Fila de validação e mesa (fase 4) ────────────────────────────────────
+
+export type ItemDaFila = { validacao: Validacao; ativo: AtivoResumo; slaRestante: string };
+export type FilaDeValidacao = { itens: ItemDaFila[]; contagem: Record<string, number> };
+
+export function consultarFila(filtro: { etapa?: string; minhas?: boolean; livres?: boolean } = {}): Promise<FilaDeValidacao> {
+  const busca = new URLSearchParams();
+  if (filtro.etapa) busca.set('etapa', filtro.etapa);
+  if (filtro.minhas) busca.set('minhas', 'true');
+  if (filtro.livres) busca.set('livres', 'true');
+  const texto = busca.toString();
+  return requisicao(`/v1/validacoes/fila${texto ? `?${texto}` : ''}`);
+}
+
+export function assumirValidacao(id: string): Promise<Validacao> {
+  return requisicao(`/v1/validacoes/${id}/atribuicao`, { method: 'POST' });
+}
+
+export function liberarValidacao(id: string): Promise<Validacao> {
+  return requisicao(`/v1/validacoes/${id}/atribuicao`, { method: 'DELETE' });
+}
+
+/** Tudo o que o validador precisa para decidir: a ficha, o pré-check e o que mudou. */
+export type PainelDoValidador = {
+  validacao: Validacao; ficha: FichaDoAtivo; preCheck: PreCheck; mudancas: Comparacao | null; primeiraRevisao: boolean;
+};
+
+export function consultarPainel(id: string): Promise<PainelDoValidador> {
+  return requisicao(`/v1/validacoes/${id}/painel`);
+}
+
+export type Mesa = { minhasValidacoes: ItemDaFila[]; filaLivre: ItemDaFila[]; meusRascunhos: AtivoResumo[]; aguardandoDecisao: AtivoResumo[] };
+
+export function consultarMesa(): Promise<Mesa> {
+  return requisicao('/v1/mesa');
 }

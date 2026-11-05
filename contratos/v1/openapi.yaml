@@ -3484,6 +3484,461 @@ paths:
         - Bearer: [ ]
         - X-Empresa: [ ]
           X-Pessoa: [ ]
+  /v1/validacoes/fila:
+    get:
+      tags:
+        - Governança
+      summary: 'Fila de validação, a mais crítica primeiro'
+      description: 'Só etapas abertas, ordenadas por criticidade do ativo e prazo. etapa filtra pela aba; minhas=true só as que você assumiu; livres=true só as que ninguém assumiu. contagem traz o total aberto por etapa e o das minhas.'
+      operationId: consultarFilaDeValidacao
+      parameters:
+        - name: etapa
+          in: query
+          schema:
+            type: string
+        - name: minhas
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: livres
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilaDeValidacaoResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  '/v1/validacoes/{id}/atribuicao':
+    post:
+      tags:
+        - Governança
+      summary: Assume a análise de uma etapa
+      description: 'Marca você como quem está analisando, para dois validadores não duplicarem trabalho. Já assumida por outra pessoa: 409 VALIDACAO_JA_ASSUMIDA.'
+      operationId: assumirValidacao
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidacaoResponse'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+    delete:
+      tags:
+        - Governança
+      summary: Devolve a etapa à fila livre
+      description: 'Só quem assumiu libera; de outra pessoa, 409 VALIDACAO_JA_ASSUMIDA.'
+      operationId: liberarValidacao
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidacaoResponse'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  '/v1/validacoes/{id}/painel':
+    get:
+      tags:
+        - Governança
+      summary: Tudo o que o validador precisa para decidir a etapa
+      description: 'A etapa, a ficha do ativo (evidências, responsáveis, trilha), o pré-check e o que mudou desde a revisão anterior.'
+      operationId: consultarPainelDoValidador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PainelDoValidadorResponse'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/mesa:
+    get:
+      tags:
+        - Governança
+      summary: 'Minha mesa: o que é meu'
+      description: 'As etapas que você assumiu, a fila livre, o que você cadastrou e ainda está com você (rascunho ou em revisão), e o que você cadastrou e aguarda decisão.'
+      operationId: consultarMesa
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MesaResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   '/v1/validacoes/{id}/decisoes':
     post:
       tags:
@@ -4355,6 +4810,25 @@ components:
           description: Os pleitos.
       additionalProperties: false
       description: 'A fila de pleitos, pendentes primeiro e, entre eles, quem espera há mais tempo.'
+    FilaDeValidacaoResponse:
+      required:
+        - itens
+        - contagem
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemDaFilaResponse'
+          description: 'As etapas abertas, com os filtros pedidos.'
+        contagem:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: 'Etapas abertas por etapa (negocial, tecnica, arquitetural) e as "minhas".'
+      additionalProperties: false
+      description: 'A fila de validação: a mais crítica primeiro, e, na mesma criticidade, o prazo mais próximo.'
     HistoricoResponse:
       required:
         - revisoes
@@ -4442,6 +4916,22 @@ components:
             format: uuid
       additionalProperties: false
       description: Cadastros a inativar de uma vez. O do administrador conectado é ignorado.
+    ItemDaFilaResponse:
+      required:
+        - validacao
+        - ativo
+        - slaRestante
+      type: object
+      properties:
+        validacao:
+          $ref: '#/components/schemas/ValidacaoResponse'
+        ativo:
+          $ref: '#/components/schemas/AtivoResumoResponse'
+        slaRestante:
+          type: string
+          description: '"vencido", horas (abaixo de 48) ou dias.'
+      additionalProperties: false
+      description: 'Uma etapa aberta na fila, com o ativo e o tempo que falta.'
     LinhaDaMatrizResponse:
       required:
         - acao
@@ -4571,6 +5061,36 @@ components:
           type: string
       additionalProperties: false
       description: Um mecanismo de relação.
+    MesaResponse:
+      required:
+        - minhasValidacoes
+        - filaLivre
+        - meusRascunhos
+        - aguardandoDecisao
+      type: object
+      properties:
+        minhasValidacoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemDaFilaResponse'
+          description: Etapas que eu assumi.
+        filaLivre:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemDaFilaResponse'
+          description: Etapas que ninguém assumiu.
+        meusRascunhos:
+          type: array
+          items:
+            $ref: '#/components/schemas/AtivoResumoResponse'
+          description: 'O que cadastrei e ainda está comigo: rascunho ou em revisão.'
+        aguardandoDecisao:
+          type: array
+          items:
+            $ref: '#/components/schemas/AtivoResumoResponse'
+          description: O que cadastrei e está em validação.
+      additionalProperties: false
+      description: A minha mesa.
     MetamodeloResponse:
       required:
         - tipos
@@ -4592,6 +5112,28 @@ components:
             $ref: '#/components/schemas/MecanismoResponse'
       additionalProperties: false
       description: 'O metamodelo da empresa: tipos de ativo, tipos de relação e mecanismos.'
+    PainelDoValidadorResponse:
+      required:
+        - validacao
+        - ficha
+        - preCheck
+        - mudancas
+        - primeiraRevisao
+      type: object
+      properties:
+        validacao:
+          $ref: '#/components/schemas/ValidacaoResponse'
+        ficha:
+          $ref: '#/components/schemas/FichaDoAtivoResponse'
+        preCheck:
+          $ref: '#/components/schemas/PreCheckResponse'
+        mudancas:
+          $ref: '#/components/schemas/ComparacaoResponse'
+        primeiraRevisao:
+          type: boolean
+          description: 'É a primeira revisão do ativo: não há o que comparar.'
+      additionalProperties: false
+      description: O painel do validador.
     PapelNoEscopoRequest:
       required:
         - papel
@@ -5344,6 +5886,21 @@ components:
           type: string
           description: Justificativa da decisão.
           nullable: true
+        abertaEm:
+          type: string
+          description: Quando a etapa abriu.
+          format: date-time
+          nullable: true
+        prazo:
+          type: string
+          description: 'Até quando decidir: abertura mais o SLA da política.'
+          format: date-time
+          nullable: true
+        atribuidaA:
+          type: string
+          description: Quem assumiu a análise; nulo na fila livre.
+          format: uuid
+          nullable: true
       additionalProperties: false
       description: Etapa de validação de uma revisão.
       example:
@@ -5355,6 +5912,9 @@ components:
         submetidaPor: 20000000-0000-0000-0000-000000000001
         decididaPor: null
         motivo: null
+        abertaEm: '2026-11-05T12:00:00+00:00'
+        prazo: '2026-11-07T12:00:00+00:00'
+        atribuidaA: null
     VinculosResponse:
       required:
         - podeExcluir

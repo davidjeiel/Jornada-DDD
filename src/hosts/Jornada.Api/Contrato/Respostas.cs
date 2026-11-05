@@ -1,5 +1,6 @@
 using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Governanca;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -268,13 +269,61 @@ public sealed record SubmissaoResponse(int Revisao, int Score, IReadOnlyList<str
 /// <param name="SubmetidaPor">Quem submeteu a revisão.</param>
 /// <param name="DecididaPor">Quem decidiu a etapa, se já decidida.</param>
 /// <param name="Motivo">Justificativa da decisão.</param>
+/// <param name="AbertaEm">Quando a etapa abriu.</param>
+/// <param name="Prazo">Até quando decidir: abertura mais o SLA da política.</param>
+/// <param name="AtribuidaA">Quem assumiu a análise; nulo na fila livre.</param>
 public sealed record ValidacaoResponse(
     Guid Id, Guid Ativo, int Revisao, string Etapa, string Status,
-    Guid SubmetidaPor, Guid? DecididaPor, string? Motivo)
+    Guid SubmetidaPor, Guid? DecididaPor, string? Motivo,
+    DateTimeOffset? AbertaEm, DateTimeOffset? Prazo, Guid? AtribuidaA)
 {
     public static ValidacaoResponse De(ValidacaoEmProcesso v) => new(
         v.Id, v.Ativo.Valor, v.Revisao, v.Etapa.ToString().ToLowerInvariant(),
-        v.Status.ToString().ToLowerInvariant(), v.IdSubmissor, v.IdDecisor, v.Motivo);
+        v.Status.ToString().ToLowerInvariant(), v.IdSubmissor, v.IdDecisor, v.Motivo,
+        v.AbertaEm, v.Prazo, v.AtribuidaA);
+}
+
+/// <summary>Uma etapa aberta na fila, com o ativo e o tempo que falta.</summary>
+/// <param name="Validacao">A etapa.</param>
+/// <param name="Ativo">O ativo validado.</param>
+/// <param name="SlaRestante">"vencido", horas (abaixo de 48) ou dias.</param>
+public sealed record ItemDaFilaResponse(ValidacaoResponse Validacao, AtivoResumoResponse Ativo, string SlaRestante)
+{
+    public static ItemDaFilaResponse De(ItemDaFila i) =>
+        new(ValidacaoResponse.De(i.Validacao), AtivoResumoResponse.De(i.Ativo), i.SlaRestante);
+}
+
+/// <summary>A fila de validação: a mais crítica primeiro, e, na mesma criticidade, o prazo mais próximo.</summary>
+/// <param name="Itens">As etapas abertas, com os filtros pedidos.</param>
+/// <param name="Contagem">Etapas abertas por etapa (negocial, tecnica, arquitetural) e as "minhas".</param>
+public sealed record FilaDeValidacaoResponse(IReadOnlyList<ItemDaFilaResponse> Itens, IReadOnlyDictionary<string, int> Contagem);
+
+/// <summary>O painel do validador.</summary>
+/// <param name="Validacao">A etapa em análise.</param>
+/// <param name="Ficha">A ficha do ativo: trilha, responsáveis, evidências, relações.</param>
+/// <param name="PreCheck">O pré-check de agora.</param>
+/// <param name="Mudancas">O que mudou desde a revisão anterior; nulo na primeira ou sem retrato anterior.</param>
+/// <param name="PrimeiraRevisao">É a primeira revisão do ativo: não há o que comparar.</param>
+public sealed record PainelDoValidadorResponse(
+    ValidacaoResponse Validacao, FichaDoAtivoResponse Ficha, PreCheckResponse PreCheck, ComparacaoResponse? Mudancas, bool PrimeiraRevisao)
+{
+    public static PainelDoValidadorResponse De(PainelDoValidador.Saida s) => new(
+        ValidacaoResponse.De(s.Validacao), FichaDoAtivoResponse.De(s.Ficha), PreCheckResponse.De(s.PreCheck),
+        s.Mudancas is { } m ? ComparacaoResponse.De(m) : null, s.PrimeiraRevisao);
+}
+
+/// <summary>A minha mesa.</summary>
+/// <param name="MinhasValidacoes">Etapas que eu assumi.</param>
+/// <param name="FilaLivre">Etapas que ninguém assumiu.</param>
+/// <param name="MeusRascunhos">O que cadastrei e ainda está comigo: rascunho ou em revisão.</param>
+/// <param name="AguardandoDecisao">O que cadastrei e está em validação.</param>
+public sealed record MesaResponse(
+    IReadOnlyList<ItemDaFilaResponse> MinhasValidacoes, IReadOnlyList<ItemDaFilaResponse> FilaLivre,
+    IReadOnlyList<AtivoResumoResponse> MeusRascunhos, IReadOnlyList<AtivoResumoResponse> AguardandoDecisao)
+{
+    public static MesaResponse De(MinhaMesa.Saida s) => new(
+        s.MinhasValidacoes.Select(ItemDaFilaResponse.De).ToArray(), s.FilaLivre.Select(ItemDaFilaResponse.De).ToArray(),
+        s.MeusRascunhos.Select(AtivoResumoResponse.De).ToArray(), s.AguardandoDecisao.Select(AtivoResumoResponse.De).ToArray());
 }
 
 /// <summary>Fila de validações da empresa.</summary>

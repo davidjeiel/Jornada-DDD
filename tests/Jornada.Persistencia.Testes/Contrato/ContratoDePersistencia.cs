@@ -426,6 +426,54 @@ public abstract class ContratoDePersistencia
         Verificar.Igual("falta evidência", decidida.Motivo);
     }
 
+    [Teste("prazo, abertura e quem assumiu a validação voltam iguais, e liberar persiste")]
+    public async Task ValidacaoAssumidaPersiste()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var ativo = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0001", "Core"));
+        var validacao = new ValidacaoEmProcesso(Guid.CreateVersion7(), ativo.Id, empresa, 1, EtapaValidacao.Tecnica,
+            Guid.NewGuid(), Relogio.Agora, Relogio.Agora.AddHours(72));
+        var analista = Guid.NewGuid();
+        await using (var s = Abrir(empresa))
+        {
+            await s.Validacoes.AdicionarAsync(validacao);
+            await s.Unidade.ConfirmarAsync();
+        }
+        await using (var s = Abrir(empresa))
+        {
+            (await s.Validacoes.ObterAsync(validacao.Id))!.Assumir(analista);
+            await s.Unidade.ConfirmarAsync();
+        }
+        await using (var s = Abrir(empresa))
+        {
+            var lida = await s.Validacoes.ObterAsync(validacao.Id) ?? throw Ausente("validação");
+            Verificar.Igual<DateTimeOffset?>(Relogio.Agora, lida.AbertaEm);
+            Verificar.Igual<DateTimeOffset?>(Relogio.Agora.AddHours(72), lida.Prazo);
+            Verificar.Igual<Guid?>(analista, lida.AtribuidaA);
+            lida.Liberar(analista);
+            await s.Unidade.ConfirmarAsync();
+        }
+        await using var nova = Abrir(empresa);
+        Verificar.Igual<Guid?>(null, (await nova.Validacoes.ObterAsync(validacao.Id))!.AtribuidaA);
+    }
+
+    [Teste("listar filtra por quem cadastrou")]
+    public async Task ListarPorQuemCadastrou()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var ana = Guid.NewGuid();
+        var tipo = Tipos.Obter("sistema");
+        await Gravar(empresa, Ativo.Rascunhar(empresa, tipo, CodigoDeAtivo.De("SIS-0001"), "Da Ana", Relogio, criadoPor: ana));
+        await Gravar(empresa, Ativo.Rascunhar(empresa, tipo, CodigoDeAtivo.De("SIS-0002"), "De outra", Relogio, criadoPor: Guid.NewGuid()));
+        await Gravar(empresa, Ativo.Rascunhar(empresa, tipo, CodigoDeAtivo.De("SIS-0003"), "Sem autor", Relogio));
+
+        await using var s = Abrir(empresa);
+        var daAna = await s.Ativos.ListarAsync(criadoPor: ana);
+        Verificar.Igual("Da Ana", daAna.Single().Nome);
+        Verificar.Igual<Guid?>(ana, daAna.Single().CriadoPor);
+        Verificar.Igual(3, (await s.Ativos.ListarAsync()).Count);
+    }
+
     [Teste("cancelamento de etapa persiste")]
     public async Task CancelamentoPersiste()
     {

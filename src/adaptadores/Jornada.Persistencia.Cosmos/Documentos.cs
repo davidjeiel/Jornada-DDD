@@ -53,6 +53,7 @@ internal sealed class DocumentoDeAtivo : DocumentoDoCatalogo
     public required string Descricao { get; init; }
     public string? IdPai { get; init; }
     public Guid? IdSquad { get; init; }
+    public Guid? CriadoPor { get; init; }
     public required string Criticidade { get; init; }
     public required string Status { get; init; }
     public required string Origem { get; init; }
@@ -80,6 +81,9 @@ internal sealed class DocumentoDeValidacao : DocumentoDoCatalogo
     public required string Status { get; init; }
     public Guid? IdDecisor { get; init; }
     public string? Motivo { get; init; }
+    public DateTimeOffset? AbertaEm { get; init; }
+    public DateTimeOffset? Prazo { get; init; }
+    public Guid? AtribuidaA { get; init; }
 }
 
 /// <summary>

@@ -85,9 +85,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 98 |
+| ✅ coberto | 106 |
 | 🟡 parcial | 4 |
-| ⬜ pendente | 50 |
+| ⬜ pendente | 42 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -100,7 +100,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | 1 | Ciclo de vida | 4 | 0 | 0 |
 | 2 | Pessoas e acesso | 43 | 2 | 0 |
 | 3 | Ficha e cadastro | 22 | 0 | 0 |
-| 4 | Validação e mesa | 0 | 0 | 8 |
+| 4 | Validação e mesa | 8 | 0 | 0 |
 | 5 | Catálogo e busca | 0 | 1 | 11 |
 | 6 | Mapas e grafo | 0 | 0 | 12 |
 | 7 | Visão executiva | 0 | 0 | 3 |
@@ -131,6 +131,13 @@ publicação), a relação com mecanismo, destinos sugeridos, recusa de ciclo
 antes de gravar e relação repetida ignorada, e as relações em lote. O 3b traz o
 assistente de cadastro lendo o metamodelo (`GET /v1/metamodelo`) com o rito do
 tipo antecipado, o squad do ativo e o escopo de papel por squad.
+
+A fase 4 porta a fila de validação (abas por etapa com contagem, a mais
+crítica primeiro, prazo de cada etapa pelo SLA da política), assumir e liberar
+uma etapa, o painel do validador com o que mudou desde a revisão anterior,
+"decidir e seguir para a próxima", a Minha mesa e a página Políticas. Etapas
+abertas antes desta fase não têm prazo gravado e aparecem com "—"; ativos
+cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 
 ### Governança (regras de publicação) — `tests/test_governanca.py` (10)
 
@@ -232,14 +239,14 @@ tipo antecipado, o squad do ativo e o escopo de papel por squad.
 | `test_todo_bloqueio_do_precheck_cai_em_algum_passo` — O checklist não pode esconder um impedimento que a submissão vai levantar. | 0 | ✅ | `ChecklistDerivaDoPreCheck` |
 | `test_checklist_aparece_no_rascunho_e_some_no_publicado` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |
 | `test_wizard_antecipa_o_rito_do_tipo` | 3 | ✅ | `telas/NovoAtivo.test.tsx`: o rito vem de `GET /v1/ritos?tipo=&criticidade=` e aparece ao lado do formulário |
-| `test_painel_do_validador_mostra_evidencias_e_responsaveis` | 4 | ⬜ |  |
-| `test_painel_mostra_o_que_mudou_na_segunda_revisao` | 4 | ⬜ |  |
-| `test_decidir_preserva_a_etapa_e_segue_para_a_proxima` | 4 | ⬜ |  |
-| `test_decidir_sem_seguir_nao_seleciona_ninguem` | 4 | ⬜ |  |
-| `test_abas_da_fila_mostram_a_contagem` | 4 | ⬜ |  |
-| `test_assumir_e_liberar_uma_validacao` | 4 | ⬜ |  |
-| `test_minha_mesa_separa_o_que_e_meu` | 4 | ⬜ |  |
-| `test_tela_da_mesa_responde_e_entra_no_menu` | 4 | ⬜ |  |
+| `test_painel_do_validador_mostra_evidencias_e_responsaveis` | 4 | ✅ | `PainelMostraEvidenciasEResponsaveis` e `telas/Validacoes.test.tsx` (`GET /v1/validacoes/{id}/painel`) |
+| `test_painel_mostra_o_que_mudou_na_segunda_revisao` | 4 | ✅ | `PainelMostraOQueMudouNaSegundaRevisao` e `telas/Validacoes.test.tsx`: a comparação com a revisão anterior, pelo retrato (ADR-0017) |
+| `test_decidir_preserva_a_etapa_e_segue_para_a_proxima` | 4 | ✅ | `telas/Validacoes.test.tsx` (`destinoDepoisDeDecidir`) |
+| `test_decidir_sem_seguir_nao_seleciona_ninguem` | 4 | ✅ | `telas/Validacoes.test.tsx` |
+| `test_abas_da_fila_mostram_a_contagem` | 4 | ✅ | `FilaOrdenaEConta` e `telas/Validacoes.test.tsx` |
+| `test_assumir_e_liberar_uma_validacao` | 4 | ✅ | `AssumirELiberarUmaValidacao` e `telas/Validacoes.test.tsx`; quem não decide não assume (`QuemNaoDecideNaoAssume`) |
+| `test_minha_mesa_separa_o_que_e_meu` | 4 | ✅ | `MinhaMesaSeparaOQueEMeu` e `telas/Validacoes.test.tsx` (`GET /v1/mesa`) |
+| `test_tela_da_mesa_responde_e_entra_no_menu` | 4 | ✅ | `telas/Validacoes.test.tsx` |
 | `test_migracao_cria_a_coluna_em_banco_antigo` — Banco criado antes da onda 2 recebe atribuido_a sem perder dados. |  | — | Migração de coluna do SQLite; o Cosmos não tem esquema. |
 | `test_formulario_de_relacao_oferece_mecanismo` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx`: mecanismo e busca de destino (`destino-busca`) |
 | `test_mecanismo_chega_ao_banco` | 3 | ✅ | `MecanismoChegaAoBanco` e o contrato de persistência |

@@ -74,7 +74,7 @@ public sealed class CadastrarAtivo(
 
         var ativo = Ativo.Rascunhar(
             contexto.Empresa, tipo, codigo, cmd.Nome, relogio,
-            cmd.Descricao, cmd.Criticidade, cmd.IdPai, contexto.Unidade, cmd.Atributos, idSquad: cmd.IdSquad);
+            cmd.Descricao, cmd.Criticidade, cmd.IdPai, contexto.Unidade, cmd.Atributos, idSquad: cmd.IdSquad, criadoPor: ator.IdPessoa);
 
         await ativos.AdicionarAsync(ativo, ct);
         await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.Criar, ator.IdPessoa, relogio,

@@ -30,7 +30,7 @@ export const MENU: ItemDeMenu[] = [
   { secao: 'catalogo', caminho: '/catalogo', rotulo: 'Catálogo de ativos', inicial: 'CA', descricao: 'Todos os ativos da empresa, com busca e filtros.' },
   { secao: 'mapas', caminho: '/mapas', rotulo: 'Mapas', inicial: 'MP', fase: 6, descricao: 'Árvores de negócio e técnica, vizinhança e análise de consumidores.' },
 
-  { secao: 'mesa', caminho: '/mesa', rotulo: 'Minha mesa', inicial: 'MM', grupo: 'Trabalhar', fase: 4, descricao: 'O que é seu: rascunhos, validações assumidas e pendências.' },
+  { secao: 'mesa', caminho: '/mesa', rotulo: 'Minha mesa', inicial: 'MM', grupo: 'Trabalhar', descricao: 'O que é seu: rascunhos, validações assumidas e pendências.' },
   { secao: 'novo', caminho: '/novo', rotulo: 'Novo ativo', inicial: 'NA', grupo: 'Trabalhar', descricao: 'Cadastro de um ativo em rascunho.' },
   { secao: 'descobertas', caminho: '/descobertas', rotulo: 'Descobertas', inicial: 'DE', grupo: 'Trabalhar', fase: 9, descricao: 'Importação de OpenAPI e inventário Git, com prévia e triagem.' },
   { secao: 'validacoes', caminho: '/validacoes', rotulo: 'Validações', inicial: 'VL', grupo: 'Trabalhar', descricao: 'Fila de etapas de validação aguardando decisão.' },
@@ -41,7 +41,7 @@ export const MENU: ItemDeMenu[] = [
   { secao: 'pleitos', caminho: '/pleitos', rotulo: 'Pleitos de acesso', inicial: 'PA', grupo: 'Administração', exige: 'conceder', descricao: 'Fila de pedidos de papel para quem concede acesso.' },
   { secao: 'squads', caminho: '/squads', rotulo: 'Squads', inicial: 'SQ', grupo: 'Administração', exige: 'conceder', descricao: 'Os times da empresa.' },
   { secao: 'gestao-acessos', caminho: '/gestao-acessos', rotulo: 'Gestão de acessos', inicial: 'GA', grupo: 'Administração', exige: 'administrar', descricao: 'Cadastros, concessões e revogações de papel em toda a empresa.' },
-  { secao: 'politicas', caminho: '/politicas', rotulo: 'Políticas', inicial: 'PO', grupo: 'Administração', fase: 4, descricao: 'Rito de validação por tipo e criticidade: etapas, evidência, score e SLA.' },
+  { secao: 'politicas', caminho: '/politicas', rotulo: 'Políticas', inicial: 'PO', grupo: 'Administração', descricao: 'Rito de validação por tipo e criticidade: etapas, evidência, score e SLA.' },
 ];
 
 export const CARTILHA: ItemDeMenu = {

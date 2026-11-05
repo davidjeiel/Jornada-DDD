@@ -24,6 +24,8 @@ internal sealed class MundoDeGovernanca
 
     public RepositorioDeAtivosEmMemoria Repo => new(_armazem, _tenant);
     public RepositorioDeAcessoEmMemoria Squads => new(_armazem, _tenant);
+    public MetamodeloPadrao Metamodelo => _metamodelo;
+    public ContextoDeTenantFixo Tenant => _tenant;
 
     public Ativo Ativo(IdDeAtivo id) => Repo.ObterAsync(id).Result!;
 
@@ -35,8 +37,8 @@ internal sealed class MundoDeGovernanca
 
     public Guid UnicaAberta(IdDeAtivo id) => Abertas(id).Single().Id;
 
-    public IdDeAtivo SistemaCompleto(string nome = "Core Bancário") => Cadastrar("sistema", nome,
-        new() { ["plataforma"] = "mainframe" }, PapelDeOwnership.OwnerTecnico);
+    public IdDeAtivo SistemaCompleto(string nome = "Core Bancário", Criticidade criticidade = Criticidade.Media, Ator? quem = null) =>
+        Cadastrar("sistema", nome, new() { ["plataforma"] = "mainframe" }, PapelDeOwnership.OwnerTecnico, criticidade, quem);
 
     public IdDeAtivo DominioCompleto()
     {
@@ -91,18 +93,18 @@ internal sealed class MundoDeGovernanca
         new CompararRevisoes(Repo, Repo).ExecutarAsync(id, a, b).Result;
 
     private IdDeAtivo Cadastrar(string tipo, string nome, Dictionary<string, string> atributos,
-                                PapelDeOwnership owner)
+                                PapelDeOwnership owner, Criticidade criticidade = Criticidade.Media, Ator? quem = null)
     {
-        var r = new CadastrarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(Curador), Repo, Repo, Squads, Cenario.Relogio)
+        var r = new CadastrarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(quem ?? Curador), Repo, Repo, Squads, Cenario.Relogio)
             .ExecutarAsync(new ComandoCadastrarAtivo(tipo, nome, "Descrição completa do ativo.",
-                Criticidade.Media, null, atributos)).Result;
+                criticidade, null, atributos)).Result;
         Exigir(r);
         Exigir(new AtribuirResponsavel(Repo, _metamodelo, _tenant, new AtorFixo(Curador), Repo, Repo, Cenario.Relogio)
             .ExecutarAsync(new ComandoAtribuirResponsavel(r.Valor, Guid.NewGuid(), owner)).Result);
         return r.Valor;
     }
 
-    private AvaliarPreCheck PreCheck() => new(Repo, Repo, _metamodelo, _politicas, Cenario.Relogio);
+    public AvaliarPreCheck PreCheck() => new(Repo, Repo, _metamodelo, _politicas, Cenario.Relogio);
 
     private static void Exigir<T>(Aplicacao.Resultado<T> r)
     {
