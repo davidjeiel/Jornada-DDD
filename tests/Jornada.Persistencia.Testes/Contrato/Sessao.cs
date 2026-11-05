@@ -20,6 +20,8 @@ public sealed class Sessao(
     IRepositorioDeSquads squads,
     IConsultaDeVinculos vinculos,
     IRepositorioDeIndicadores indicadores,
+    IRepositorioDeNotificacoes notificacoes,
+    IRepositorioDePreferencias preferencias,
     IAsyncDisposable? recursos = null) : IAsyncDisposable
 {
     public IRepositorioDeAtivos Ativos { get; } = ativos;
@@ -33,6 +35,8 @@ public sealed class Sessao(
     public IRepositorioDeSquads Squads { get; } = squads;
     public IConsultaDeVinculos Vinculos { get; } = vinculos;
     public IRepositorioDeIndicadores Indicadores { get; } = indicadores;
+    public IRepositorioDeNotificacoes Notificacoes { get; } = notificacoes;
+    public IRepositorioDePreferencias Preferencias { get; } = preferencias;
 
     public ValueTask DisposeAsync() => recursos?.DisposeAsync() ?? ValueTask.CompletedTask;
 }

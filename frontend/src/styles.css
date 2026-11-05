@@ -802,3 +802,26 @@ a.validation-row > :not(:first-child) { flex: none; width: auto; }
 .metric .delta { font-weight: 600; }
 .metric .delta.bom { color: var(--success); }
 .metric .delta.ruim { color: var(--danger); }
+
+/* Notificações: a bolha do sino, a caixa e as preferências. */
+.sino { position: relative; }
+.sino .bolha { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: var(--paper); font-size: 11px; font-weight: 700; line-height: 1; }
+.barra-da-caixa { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.barra-da-caixa .ficha-tabs { margin: 0; }
+.caixa-de-avisos { margin: 0; padding: 0; list-style: none; }
+.caixa-de-avisos li { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-bottom: 1px solid var(--line); border-left: 3px solid transparent; }
+.caixa-de-avisos li.nao-lida { background: var(--neutral-bg); }
+.caixa-de-avisos li.nao-lida .titulo-do-aviso { font-weight: 700; }
+.caixa-de-avisos li.urgente.nao-lida { border-left-color: var(--danger); }
+.caixa-de-avisos li.lida { color: var(--muted); }
+.caixa-de-avisos p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.caixa-de-avisos .titulo-do-aviso { color: var(--ink); }
+.caixa-de-avisos li.lida .titulo-do-aviso { color: var(--muted); }
+.caixa-de-avisos .tag, .tabela.preferencias .tag { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--neutral-bg); color: var(--muted); font-size: 11.5px; }
+.tag.tag-urgente { border-color: var(--danger); background: var(--danger-weak); color: var(--danger); }
+.tabela.preferencias .tag { margin-left: 8px; }
+.tabela.preferencias td:not(:first-child), .tabela.preferencias th:not(:first-child) { text-align: center; }
+.link-button { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--brand); font: inherit; font-size: 13px; cursor: pointer; }
+.link-button:hover { text-decoration: underline; }
+.link-button:disabled { color: var(--muted); cursor: default; }
+.aviso-de-sucesso { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: var(--success-weak); color: var(--success); }

@@ -1,10 +1,12 @@
 using Jornada.Aplicacao.Catalogo.Consultas;
 using Jornada.Aplicacao.Acesso;
+using Jornada.Aplicacao.Notificacoes;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Governanca;
+using Jornada.Dominio.Notificacoes;
 
 namespace Jornada.Aplicacao.Catalogo.Comandos;
 
@@ -29,6 +31,7 @@ public sealed class SubmeterAtivo(
     IRepositorioDeRelacoes relacoes,
     IRepositorioDeRevisoes revisoes,
     ITrilhaDeAuditoria trilha,
+    Notificador notificador,
     IRelogio relogio)
 {
     public sealed record Saida(int Revisao, IReadOnlyList<EtapaValidacao> EtapasAbertas, int Score);
@@ -81,9 +84,17 @@ public sealed class SubmeterAtivo(
         foreach (var etapa in checagem.Politica.Etapas)
         {
             // O prazo de cada etapa é o SLA da política, contado da submissão (governanca.gerar_validacoes).
-            await validacoes.AdicionarAsync(new ValidacaoEmProcesso(
+            var validacao = new ValidacaoEmProcesso(
                 Guid.CreateVersion7(), ativo.Id, contexto.Empresa, ativo.RevisaoAtual,
-                etapa, ator.IdPessoa, relogio.Agora, relogio.Agora.AddHours(checagem.Politica.SlaHoras)), ct);
+                etapa, ator.IdPessoa, relogio.Agora, relogio.Agora.AddHours(checagem.Politica.SlaHoras));
+            await validacoes.AdicionarAsync(validacao, ct);
+
+            // Avisa quem pode decidir a etapa, na mesma transação (servicos.submeter).
+            var nome = etapa.ToString().ToLowerInvariant();
+            await notificador.ParaMuitosAsync(await notificador.QuemPodeDecidirAsync(validacao, ativo, alvo, ct),
+                TiposDeNotificacao.RevisaoSubmetida, $"{ativo.Nome} aguarda validação {nome}",
+                $"{ativo.Codigo.Valor} entrou na fila da etapa {nome}.", $"/validacoes?validacao={validacao.Id}",
+                ativo.Id, validacao.Id, $"{TiposDeNotificacao.RevisaoSubmetida}:{validacao.Id}", ct: ct);
         }
         await uow.ConfirmarAsync(ct);
 

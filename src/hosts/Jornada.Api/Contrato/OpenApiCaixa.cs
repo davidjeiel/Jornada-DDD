@@ -58,6 +58,7 @@ public static class OpenApiCaixa
     public const string TagGovernanca = "Governança";
     public const string TagOperacao = "Operação";
     public const string TagAcesso = "Acesso";
+    public const string TagNotificacoes = "Notificações";
 
     // Esquemas de segurança.
     public const string EsquemaBearer = "Bearer";
@@ -153,6 +154,7 @@ internal sealed class FiltroDoDocumento(MetadadosDoContrato meta) : IDocumentFil
             new() { Name = OpenApiCaixa.TagCatalogo, Description = "Cadastro e consulta de ativos, responsáveis, evidências e relações." },
             new() { Name = OpenApiCaixa.TagGovernanca, Description = "Pré-check, submissão e decisão das etapas de validação." },
             new() { Name = OpenApiCaixa.TagAcesso, Description = "Cadastro de pessoa, pleito de papel, concessão e perfil." },
+            new() { Name = OpenApiCaixa.TagNotificacoes, Description = "A caixa de avisos de quem está identificado, as preferências e as tarefas de fundo (despacho e vigia de SLA)." },
             new() { Name = OpenApiCaixa.TagOperacao, Description = "Verificações de saúde para o orquestrador." },
         };
     }

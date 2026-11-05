@@ -1,6 +1,7 @@
 using Jornada.Adaptadores.Memoria;
 using Jornada.Aplicacao.Catalogo.Comandos;
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Notificacoes;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -26,6 +27,9 @@ internal sealed class MundoDeGovernanca
     public RepositorioDeAcessoEmMemoria Squads => new(_armazem, _tenant);
     public MetamodeloPadrao Metamodelo => _metamodelo;
     public ContextoDeTenantFixo Tenant => _tenant;
+    public RepositorioDeNotificacoesEmMemoria Notificacoes => new(_armazem, _tenant);
+    public RepositorioDePreferenciasEmMemoria Preferencias => new(_armazem, _tenant);
+    public Notificador Notificador => new(Notificacoes, Preferencias, Squads, _tenant, Cenario.Relogio);
 
     public Ativo Ativo(IdDeAtivo id) => Repo.ObterAsync(id).Result!;
 
@@ -59,11 +63,11 @@ internal sealed class MundoDeGovernanca
 
     public void Submeter(IdDeAtivo id) =>
         Exigir(new SubmeterAtivo(Repo, PreCheck(), _metamodelo, _tenant, new AtorFixo(Curador),
-            Repo, Repo, Repo, Repo, Repo, Cenario.Relogio).ExecutarAsync(new ComandoSubmeterAtivo(id, "teste")).Result);
+            Repo, Repo, Repo, Repo, Repo, Notificador, Cenario.Relogio).ExecutarAsync(new ComandoSubmeterAtivo(id, "teste")).Result);
 
     public void Decidir(Guid validacao, bool aprovada, Ator quem) =>
         Exigir(new DecidirValidacao(Repo, Repo, _metamodelo, _tenant, new AtorFixo(quem), Repo,
-            Repo, Repo, Cenario.Relogio).ExecutarAsync(new ComandoDecidirValidacao(validacao, aprovada, "teste")).Result);
+            Repo, Repo, Repo, Notificador, Cenario.Relogio).ExecutarAsync(new ComandoDecidirValidacao(validacao, aprovada, "teste")).Result);
 
     public Aplicacao.Resultado<bool> Editar(IdDeAtivo id, string nome) =>
         new EditarAtivo(Repo, _metamodelo, _tenant, new AtorFixo(Curador), Repo, Repo, Squads, Cenario.Relogio)

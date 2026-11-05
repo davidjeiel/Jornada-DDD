@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  consultarMetamodelo, consultarPerfil, definirAoFaltarIdentificacao, definirIdentidade, listarAtivos, listarPessoas, listarSquads, listarValidacoes, obterIdentidade,
+  consultarMetamodelo, consultarPerfil, contarNotificacoes, definirAoFaltarIdentificacao, definirIdentidade, listarAtivos, listarPessoas, listarSquads, listarValidacoes, obterIdentidade,
   type AtivoResumo, type Metamodelo, type Perfil as DadosDoPerfil, type Pessoa, type Squad, type Validacao,
 } from './api';
 import { Erro } from './componentes';
@@ -18,6 +18,7 @@ import { GestaoDeAcessos } from './telas/GestaoDeAcessos';
 import { Grafo } from './telas/Grafo';
 import { Mapas } from './telas/Mapas';
 import { Mesa } from './telas/Mesa';
+import { Notificacoes } from './telas/Notificacoes';
 import { NovoAtivo } from './telas/NovoAtivo';
 import { abaDaUrl, PaginaDoAtivo } from './telas/PaginaDoAtivo';
 import { podeDescontinuar } from './telas/Impacto';
@@ -43,6 +44,7 @@ function App() {
   const [ativos, setAtivos] = useState<AtivoResumo[]>([]);
   const [validacoes, setValidacoes] = useState<Validacao[]>([]);
   const [metamodelo, setMetamodelo] = useState<Metamodelo | null>(null);
+  const [naoLidas, setNaoLidas] = useState(0);
   const [squads, setSquads] = useState<Squad[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
@@ -108,6 +110,16 @@ function App() {
     void carregarPerfil();
     void carregar();
     consultarMetamodelo().then(setMetamodelo).catch(() => setMetamodelo(null));
+  }, [identidade]);
+
+  // A bolha do sino: a cada troca de tela e, parado, a cada minuto.
+  function contarAvisos() {
+    contarNotificacoes().then((r) => setNaoLidas(r.naoLidas)).catch(() => setNaoLidas(0));
+  }
+  useEffect(contarAvisos, [identidade, local.caminho]);
+  useEffect(() => {
+    const relogio = setInterval(contarAvisos, 60_000);
+    return () => clearInterval(relogio);
   }, [identidade]);
 
   useEffect(() => {
@@ -184,6 +196,10 @@ function App() {
       case 'politicas':
         tela = <Politicas onErro={setErro} />;
         break;
+      case 'notificacoes':
+        tela = <Notificacoes key={identidade.pessoaId ?? ''} aba={local.busca.get('aba') === 'preferencias' ? 'preferencias' : 'caixa'}
+          apenasNaoLidas={local.busca.get('naoLidas') === '1'} onAlterado={contarAvisos} onErro={setErro} />;
+        break;
       case 'perfil':
         tela = (
           <Perfil
@@ -236,6 +252,7 @@ function App() {
       onAlternarMenu={alternarMenu}
       termo={secao === 'catalogo' ? local.busca.get('termo') ?? '' : ''}
       onBuscar={buscar}
+      naoLidas={naoLidas}
     >
       <Erro mensagem={erro} onFechar={() => setErro('')} />
       {tela}

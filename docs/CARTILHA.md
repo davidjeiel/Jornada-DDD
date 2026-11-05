@@ -75,6 +75,16 @@ A escolha fica salva no seu navegador — ao voltar, você continua como a mesma
   próxima" marcado, a fila já abre a seguinte.
 - **Minha mesa** — o que você assumiu, a fila livre, os seus rascunhos e o que você
   submeteu e espera decisão.
+- **Notificações** — o sino no topo mostra quantos avisos você ainda não leu. Avisa:
+  - quem pode decidir uma etapa, quando ela entra na fila (quem submeteu não é avisado);
+  - quem submeteu, quando a revisão é rejeitada, com o parecer;
+  - quem responde por um ativo, quando algo que ele consome publica revisão nova;
+  - quem assumiu a etapa (ou, na fila livre, quem pode decidi-la), quando o prazo vence ou
+    vence em menos de 24 horas, uma vez por dia;
+  - quem concede acesso, quando chega um pleito, e quem pediu, quando ele é decidido.
+  Clicar no aviso leva aonde agir e o marca como lido. Na aba **Preferências** você
+  desliga o que não quer receber; e-mail e Teams aparecem desligados até a identidade
+  corporativa.
 - **Visão executiva** — os indicadores do catálogo: domínios vigentes, capacidades, cobertura
   das capacidades, publicados sem responsável, APIs governadas e etapas pendentes. Cada
   número é um link para o recorte que o explica. Abaixo de cada um, a variação contra o

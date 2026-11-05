@@ -536,3 +536,46 @@ export function fotografarIndicadores(competencia?: string): Promise<FotografiaD
   const busca = competencia ? `?competencia=${encodeURIComponent(competencia)}` : '';
   return requisicao(`/v1/indicadores/fotografias${busca}`, { method: 'POST' });
 }
+
+export type Notificacao = {
+  id: string;
+  tipo: string;
+  rotulo: string;
+  urgente: boolean;
+  titulo: string;
+  corpo: string;
+  url: string | null;
+  idAtivo: string | null;
+  criadaEm: string;
+  lidaEm: string | null;
+};
+export type CaixaDeNotificacoes = { naoLidas: number; itens: Notificacao[] };
+export type CanalDeNotificacao = { chave: string; rotulo: string; disponivel: boolean };
+export type PreferenciasDeNotificacao = {
+  canais: CanalDeNotificacao[];
+  tipos: { tipo: string; rotulo: string; urgente: boolean; canais: Record<string, boolean> }[];
+};
+
+export function listarNotificacoes(naoLidas = false): Promise<CaixaDeNotificacoes> {
+  return requisicao(`/v1/notificacoes${naoLidas ? '?naoLidas=true' : ''}`);
+}
+
+export function contarNotificacoes(): Promise<{ naoLidas: number }> {
+  return requisicao('/v1/notificacoes/contagem');
+}
+
+export function marcarNotificacaoLida(id: string): Promise<void> {
+  return requisicao(`/v1/notificacoes/${id}/leitura`, { method: 'POST' });
+}
+
+export function marcarTodasLidas(): Promise<{ marcadas: number }> {
+  return requisicao('/v1/notificacoes/leitura', { method: 'POST' });
+}
+
+export function consultarPreferencias(): Promise<PreferenciasDeNotificacao> {
+  return requisicao('/v1/notificacoes/preferencias');
+}
+
+export function salvarPreferencias(ativas: { tipo: string; canal: string }[]): Promise<PreferenciasDeNotificacao> {
+  return requisicao('/v1/notificacoes/preferencias', { method: 'PUT', body: JSON.stringify({ ativas }) });
+}

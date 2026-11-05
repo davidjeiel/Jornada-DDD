@@ -77,7 +77,7 @@ original no título, para facilitar a busca.
 | 5 | Catálogo e busca: sugestões na busca, paginação, ordenação, filtros guardados com chips |
 | 6 | Mapas e grafo: árvores de negócio e técnica, vizinhança, análise de consumidores |
 | 7 | Visão executiva: KPIs que levam ao recorte, snapshots mensais, variação |
-| 8 | Notificações: caixa, sino, preferências, vigia de SLA (processo de fundo lendo o change feed) |
+| 8 | Notificações: caixa, sino, preferências, vigia de SLA (tarefa de fundo periódica, por empresa) |
 | 9 | Descobertas: importação de OpenAPI e inventário Git com prévia, bandeja e triagem |
 | 10 | Migração dos dados do painel |
 
@@ -91,9 +91,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 133 |
-| 🟡 parcial | 3 |
-| ⬜ pendente | 16 |
+| ✅ coberto | 142 |
+| 🟡 parcial | 0 |
+| ⬜ pendente | 10 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -104,13 +104,13 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 |---|---|---|---|---|
 | 0 | Fundação, mais o que o domínio já cobria | 29 | 0 | 0 |
 | 1 | Ciclo de vida | 4 | 0 | 0 |
-| 2 | Pessoas e acesso | 43 | 2 | 0 |
+| 2 | Pessoas e acesso | 45 | 0 | 0 |
 | 3 | Ficha e cadastro | 22 | 0 | 0 |
 | 4 | Validação e mesa | 8 | 0 | 0 |
 | 5 | Catálogo e busca | 12 | 0 | 0 |
 | 6 | Mapas e grafo | 12 | 0 | 0 |
 | 7 | Visão executiva | 3 | 0 | 0 |
-| 8 | Notificações | 0 | 1 | 6 |
+| 8 | Notificações | 7 | 0 | 0 |
 | 9 | Descobertas | 0 | 0 | 10 |
 
 A fase 1 também porta o que o painel faz sem teste próprio: o retrato de cada
@@ -176,12 +176,12 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 | `test_descontinuar_com_consumidor_critico_exige_o_codigo` | 1 | ✅ | `ConfirmacaoErradaNaoDescontinua` e `telas/Impacto.test.tsx` |
 | `test_acessibilidade_do_esqueleto` | 0 | ✅ | `Layout.test.tsx` e `estilos.test.ts` (frontend/src) |
 | `test_criticidade_media_e_baixa_tem_estilos_proprios` | 0 | ✅ | `estilos.test.ts` |
-| `test_submissao_avisa_quem_pode_decidir` | 8 | ⬜ |  |
-| `test_notificacao_entra_na_mesma_transacao_e_fica_na_outbox` | 8 | ⬜ | A outbox de eventos já existe (lote do Cosmos); falta a notificação. |
-| `test_preferencia_desligada_nao_gera_notificacao` | 8 | ⬜ |  |
-| `test_rejeicao_avisa_o_autor` | 8 | ⬜ |  |
-| `test_vigia_de_sla_nao_repete_o_alerta_no_mesmo_dia` | 8 | ⬜ |  |
-| `test_sino_mostra_a_contagem_de_nao_lidas` | 8 | 🟡 | O sino está no topo de toda tela; a contagem chega com as notificações. |
+| `test_submissao_avisa_quem_pode_decidir` | 8 | ✅ | `SubmissaoAvisaQuemPodeDecidir`: a mesma regra de `PodeDecidir` aplicada a cada pessoa ativa |
+| `test_notificacao_entra_na_mesma_transacao_e_fica_na_outbox` | 8 | ✅ | `NotificacaoEntraNaMesmaTransacaoEFicaNaOutbox` e o contrato `NotificacoesPersistem`: o aviso vai no lote da partição do fato (ativo, ou acesso); despacho em `POST /v1/notificacoes/despachos` |
+| `test_preferencia_desligada_nao_gera_notificacao` | 8 | ✅ | `PreferenciaDesligadaNaoGeraNotificacao`; `GET/PUT /v1/notificacoes/preferencias` |
+| `test_rejeicao_avisa_o_autor` | 8 | ✅ | `RejeicaoAvisaOAutor` |
+| `test_vigia_de_sla_nao_repete_o_alerta_no_mesmo_dia` | 8 | ✅ | `VigiaDeSlaNaoRepeteOAlertaNoMesmoDia` e `VigiaAvisaQuemAssumiu`; roda na tarefa de fundo `TarefasDeNotificacao` (a cada 15 min, por empresa) e em `POST /v1/notificacoes/vigia-de-sla` |
+| `test_sino_mostra_a_contagem_de_nao_lidas` | 8 | ✅ | `SinoMostraAContagemDeNaoLidas` e `telas/Notificacoes.test.tsx`: bolha do sino (`GET /v1/notificacoes/contagem`) e a caixa |
 | `test_vizinhanca_de_um_salto_traz_so_os_vizinhos_diretos` | 6 | ✅ | `VizinhancaDeUmSalto` (`GET /v1/ativos/{id}/vizinhanca`) |
 | `test_vizinhanca_de_dois_saltos_nao_repete_nos` | 6 | ✅ | `VizinhancaDeDoisSaltosNaoRepeteNos` |
 | `test_teto_marca_truncado` | 6 | ✅ | `TetoMarcaTruncado` |
@@ -208,9 +208,9 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 | `test_pleito_nasce_pendente_com_os_dados_informados` | 2 | ✅ | `PleitoNascePendenteComOsDadosInformados` |
 | `test_segundo_pleito_pendente_e_recusado` | 2 | ✅ | `SegundoPleitoPendenteERecusado` (409 `PLEITO_PENDENTE`) |
 | `test_recadastro_atualiza_a_pessoa_sem_duplicar` | 2 | ✅ | `RecadastroAtualizaAPessoaSemDuplicar`; no Cosmos, a reserva da matrícula impede a duplicata (contrato de persistência) |
-| `test_quem_concede_e_avisado_do_pleito` | 8 | ⬜ | A fila já mostra o pleito a quem concede; o aviso na caixa chega com as notificações. |
-| `test_aprovacao_concede_o_papel_e_responde` | 2 | 🟡 | `AprovacaoConcedeOPapelEResponde`: o papel vale e a resposta fica no pleito e no perfil; o aviso na caixa chega na fase 8. |
-| `test_negativa_exige_motivo_e_nao_concede_nada` | 2 | 🟡 | `NegativaExigeMotivoENaoConcedeNada`; o aviso na caixa chega na fase 8. |
+| `test_quem_concede_e_avisado_do_pleito` | 8 | ✅ | `QuemConcedeEAvisadoDoPleito`: `PodeConceder` por pessoa; admin só por admin; a resposta vai a quem pediu |
+| `test_aprovacao_concede_o_papel_e_responde` | 2 | ✅ | `AprovacaoConcedeOPapelEResponde`: o papel vale, a resposta fica no pleito e no perfil, e o aviso vai à caixa (fase 8). |
+| `test_negativa_exige_motivo_e_nao_concede_nada` | 2 | ✅ | `NegativaExigeMotivoENaoConcedeNada`, com o aviso de negativa na caixa (fase 8). |
 | `test_papel_diferente_do_pleiteado_exige_explicacao` | 2 | ✅ | `PapelDiferenteDoPleiteadoExigeExplicacao` |
 | `test_concessao_com_escopo_de_dominio_nao_vale_fora_dele` | 2 | ✅ | `ConcessaoComEscopoDeDominioNaoValeForaDele` |
 | `test_pleito_ja_decidido_nao_se_decide_de_novo` | 2 | ✅ | `PleitoJaDecididoNaoSeDecideDeNovo` (409 `PLEITO_JA_DECIDIDO`) |

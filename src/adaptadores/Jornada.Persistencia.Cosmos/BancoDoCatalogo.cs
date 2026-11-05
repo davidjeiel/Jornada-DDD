@@ -74,6 +74,22 @@ public sealed class BancoDoCatalogo : IDisposable
             new ContainerProperties(ContainerDeContadores, "/empresa"), cancellationToken: ct);
     }
 
+    /// <summary>
+    /// As empresas com alguém cadastrado. É a única consulta que atravessa
+    /// empresas, e devolve só os ids: serve às tarefas de fundo, que depois
+    /// abrem o contexto de cada uma.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> EmpresasAsync(CancellationToken ct = default)
+    {
+        var empresas = new HashSet<string>();
+        using var iterador = Catalogo.GetItemQueryIterator<string>(
+            new QueryDefinition("SELECT DISTINCT VALUE c.empresa FROM c WHERE c.tipo = 'pessoa'"));
+        while (iterador.HasMoreResults)
+            foreach (var empresa in await iterador.ReadNextAsync(ct))
+                empresas.Add(empresa);
+        return empresas.Order(StringComparer.Ordinal).ToArray();
+    }
+
     /// <summary>Prontidão: o container do catálogo responde?</summary>
     public async Task<bool> VerificarAsync(CancellationToken ct = default)
     {

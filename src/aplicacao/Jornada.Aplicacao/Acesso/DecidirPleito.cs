@@ -1,6 +1,8 @@
+using Jornada.Aplicacao.Notificacoes;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Comum;
+using Jornada.Dominio.Notificacoes;
 
 namespace Jornada.Aplicacao.Acesso;
 
@@ -21,6 +23,7 @@ public sealed class DecidirPleito(
     IRepositorioDeSquads squads,
     IAtorAtual atorAtual,
     IUnidadeDeTrabalho uow,
+    Notificador notificador,
     IRelogio relogio)
 {
     public async Task<Resultado<PleitoLegivel>> ExecutarAsync(ComandoDecidirPleito cmd, CancellationToken ct = default)
@@ -59,8 +62,15 @@ public sealed class DecidirPleito(
 
         try
         {
-            if (pleito.Decidir(ator, cmd.Aprovar, cmd.Resposta, relogio, papel, escopo.Value, cmd.EscopoId) is { } concedida)
-                pessoa.Conceder(concedida);
+            var concedida = pleito.Decidir(ator, cmd.Aprovar, cmd.Resposta, relogio, papel, escopo.Value, cmd.EscopoId);
+            if (concedida is not null) pessoa.Conceder(concedida);
+
+            // A resposta vai para a caixa de quem pediu (acesso.decidir_solicitacao).
+            var pleiteado = pleito.PapelPleiteado.Rotulo();
+            await notificador.RegistrarAsync(pessoa.Id, TiposDeNotificacao.AcessoDecidido,
+                concedida is not null ? $"Acesso concedido: {concedida.Papel.Rotulo()}" : "Seu pleito de acesso foi negado",
+                string.IsNullOrWhiteSpace(cmd.Resposta) ? (concedida is not null ? $"Pleito de {pleiteado} aprovado." : $"Pleito de {pleiteado} negado.") : cmd.Resposta!.Trim(),
+                "/perfil", chaveUnica: $"pleito-decidido-{pleito.Id}", ct: ct);
         }
         catch (ErroDeDominio e)
         {

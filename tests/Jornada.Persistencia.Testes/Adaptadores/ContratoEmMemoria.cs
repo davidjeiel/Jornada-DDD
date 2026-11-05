@@ -20,6 +20,8 @@ public sealed class ContratoEmMemoria : ContratoDePersistencia
     {
         var repositorio = new RepositorioDeAtivosEmMemoria(_armazem, ContextoDeTenantFixo.Para(empresa));
         var acesso = new RepositorioDeAcessoEmMemoria(_armazem, ContextoDeTenantFixo.Para(empresa));
-        return new Sessao(repositorio, repositorio, repositorio, repositorio, repositorio, repositorio, acesso, acesso, acesso, repositorio, new RepositorioDeIndicadoresEmMemoria(_armazem, ContextoDeTenantFixo.Para(empresa)));
+        return new Sessao(repositorio, repositorio, repositorio, repositorio, repositorio, repositorio, acesso, acesso, acesso, repositorio, new RepositorioDeIndicadoresEmMemoria(_armazem, ContextoDeTenantFixo.Para(empresa)),
+            new RepositorioDeNotificacoesEmMemoria(_armazem, ContextoDeTenantFixo.Para(empresa)),
+            new RepositorioDePreferenciasEmMemoria(_armazem, ContextoDeTenantFixo.Para(empresa)));
     }
 }

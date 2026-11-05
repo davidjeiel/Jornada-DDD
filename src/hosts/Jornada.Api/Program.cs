@@ -7,6 +7,7 @@ using Jornada.Aplicacao.Catalogo.Comandos;
 using Jornada.Aplicacao.Catalogo.Consultas;
 using Jornada.Aplicacao.Catalogo.Mapas;
 using Jornada.Aplicacao.Governanca;
+using Jornada.Aplicacao.Notificacoes;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
@@ -84,6 +85,9 @@ if (usaCosmos)
     builder.Services.AddScoped<IRepositorioDeSquads>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<IConsultaDeVinculos>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<IRepositorioDeIndicadores>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IRepositorioDeNotificacoes>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IRepositorioDePreferencias>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddSingleton<IEmpresasDaPlataforma, EmpresasNoCosmos>();
 }
 else
 {
@@ -104,6 +108,9 @@ else
     builder.Services.AddScoped<IRepositorioDeSquads>(sp => sp.GetRequiredService<RepositorioDeAcessoEmMemoria>());
     builder.Services.AddScoped<IConsultaDeVinculos>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
     builder.Services.AddScoped<IRepositorioDeIndicadores, RepositorioDeIndicadoresEmMemoria>();
+    builder.Services.AddScoped<IRepositorioDeNotificacoes, RepositorioDeNotificacoesEmMemoria>();
+    builder.Services.AddScoped<IRepositorioDePreferencias, RepositorioDePreferenciasEmMemoria>();
+    builder.Services.AddSingleton<IEmpresasDaPlataforma, EmpresasEmMemoria>();
 }
 
 builder.Services.AddSingleton<IMetamodelo, MetamodeloPadrao>();
@@ -134,6 +141,18 @@ builder.Services.AddScoped<BuscarNoCatalogo>();
 builder.Services.AddScoped<ConsultarVizinhanca>();
 builder.Services.AddScoped<MontarArvore>();
 builder.Services.AddScoped<Indicadores>();
+builder.Services.AddScoped<Notificador>();
+builder.Services.AddScoped<CaixaDeNotificacoes>();
+builder.Services.AddScoped<PreferenciasDoNotificado>();
+builder.Services.AddScoped<DespacharNotificacoes>();
+builder.Services.AddScoped<VigiarSla>();
+
+// O despacho da outbox e o vigia de SLA, em cada empresa, de tempos em tempos
+// (o `flask notificar` agendado do painel). Notificacoes:IntervaloEmMinutos = 0 desliga.
+var opcoesDeNotificacao = builder.Configuration.GetSection("Notificacoes").Get<OpcoesDeNotificacao>() ?? new OpcoesDeNotificacao();
+builder.Services.AddSingleton(opcoesDeNotificacao);
+if (opcoesDeNotificacao.IntervaloEmMinutos > 0)
+    builder.Services.AddHostedService<TarefasDeNotificacao>();
 builder.Services.AddScoped<SolicitarAcesso>();
 builder.Services.AddScoped<DecidirPleito>();
 builder.Services.AddScoped<ListarPleitos>();
@@ -800,6 +819,95 @@ acesso.MapGet("/cartilha", async (ConsultarCartilha caso, CancellationToken ct) 
     .WithName("consultarCartilha")
     .WithSummary("Tabelas de referência da cartilha")
     .WithDescription("Quem pode fazer o quê, as etapas que cada papel decide, os blocos em que cada papel escreve e o rito de cada tipo de ativo. Tudo lido das políticas que a API aplica, não escrito à mão. Não exige X-Pessoa.");
+
+// ── notificações: a caixa de quem está identificado ──
+
+var notificacoes = v1.MapGroup("/notificacoes").WithTags(OpenApiCaixa.TagNotificacoes);
+
+notificacoes.MapGet("", async Task<Results<Ok<CaixaResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, CaixaDeNotificacoes caso, CancellationToken ct, bool naoLidas = false, int limite = CaixaDeNotificacoes.LimitePadrao) =>
+{
+    var r = await caso.ListarAsync(naoLidas, limite, ct);
+    return r.Sucesso
+        ? TypedResults.Ok(new CaixaResponse(r.Valor!.NaoLidas, r.Valor.Itens.Select(NotificacaoResponse.De).ToArray()))
+        : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("listarNotificacoes")
+    .WithSummary("A caixa de avisos de quem está identificado")
+    .WithDescription("Do mais recente para o mais antigo, até limite (1 a 200; padrão 50). naoLidas=true traz só os não lidos. Sem X-Pessoa, 401.")
+    .ComErros(StatusCodes.Status401Unauthorized);
+
+notificacoes.MapGet("/contagem", async (CaixaDeNotificacoes caso, CancellationToken ct) =>
+    TypedResults.Ok(new ContagemDeNotificacoesResponse(await caso.ContarNaoLidasAsync(ct))))
+    .WithName("contarNotificacoes")
+    .WithSummary("A bolha do sino: quantos avisos não lidos")
+    .WithDescription("Zero sem pessoa identificada: o sino não recusa a página.");
+
+notificacoes.MapPost("/{id:guid}/leitura", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, CaixaDeNotificacoes caso, CancellationToken ct) =>
+{
+    var r = await caso.MarcarLidaAsync(id, ct);
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("marcarNotificacaoLida")
+    .WithSummary("Marca um aviso como lido")
+    .WithDescription("Só na caixa de quem está identificado; aviso de outra pessoa responde 404. Vale também no modo leitura: mexe só na caixa da pessoa.")
+    .ComErros(StatusCodes.Status401Unauthorized, StatusCodes.Status404NotFound);
+
+notificacoes.MapPost("/leitura", async Task<Results<Ok<LeituraResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, CaixaDeNotificacoes caso, CancellationToken ct) =>
+{
+    var r = await caso.MarcarTodasLidasAsync(ct);
+    return r.Sucesso ? TypedResults.Ok(new LeituraResponse(r.Valor)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("marcarTodasLidas")
+    .WithSummary("Marca todos os avisos como lidos")
+    .WithDescription("Na caixa de quem está identificado. Devolve quantos mudaram; os já lidos ficam como estavam.")
+    .ComErros(StatusCodes.Status401Unauthorized);
+
+notificacoes.MapGet("/preferencias", async Task<Results<Ok<PreferenciasResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, PreferenciasDoNotificado caso, CancellationToken ct) =>
+{
+    var r = await caso.ObterAsync(ct);
+    return r.Sucesso ? TypedResults.Ok(PreferenciasResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("consultarPreferencias")
+    .WithSummary("Que avisos a pessoa recebe, e por qual canal")
+    .WithDescription("Sem nada guardado, todo tipo vem ligado no app. E-mail e Teams aparecem, indisponíveis, até a identidade corporativa.")
+    .ComErros(StatusCodes.Status401Unauthorized);
+
+notificacoes.MapPut("/preferencias", async Task<Results<Ok<PreferenciasResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, SalvarPreferenciasRequest corpo, PreferenciasDoNotificado caso, CancellationToken ct) =>
+{
+    var r = await caso.SalvarAsync(corpo.Ativas.Select(a => (a.Tipo, a.Canal)), ct);
+    return r.Sucesso ? TypedResults.Ok(PreferenciasResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("salvarPreferencias")
+    .WithSummary("Guarda as preferências de notificação")
+    .WithDescription("Substitui tudo: o que não vier em ativas fica desligado. Tipo desconhecido: 400 TIPO_DE_NOTIFICACAO_INVALIDO; canal que ainda não entrega: 400 CANAL_INDISPONIVEL.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status401Unauthorized);
+
+notificacoes.MapPost("/despachos", async Task<Results<Ok<DespachoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, DespacharNotificacoes caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(ct: ct);
+    return r.Sucesso ? TypedResults.Ok(DespachoResponse.De(r.Valor!)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("despacharNotificacoes")
+    .WithSummary("Despacha a outbox de avisos agora")
+    .WithDescription("Só admin. A tarefa de fundo faz o mesmo de tempos em tempos. Idempotente: a segunda chamada não despacha nada.")
+    .ComErros(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden);
+
+notificacoes.MapPost("/vigia-de-sla", async Task<Results<Ok<VigiaDeSlaResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, VigiarSla caso, CancellationToken ct) =>
+{
+    var r = await caso.ExecutarAsync(ct);
+    return r.Sucesso ? TypedResults.Ok(new VigiaDeSlaResponse(r.Valor!.SlaVencendo, r.Valor.SlaVencido)) : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("vigiarSla")
+    .WithSummary("Roda o vigia de SLA agora")
+    .WithDescription("Só admin. Avisa das etapas abertas vencidas ou que vencem em 24h: quem assumiu, ou quem pode decidir. Um aviso por etapa por dia, por mais que rode.")
+    .ComErros(StatusCodes.Status401Unauthorized, StatusCodes.Status403Forbidden);
 
 // ── gestão de acessos (só admin) ──
 

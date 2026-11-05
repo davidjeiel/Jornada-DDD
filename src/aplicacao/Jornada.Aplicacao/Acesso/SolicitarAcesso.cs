@@ -1,6 +1,8 @@
+using Jornada.Aplicacao.Notificacoes;
 using Jornada.Aplicacao.Portas;
 using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Comum;
+using Jornada.Dominio.Notificacoes;
 
 namespace Jornada.Aplicacao.Acesso;
 
@@ -32,6 +34,7 @@ public sealed class SolicitarAcesso(
     IContextoDeTenantAtual tenant,
     IUnidadeDeTrabalho uow,
     RegrasDeAcesso regras,
+    Notificador notificador,
     IRelogio relogio)
 {
     public sealed record Saida(Pessoa Pessoa, PleitoDeAcesso Pleito);
@@ -64,6 +67,14 @@ public sealed class SolicitarAcesso(
             pessoa.Conceder(pleito.AprovarPelaConfiguracao(relogio));
 
         await pleitos.AdicionarAsync(pleito, ct);
+
+        // Quem concede fica sabendo, no mesmo lote do pleito (acesso.solicitar_acesso).
+        // O admin inicial, aprovado pela configuração, não espera decisão de ninguém.
+        if (pleito.Status == StatusDoPleito.Pendente)
+            await notificador.ParaMuitosAsync(await notificador.QuemConcedeAsync(papel, ct), TiposDeNotificacao.AcessoSolicitado,
+                $"{pessoa.Nome} pleiteia o papel de {papel.Rotulo()}",
+                $"Matrícula {pessoa.Matricula.Valor} · unidade {pessoa.Unidade.Valor}. {cmd.Justificativa?.Trim()}".Trim(),
+                $"/pleitos#pleito-{pleito.Id}", sufixoChave: $"pleito-{pleito.Id}", excluir: pessoa.Id, ct: ct);
         await uow.ConfirmarAsync(ct);
         return Resultado<Saida>.Ok(new Saida(pessoa, pleito));
     }

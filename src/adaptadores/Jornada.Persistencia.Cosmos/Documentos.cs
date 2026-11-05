@@ -38,6 +38,8 @@ internal static class TiposDeDocumento
     public const string Squad = "squad";
     public const string Sigla = "sigla";
     public const string Fotografia = "fotografia";
+    public const string Notificacao = "notificacao";
+    public const string Preferencias = "preferencias";
 }
 
 internal sealed class DocumentoDeAtivo : DocumentoDoCatalogo
@@ -228,6 +230,37 @@ internal sealed class DocumentoDeFotografia : DocumentoDoCatalogo
     public required string Competencia { get; init; }
     public Dictionary<string, double> Valores { get; init; } = [];
     public DateTimeOffset GeradaEm { get; init; }
+}
+
+/// <summary>
+/// Um aviso na partição do fato que o gerou: a do ativo, ou a de acesso quando
+/// não há ativo (pleitos). Entra no mesmo lote do fato: é a outbox do painel.
+/// </summary>
+internal sealed class DocumentoDeNotificacao : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Notificacao;
+
+    public required string IdPessoa { get; init; }
+    public required string TipoNotificacao { get; init; }
+    public required string Titulo { get; init; }
+    public string Corpo { get; init; } = "";
+    public string? Url { get; init; }
+    public string? Ativo { get; init; }
+    public string? IdValidacao { get; init; }
+    public string? ChaveUnica { get; init; }
+    public required string Canal { get; init; }
+    public DateTimeOffset CriadaEm { get; init; }
+    public DateTimeOffset? LidaEm { get; init; }
+    public DateTimeOffset? EnviadaEm { get; init; }
+}
+
+/// <summary>As preferências de uma pessoa (id <c>preferencias-{pessoa}</c>), na partição de acesso.</summary>
+internal sealed class DocumentoDePreferencias : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Preferencias;
+
+    public required string IdPessoa { get; init; }
+    public List<string> Ativas { get; init; } = [];
 }
 
 /// <summary>Sequencial do código por (empresa, tipo). Container <c>contadores</c>, partição <c>/empresa</c>.</summary>

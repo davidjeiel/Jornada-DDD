@@ -4568,6 +4568,604 @@ paths:
         - Bearer: [ ]
         - X-Empresa: [ ]
           X-Pessoa: [ ]
+  /v1/notificacoes:
+    get:
+      tags:
+        - Notificações
+      summary: A caixa de avisos de quem está identificado
+      description: 'Do mais recente para o mais antigo, até limite (1 a 200; padrão 50). naoLidas=true traz só os não lidos. Sem X-Pessoa, 401.'
+      operationId: listarNotificacoes
+      parameters:
+        - name: naoLidas
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: limite
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 50
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaixaResponse'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/notificacoes/contagem:
+    get:
+      tags:
+        - Notificações
+      summary: 'A bolha do sino: quantos avisos não lidos'
+      description: 'Zero sem pessoa identificada: o sino não recusa a página.'
+      operationId: contarNotificacoes
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContagemDeNotificacoesResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  '/v1/notificacoes/{id}/leitura':
+    post:
+      tags:
+        - Notificações
+      summary: Marca um aviso como lido
+      description: 'Só na caixa de quem está identificado; aviso de outra pessoa responde 404. Vale também no modo leitura: mexe só na caixa da pessoa.'
+      operationId: marcarNotificacaoLida
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '204':
+          description: 'Operação concluída, sem conteúdo de resposta.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/notificacoes/leitura:
+    post:
+      tags:
+        - Notificações
+      summary: Marca todos os avisos como lidos
+      description: Na caixa de quem está identificado. Devolve quantos mudaram; os já lidos ficam como estavam.
+      operationId: marcarTodasLidas
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeituraResponse'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/notificacoes/preferencias:
+    get:
+      tags:
+        - Notificações
+      summary: 'Que avisos a pessoa recebe, e por qual canal'
+      description: 'Sem nada guardado, todo tipo vem ligado no app. E-mail e Teams aparecem, indisponíveis, até a identidade corporativa.'
+      operationId: consultarPreferencias
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferenciasResponse'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+    put:
+      tags:
+        - Notificações
+      summary: Guarda as preferências de notificação
+      description: 'Substitui tudo: o que não vier em ativas fica desligado. Tipo desconhecido: 400 TIPO_DE_NOTIFICACAO_INVALIDO; canal que ainda não entrega: 400 CANAL_INDISPONIVEL.'
+      operationId: salvarPreferencias
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalvarPreferenciasRequest'
+        required: true
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferenciasResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/notificacoes/despachos:
+    post:
+      tags:
+        - Notificações
+      summary: Despacha a outbox de avisos agora
+      description: 'Só admin. A tarefa de fundo faz o mesmo de tempos em tempos. Idempotente: a segunda chamada não despacha nada.'
+      operationId: despacharNotificacoes
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DespachoResponse'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/notificacoes/vigia-de-sla:
+    post:
+      tags:
+        - Notificações
+      summary: Roda o vigia de SLA agora
+      description: 'Só admin. Avisa das etapas abertas vencidas ou que vencem em 24h: quem assumiu, ou quem pode decidir. Um aviso por etapa por dia, por mais que rode.'
+      operationId: vigiarSla
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VigiaDeSlaResponse'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   /saude:
     get:
       tags:
@@ -4915,6 +5513,23 @@ components:
           description: 'Os papéis vigentes, com escopo e blocos.'
       additionalProperties: false
       description: Um cadastro na gestão de acessos.
+    CaixaResponse:
+      required:
+        - naoLidas
+        - itens
+      type: object
+      properties:
+        naoLidas:
+          type: integer
+          description: Quantos avisos ainda não lidos (a bolha do sino).
+          format: int32
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificacaoResponse'
+          description: 'Os avisos, do mais recente para o mais antigo.'
+      additionalProperties: false
+      description: A caixa de avisos.
     CampoDoTipoResponse:
       required:
         - nome
@@ -4943,6 +5558,24 @@ components:
           description: 'As opções, quando o tipo é selecao.'
       additionalProperties: false
       description: 'Um campo específico do tipo, declarado no metamodelo.'
+    CanalResponse:
+      required:
+        - chave
+        - rotulo
+        - disponivel
+      type: object
+      properties:
+        chave:
+          type: string
+          description: 'app, email ou teams.'
+        rotulo:
+          type: string
+          description: 'O canal, por extenso.'
+        disponivel:
+          type: boolean
+          description: Se já entrega. Hoje só o app.
+      additionalProperties: false
+      description: Um canal de entrega.
     CartilhaResponse:
       required:
         - papeis
@@ -5033,6 +5666,17 @@ components:
           description: 'Criticidade da dependência: baixa, media, alta ou critica.'
       additionalProperties: false
       description: Ativo que aponta para o analisado e ainda vale como referência (publicado ou em revisão).
+    ContagemDeNotificacoesResponse:
+      required:
+        - naoLidas
+      type: object
+      properties:
+        naoLidas:
+          type: integer
+          description: Avisos não lidos; zero sem pessoa identificada.
+          format: int32
+      additionalProperties: false
+      description: A bolha do sino.
     CorrigirCadastroRequest:
       required:
         - ativa
@@ -5133,6 +5777,29 @@ components:
           example: CAP-0001
       additionalProperties: false
       description: Pedido para tirar o ativo de vigência.
+    DespachoResponse:
+      required:
+        - despachadas
+        - porCanal
+        - semCanalDisponivel
+      type: object
+      properties:
+        despachadas:
+          type: integer
+          description: Quantas saíram agora.
+          format: int32
+        porCanal:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Canal → quantas.
+        semCanalDisponivel:
+          type: integer
+          description: Quantas esperam um canal que ainda não entrega.
+          format: int32
+      additionalProperties: false
+      description: O resultado de um despacho da outbox.
     DiferencaResponse:
       required:
         - campo
@@ -5574,6 +6241,17 @@ components:
           format: date-time
       additionalProperties: false
       description: Um ativo na lista do catálogo.
+    LeituraResponse:
+      required:
+        - marcadas
+      type: object
+      properties:
+        marcadas:
+          type: integer
+          description: Quantos mudaram agora.
+          format: int32
+      additionalProperties: false
+      description: Quantos avisos foram marcados como lidos.
     LinhaDaMatrizResponse:
       required:
         - acao
@@ -5788,6 +6466,56 @@ components:
           format: int32
       additionalProperties: false
       description: Um nó da vizinhança.
+    NotificacaoResponse:
+      required:
+        - id
+        - tipo
+        - rotulo
+        - urgente
+        - titulo
+        - corpo
+        - criadaEm
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador do aviso.
+          format: uuid
+        tipo:
+          type: string
+          description: 'revisao_submetida, sla_vencendo, sla_vencido, revisao_rejeitada, ativo_publicado, acesso_solicitado ou acesso_decidido.'
+        rotulo:
+          type: string
+          description: 'O tipo, por extenso.'
+        urgente:
+          type: boolean
+          description: Se o tipo pede ação.
+        titulo:
+          type: string
+          description: A primeira linha do aviso.
+        corpo:
+          type: string
+          description: 'O detalhe: o parecer, o prazo, a justificativa.'
+        url:
+          type: string
+          description: 'Para onde o aviso leva, na interface.'
+          nullable: true
+        idAtivo:
+          type: string
+          description: 'O ativo do aviso, se houver.'
+          format: uuid
+          nullable: true
+        criadaEm:
+          type: string
+          description: Quando o aviso foi gerado.
+          format: date-time
+        lidaEm:
+          type: string
+          description: Quando foi lido; nulo enquanto não.
+          format: date-time
+          nullable: true
+      additionalProperties: false
+      description: Um aviso da caixa.
     PaginaDoCatalogoResponse:
       required:
         - itens
@@ -6208,6 +6936,63 @@ components:
               - OWNER_NAO_DEFINIDO
             pendencias:
               - Owner técnico não definido
+    PreferenciaDoTipoResponse:
+      required:
+        - tipo
+        - rotulo
+        - urgente
+        - canais
+      type: object
+      properties:
+        tipo:
+          type: string
+          description: A chave do tipo.
+        rotulo:
+          type: string
+          description: 'O tipo, por extenso.'
+        urgente:
+          type: boolean
+          description: Se o tipo pede ação.
+        canais:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: Canal → ligado.
+      additionalProperties: false
+      description: Um tipo de aviso e os canais em que a pessoa o recebe.
+    PreferenciaRequest:
+      required:
+        - canal
+        - tipo
+      type: object
+      properties:
+        tipo:
+          type: string
+          example: revisao_submetida
+        canal:
+          type: string
+          description: Hoje só app; email e teams dependem da identidade corporativa.
+          example: app
+      additionalProperties: false
+      description: Um tipo de aviso ligado num canal.
+    PreferenciasResponse:
+      required:
+        - canais
+        - tipos
+      type: object
+      properties:
+        canais:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanalResponse'
+          description: 'Os canais, e quais já entregam.'
+        tipos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreferenciaDoTipoResponse'
+          description: Cada tipo de aviso e os canais ligados.
+      additionalProperties: false
+      description: As preferências de notificação.
     RelacaoRegistradaResponse:
       required:
         - criada
@@ -6406,6 +7191,17 @@ components:
           format: int32
       additionalProperties: false
       description: O rito de validação de um tipo (e criticidade).
+    SalvarPreferenciasRequest:
+      required:
+        - ativas
+      type: object
+      properties:
+        ativas:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreferenciaRequest'
+      additionalProperties: false
+      description: As preferências de notificação. O que não vier ligado fica desligado.
     SaudeResponse:
       required:
         - situacao
@@ -6690,6 +7486,22 @@ components:
         abertaEm: '2026-11-05T12:00:00+00:00'
         prazo: '2026-11-07T12:00:00+00:00'
         atribuidaA: null
+    VigiaDeSlaResponse:
+      required:
+        - slaVencendo
+        - slaVencido
+      type: object
+      properties:
+        slaVencendo:
+          type: integer
+          description: Avisos de prazo vencendo em menos de 24h.
+          format: int32
+        slaVencido:
+          type: integer
+          description: Avisos de prazo vencido.
+          format: int32
+      additionalProperties: false
+      description: O resultado de uma rodada do vigia de SLA.
     VinculosResponse:
       required:
         - podeExcluir
@@ -6781,5 +7593,7 @@ tags:
     description: 'Pré-check, submissão e decisão das etapas de validação.'
   - name: Acesso
     description: 'Cadastro de pessoa, pleito de papel, concessão e perfil.'
+  - name: Notificações
+    description: 'A caixa de avisos de quem está identificado, as preferências e as tarefas de fundo (despacho e vigia de SLA).'
   - name: Operação
     description: Verificações de saúde para o orquestrador.
