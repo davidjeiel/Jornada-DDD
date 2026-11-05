@@ -519,3 +519,20 @@ export type NoDaArvore = { ativo: AtivoResumo; implementacoes: number; filhos: N
 export function consultarArvore(visao: 'negocio' | 'tecnica'): Promise<{ visao: string; raizes: NoDaArvore[] }> {
   return requisicao(`/v1/mapa/arvore?visao=${visao}`);
 }
+
+export type FotografiaDosIndicadores = { competencia: string; valores: Record<string, number>; geradaEm: string };
+export type Indicadores = {
+  atuais: Record<string, number>;
+  variacao: Record<string, number>;
+  quantoMenosMelhor: string[];
+  serie: FotografiaDosIndicadores[];
+};
+
+export function consultarIndicadores(): Promise<Indicadores> {
+  return requisicao('/v1/indicadores');
+}
+
+export function fotografarIndicadores(competencia?: string): Promise<FotografiaDosIndicadores> {
+  const busca = competencia ? `?competencia=${encodeURIComponent(competencia)}` : '';
+  return requisicao(`/v1/indicadores/fotografias${busca}`, { method: 'POST' });
+}

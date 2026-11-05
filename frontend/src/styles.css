@@ -792,3 +792,13 @@ a.validation-row > :not(:first-child) { flex: none; width: auto; }
 .controles-do-grafo select { display: block; margin-top: 4px; padding: 6px 8px; border: 1px solid var(--field-border); border-radius: 7px; background: var(--field-bg); color: var(--ink); }
 .controles-do-grafo fieldset { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .controles-do-grafo label.caixa-de-marcar { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+
+/* Visão executiva: os KPIs levam ao recorte, e a variação acompanha o sentido do indicador. */
+.metric.kpi { color: inherit; text-decoration: none; transition: border-color .15s; }
+.metric.kpi:hover, .metric.kpi:focus-visible { border-color: var(--brand); }
+.metric.kpi strong.bom { color: var(--success); }
+.metric.kpi strong.alerta { color: var(--warning); }
+.metric.kpi strong.risco { color: var(--danger); }
+.metric .delta { font-weight: 600; }
+.metric .delta.bom { color: var(--success); }
+.metric .delta.ruim { color: var(--danger); }

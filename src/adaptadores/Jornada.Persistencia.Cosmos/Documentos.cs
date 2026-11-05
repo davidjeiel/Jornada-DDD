@@ -37,6 +37,7 @@ internal static class TiposDeDocumento
     public const string Pleito = "pleito";
     public const string Squad = "squad";
     public const string Sigla = "sigla";
+    public const string Fotografia = "fotografia";
 }
 
 internal sealed class DocumentoDeAtivo : DocumentoDoCatalogo
@@ -217,6 +218,16 @@ internal sealed class DocumentoDePleito : DocumentoDoCatalogo
     public string? EscopoTipo { get; init; }
     public Guid? EscopoId { get; init; }
     public string Resposta { get; init; } = "";
+}
+
+/// <summary>A fotografia de uma competência (id <c>fotografia-2026-08</c>), na partição <c>[empresa, "indicadores"]</c>.</summary>
+internal sealed class DocumentoDeFotografia : DocumentoDoCatalogo
+{
+    public override string Tipo => TiposDeDocumento.Fotografia;
+
+    public required string Competencia { get; init; }
+    public Dictionary<string, double> Valores { get; init; } = [];
+    public DateTimeOffset GeradaEm { get; init; }
 }
 
 /// <summary>Sequencial do código por (empresa, tipo). Container <c>contadores</c>, partição <c>/empresa</c>.</summary>

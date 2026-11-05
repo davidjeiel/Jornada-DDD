@@ -91,9 +91,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 130 |
+| ✅ coberto | 133 |
 | 🟡 parcial | 3 |
-| ⬜ pendente | 19 |
+| ⬜ pendente | 16 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -109,7 +109,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | 4 | Validação e mesa | 8 | 0 | 0 |
 | 5 | Catálogo e busca | 12 | 0 | 0 |
 | 6 | Mapas e grafo | 12 | 0 | 0 |
-| 7 | Visão executiva | 0 | 0 | 3 |
+| 7 | Visão executiva | 3 | 0 | 0 |
 | 8 | Notificações | 0 | 1 | 6 |
 | 9 | Descobertas | 0 | 0 | 10 |
 
@@ -275,9 +275,9 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 | `test_chip_remove_apenas_o_proprio_filtro` | 5 | ✅ | `telas/Busca.test.tsx` |
 | `test_limpar_zera_os_filtros_guardados` | 5 | ✅ | `telas/Busca.test.tsx` |
 | `test_filtro_sem_owner_isola_os_ativos_sem_responsavel` | 5 | ✅ | `FiltroSemOwnerIsolaOsAtivosSemResponsavel` e o contrato de persistência (responsável encerrado não conta) |
-| `test_kpis_do_painel_levam_ao_recorte` | 7 | ⬜ |  |
-| `test_queda_de_pendencia_e_lida_como_melhora` — Cair é bom em 'sem responsável': a cor tem de acompanhar o sentido. | 7 | ⬜ |  |
-| `test_variacao_compara_as_duas_ultimas_competencias` | 7 | ⬜ |  |
+| `test_kpis_do_painel_levam_ao_recorte` | 7 | ✅ | `telas/VisaoExecutiva.test.tsx`: cada KPI leva ao recorte do catálogo (`GET /v1/indicadores`) |
+| `test_queda_de_pendencia_e_lida_como_melhora` — Cair é bom em 'sem responsável': a cor tem de acompanhar o sentido. | 7 | ✅ | `telas/VisaoExecutiva.test.tsx`: `quantoMenosMelhor` vem da API e a cor acompanha o sentido |
+| `test_variacao_compara_as_duas_ultimas_competencias` | 7 | ✅ | `VariacaoComparaAsDuasUltimasCompetencias`; fotografia em `POST /v1/indicadores/fotografias` (só admin), persistida na partição `[empresa,"indicadores"]` |
 | `test_wizard_devolve_o_que_foi_digitado_apos_erro` | 3 | ✅ | `telas/NovoAtivo.test.tsx`: o formulário é controlado e a recusa não o limpa (campos do tipo, criticidade, squad e descrição) |
 | `test_wizard_preserva_o_pai_escolhido_apos_erro` | 3 | ✅ | `telas/NovoAtivo.test.tsx` |
 

@@ -83,6 +83,7 @@ if (usaCosmos)
     builder.Services.AddScoped<IRepositorioDePleitos>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<IRepositorioDeSquads>(sp => sp.GetRequiredService<RepositorioCosmos>());
     builder.Services.AddScoped<IConsultaDeVinculos>(sp => sp.GetRequiredService<RepositorioCosmos>());
+    builder.Services.AddScoped<IRepositorioDeIndicadores>(sp => sp.GetRequiredService<RepositorioCosmos>());
 }
 else
 {
@@ -102,6 +103,7 @@ else
     builder.Services.AddScoped<IRepositorioDePleitos>(sp => sp.GetRequiredService<RepositorioDeAcessoEmMemoria>());
     builder.Services.AddScoped<IRepositorioDeSquads>(sp => sp.GetRequiredService<RepositorioDeAcessoEmMemoria>());
     builder.Services.AddScoped<IConsultaDeVinculos>(sp => sp.GetRequiredService<RepositorioDeAtivosEmMemoria>());
+    builder.Services.AddScoped<IRepositorioDeIndicadores, RepositorioDeIndicadoresEmMemoria>();
 }
 
 builder.Services.AddSingleton<IMetamodelo, MetamodeloPadrao>();
@@ -131,6 +133,7 @@ builder.Services.AddScoped<ObterVisaoDoAtivo>();
 builder.Services.AddScoped<BuscarNoCatalogo>();
 builder.Services.AddScoped<ConsultarVizinhanca>();
 builder.Services.AddScoped<MontarArvore>();
+builder.Services.AddScoped<Indicadores>();
 builder.Services.AddScoped<SolicitarAcesso>();
 builder.Services.AddScoped<DecidirPleito>();
 builder.Services.AddScoped<ListarPleitos>();
@@ -378,6 +381,25 @@ catalogo.MapGet("/mapa/arvore", async Task<Results<Ok<ArvoreResponse>, JsonHttpR
     .WithSummary("A árvore do catálogo, de negócio ou técnica")
     .WithDescription("negocio: Domínio → Subdomínio → Contexto → Capacidade, com quantos ativos implementam cada capacidade. tecnica: Sistema → Aplicação → API → Endpoint e Base de dados → Objeto de dado. Arquivados ficam de fora.")
     .ComErros(StatusCodes.Status400BadRequest);
+
+catalogo.MapGet("/indicadores", async (Indicadores caso, CancellationToken ct) =>
+    TypedResults.Ok(IndicadoresResponse.De(await caso.ConsultarAsync(ct))))
+    .WithName("consultarIndicadores")
+    .WithSummary("Os indicadores da visão executiva e a variação no mês")
+    .WithDescription("Domínios e capacidades em vigor, cobertura de capacidades por implementação (%), publicados sem responsável, APIs e APIs governadas (%), etapas pendentes e vencidas, publicados e dependências críticas. variacao compara as duas últimas fotografias mensais.");
+
+catalogo.MapPost("/indicadores/fotografias", async Task<Results<Created<FotografiaResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, Indicadores caso, CancellationToken ct, string? competencia = null) =>
+{
+    var r = await caso.FotografarAsync(competencia, ct);
+    return r.Sucesso
+        ? TypedResults.Created($"{metadados.PrefixoDasRotas}/indicadores", FotografiaResponse.De(r.Valor!))
+        : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("fotografarIndicadores")
+    .WithSummary("Tira a fotografia mensal dos indicadores")
+    .WithDescription("Só admin. Grava os indicadores de agora na competência (padrão: o mês corrente, AAAA-MM); a mesma competência é substituída. É o que alimenta a variação no mês.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden);
 
 catalogo.MapGet("/busca/sugestoes", async (BuscarNoCatalogo caso, CancellationToken ct, string? termo = null) =>
 {

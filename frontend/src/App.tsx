@@ -158,7 +158,8 @@ function App() {
   } else {
     switch (secao) {
       case 'painel':
-        tela = <VisaoExecutiva ativos={ativos} validacoes={validacoes} nomeDaEmpresa={nomeDaEmpresa} podeEscrever={podeEscrever} />;
+        tela = <VisaoExecutiva validacoes={validacoes} nomeDaEmpresa={nomeDaEmpresa} podeEscrever={podeEscrever}
+          podeFotografar={podeEscrever && papeis.includes('admin')} onErro={setErro} />;
         break;
       case 'catalogo':
         tela = <Catalogo key={identidade.empresaId} busca={local.busca} idSelecionado={local.busca.get('ativo')} metamodelo={metamodelo} squads={squads}

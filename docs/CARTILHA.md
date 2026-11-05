@@ -75,8 +75,13 @@ A escolha fica salva no seu navegador — ao voltar, você continua como a mesma
   próxima" marcado, a fila já abre a seguinte.
 - **Minha mesa** — o que você assumiu, a fila livre, os seus rascunhos e o que você
   submeteu e espera decisão.
-- **Indicadores** — uma leitura agregada: publicados, validações abertas, composição por
-  tipo.
+- **Visão executiva** — os indicadores do catálogo: domínios vigentes, capacidades, cobertura
+  das capacidades, publicados sem responsável, APIs governadas e etapas pendentes. Cada
+  número é um link para o recorte que o explica. Abaixo de cada um, a variação contra o
+  mês anterior, em verde quando melhorou e em vermelho quando piorou; em "sem
+  responsável" e "pendências", cair é melhora. A variação sai das **fotografias
+  mensais**, que o administrador tira com "Fotografar o mês"; fotografar de novo no
+  mesmo mês substitui a anterior.
 
 ### 3. Abra a ficha do ativo
 

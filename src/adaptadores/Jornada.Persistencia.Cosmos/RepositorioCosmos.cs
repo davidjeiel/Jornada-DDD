@@ -21,7 +21,7 @@ namespace Jornada.Persistencia.Cosmos;
 /// consequências negativas).
 /// </summary>
 public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositorioDeRelacoes,
-    IRepositorioDeValidacoes, IUnidadeDeTrabalho, IRepositorioDeRevisoes, ITrilhaDeAuditoria
+    IRepositorioDeValidacoes, IUnidadeDeTrabalho, IRepositorioDeRevisoes, ITrilhaDeAuditoria, IRepositorioDeIndicadores
 {
     private readonly AcessoDoTenant _acesso;
     private readonly Dictionary<IdDeAtivo, Rastreado<Ativo>> _ativos = [];
@@ -163,6 +163,15 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
             Mecanismo = mecanismo,
             CriadoEm = DateTimeOffset.UtcNow,
         }, ct);
+
+    public async Task<IReadOnlyList<RelacaoResumo>> ListarArestasAsync(string? tipo = null, CancellationToken ct = default)
+    {
+        var documentos = tipo is null
+            ? await _acesso.ConsultarAsync<DocumentoDeRelacao>(TiposDeDocumento.Relacao, ct: ct)
+            : await _acesso.ConsultarAsync<DocumentoDeRelacao>(TiposDeDocumento.Relacao, "c.tipoRelacao = @tipoRelacao",
+                parametros: new Dictionary<string, object?> { ["@tipoRelacao"] = tipo }, ct: ct);
+        return documentos.Select(Resumo).ToArray();
+    }
 
     public async Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default)
     {
