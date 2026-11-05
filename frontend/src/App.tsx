@@ -13,6 +13,7 @@ import {
 import { navegar, useLocal } from './roteador';
 import { Cartilha } from './telas/Cartilha';
 import { Catalogo } from './telas/Catalogo';
+import { Descobertas } from './telas/Descobertas';
 import { EmBreve, NaoEncontrada } from './telas/EmBreve';
 import { GestaoDeAcessos } from './telas/GestaoDeAcessos';
 import { Grafo } from './telas/Grafo';
@@ -195,6 +196,11 @@ function App() {
         break;
       case 'politicas':
         tela = <Politicas onErro={setErro} />;
+        break;
+      case 'descobertas':
+        tela = <Descobertas key={identidade.empresaId} ativos={ativos}
+          podeImportar={podeEscrever && papeis.some((p) => p === 'admin' || p === 'curador' || p === 'techlead')}
+          onAlterado={carregar} onErro={setErro} />;
         break;
       case 'notificacoes':
         tela = <Notificacoes key={identidade.pessoaId ?? ''} aba={local.busca.get('aba') === 'preferencias' ? 'preferencias' : 'caixa'}

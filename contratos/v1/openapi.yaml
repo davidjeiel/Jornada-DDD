@@ -3024,6 +3024,356 @@ paths:
         - Bearer: [ ]
         - X-Empresa: [ ]
           X-Pessoa: [ ]
+  /v1/descobertas:
+    get:
+      tags:
+        - Catálogo
+      summary: As fontes de descoberta e a bandeja
+      description: 'A bandeja é o que a importação trouxe e ninguém triou: origem automática, em rascunho, o mais recente primeiro (até 200).'
+      operationId: consultarDescobertas
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DescobertasResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/descobertas/previas:
+    post:
+      tags:
+        - Catálogo
+      summary: 'Mostra o que a importação faria, sem gravar nada'
+      description: 'Do contrato OpenAPI: a API e um endpoint por operação (GET, POST, PUT, PATCH, DELETE). Do inventário Git: um repositório por item. Marca o que já existe pelo tipo e nome. JSON ilegível: 400 CONTEUDO_INVALIDO. Exige poder importar (tech lead, curador ou admin).'
+      operationId: previaDeImportacao
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DescobertaRequest'
+        required: true
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanoDeImportacaoResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/descobertas/importacoes:
+    post:
+      tags:
+        - Catálogo
+      summary: Importa o que a prévia mostrou
+      description: 'Cria em rascunho, com origem automática, o que ainda não existe; o que existe fica como está (repositório em rascunho recebe os atributos novos). Os criados caem na bandeja para triagem.'
+      operationId: importarDescobertas
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DescobertaRequest'
+        required: true
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportacaoResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Regra de negócio não atendida.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/descobertas/triagem:
+    post:
+      tags:
+        - Catálogo
+      summary: 'Aceita ou descarta descobertas, em lote'
+      description: 'aceitar tira da bandeja e passa a contar como cadastro humano, sem mexer no ciclo de vida; descartar arquiva. Cadastro humano e o que já saiu da bandeja são ignorados. Ação desconhecida: 400 ACAO_DE_TRIAGEM_INVALIDA.'
+      operationId: triarDescobertas
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriagemRequest'
+        required: true
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriagemResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   /v1/ritos:
     get:
       tags:
@@ -5236,6 +5586,28 @@ paths:
                 $ref: '#/components/schemas/SaudeResponse'
 components:
   schemas:
+    AcaoDoPlanoResponse:
+      required:
+        - acao
+        - tipo
+        - nome
+        - detalhe
+      type: object
+      properties:
+        acao:
+          type: string
+          description: 'criar, manter (já existe) ou atualizar (repositório existente recebe os atributos).'
+        tipo:
+          type: string
+          description: 'O tipo, por extenso.'
+        nome:
+          type: string
+          description: O nome que o ativo terá.
+        detalhe:
+          type: string
+          description: 'Versão, resumo da operação ou linguagem.'
+      additionalProperties: false
+      description: Uma linha da prévia.
     AncestralResponse:
       required:
         - id
@@ -5751,6 +6123,45 @@ components:
           example: Owner e evidência conferidos.
       additionalProperties: false
       description: Decisão sobre uma etapa de validação.
+    DescobertaRequest:
+      required:
+        - conteudo
+        - fonte
+      type: object
+      properties:
+        fonte:
+          type: string
+          description: openapi ou git.
+          example: openapi
+        conteudo:
+          type: string
+          description: 'O contrato OpenAPI (JSON) ou o inventário Git (lista JSON de {nome, url, linguagem}).'
+          example: '{"info": {"title": "API Simulação", "version": "2.1"}, "paths": {"/simulacoes": {"get": {"summary": "Lista simulações"}}}}'
+        idPai:
+          type: string
+          description: 'A aplicação sob a qual a API ou os repositórios entram. Sem ela, entram sem pai.'
+          format: uuid
+          nullable: true
+      additionalProperties: false
+      description: 'O que importar: a fonte, o JSON colado e, opcionalmente, a aplicação que recebe o que for descoberto.'
+    DescobertasResponse:
+      required:
+        - fontes
+        - bandeja
+      type: object
+      properties:
+        fontes:
+          type: array
+          items:
+            $ref: '#/components/schemas/FonteDeDescobertaResponse'
+          description: De onde se importa.
+        bandeja:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemDoCatalogoResponse'
+          description: 'O que a importação trouxe e ninguém triou: origem automática, em rascunho, o mais recente primeiro.'
+      additionalProperties: false
+      description: 'A tela de descobertas: as fontes e a bandeja.'
     DescontinuacaoResponse:
       required:
         - afetados
@@ -6057,6 +6468,28 @@ components:
           description: 'Etapas abertas por etapa (negocial, tecnica, arquitetural) e as "minhas".'
       additionalProperties: false
       description: 'A fila de validação: a mais crítica primeiro, e, na mesma criticidade, o prazo mais próximo.'
+    FonteDeDescobertaResponse:
+      required:
+        - chave
+        - rotulo
+        - ajuda
+        - tipoDoPai
+      type: object
+      properties:
+        chave:
+          type: string
+          description: openapi ou git.
+        rotulo:
+          type: string
+          description: 'A fonte, por extenso.'
+        ajuda:
+          type: string
+          description: O formato esperado.
+        tipoDoPai:
+          type: string
+          description: O tipo do ativo que recebe o que for descoberto.
+      additionalProperties: false
+      description: Uma fonte de descoberta.
     FotografiaResponse:
       required:
         - competencia
@@ -6144,6 +6577,34 @@ components:
           description: Contagem por tipo do consumidor.
       additionalProperties: false
       description: Quem seria afetado se o ativo fosse descontinuado.
+    ImportacaoResponse:
+      required:
+        - criados
+        - atualizados
+        - mantidos
+        - novos
+      type: object
+      properties:
+        criados:
+          type: integer
+          description: 'Ativos novos, em rascunho, com origem automática: estão na bandeja.'
+          format: int32
+        atualizados:
+          type: integer
+          description: Repositórios existentes que receberam os atributos novos.
+          format: int32
+        mantidos:
+          type: integer
+          description: Os que já existiam e ficaram como estavam.
+          format: int32
+        novos:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Os ids dos criados.
+      additionalProperties: false
+      description: O resultado da importação.
     InativacaoEmLoteResponse:
       required:
         - inativados
@@ -6774,6 +7235,45 @@ components:
           nullable: true
       additionalProperties: false
       description: Uma pessoa cadastrada.
+    PlanoDeImportacaoResponse:
+      required:
+        - fonte
+        - titulo
+        - versao
+        - criar
+        - manter
+        - acoes
+      type: object
+      properties:
+        fonte:
+          type: string
+          description: openapi ou git.
+        titulo:
+          type: string
+          description: 'O título do contrato, ou quantos repositórios.'
+        versao:
+          type: string
+          description: A versão do contrato; vazia no inventário Git.
+        criar:
+          type: integer
+          description: Quantos ativos seriam criados.
+          format: int32
+        manter:
+          type: integer
+          description: Quantos já existem.
+          format: int32
+        acoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AcaoDoPlanoResponse'
+          description: Uma linha por ativo.
+        idPai:
+          type: string
+          description: A aplicação escolhida.
+          format: uuid
+          nullable: true
+      additionalProperties: false
+      description: 'A prévia: o que a importação faria. Nada foi gravado.'
     PleitoAbertoResponse:
       required:
         - idPessoa
@@ -7416,6 +7916,44 @@ components:
             type: string
       additionalProperties: false
       description: Um tipo de relação e os tipos de destino que fazem sentido para ele.
+    TriagemRequest:
+      required:
+        - acao
+        - ids
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Os ativos da bandeja.
+        acao:
+          type: string
+          description: 'aceitar (vira cadastro humano, segue rascunho) ou descartar (arquiva).'
+          example: aceitar
+      additionalProperties: false
+      description: 'A triagem de descobertas, em lote.'
+    TriagemResponse:
+      required:
+        - acao
+        - tratados
+        - ignorados
+      type: object
+      properties:
+        acao:
+          type: string
+          description: aceitar ou descartar.
+        tratados:
+          type: integer
+          description: Quantos saíram da bandeja.
+          format: int32
+        ignorados:
+          type: integer
+          description: 'Os que não eram descoberta pendente (cadastro humano, já triado) ou que a pessoa não pode triar.'
+          format: int32
+      additionalProperties: false
+      description: O resultado da triagem.
     ValidacaoResponse:
       required:
         - id

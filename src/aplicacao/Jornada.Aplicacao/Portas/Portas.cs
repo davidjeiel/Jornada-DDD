@@ -46,6 +46,9 @@ public interface IRepositorioDeAtivos
     /// <summary>A trilha hierárquica até a raiz. Equivale a <c>servicos.trilha</c>.</summary>
     public Task<IReadOnlyList<Ativo>> TrilhaAsync(IdDeAtivo id, CancellationToken ct = default);
 
+    /// <summary>O ativo deste tipo com este nome (sem diferenciar maiúsculas), nesta empresa. Para a importação saber o que já existe.</summary>
+    public Task<Ativo?> ObterPorNomeAsync(string tipoItem, string nome, CancellationToken ct = default);
+
     /// <summary>Existe outro ativo do mesmo tipo e nome NESTA empresa?</summary>
     public Task<bool> ExisteNomeDuplicadoAsync(
         string tipoItem, string nome, IdDeAtivo? exceto = null, CancellationToken ct = default);

@@ -32,7 +32,7 @@ export const MENU: ItemDeMenu[] = [
 
   { secao: 'mesa', caminho: '/mesa', rotulo: 'Minha mesa', inicial: 'MM', grupo: 'Trabalhar', descricao: 'O que é seu: rascunhos, validações assumidas e pendências.' },
   { secao: 'novo', caminho: '/novo', rotulo: 'Novo ativo', inicial: 'NA', grupo: 'Trabalhar', descricao: 'Cadastro de um ativo em rascunho.' },
-  { secao: 'descobertas', caminho: '/descobertas', rotulo: 'Descobertas', inicial: 'DE', grupo: 'Trabalhar', fase: 9, descricao: 'Importação de OpenAPI e inventário Git, com prévia e triagem.' },
+  { secao: 'descobertas', caminho: '/descobertas', rotulo: 'Descobertas', inicial: 'DE', grupo: 'Trabalhar', descricao: 'Importação de OpenAPI e inventário Git, com prévia e triagem.' },
   { secao: 'validacoes', caminho: '/validacoes', rotulo: 'Validações', inicial: 'VL', grupo: 'Trabalhar', descricao: 'Fila de etapas de validação aguardando decisão.' },
 
   { secao: 'notificacoes', caminho: '/notificacoes', rotulo: 'Notificações', inicial: 'NT', grupo: 'Você', descricao: 'Caixa de avisos de submissão, decisão e SLA.' },

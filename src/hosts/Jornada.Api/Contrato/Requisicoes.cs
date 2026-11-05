@@ -263,3 +263,29 @@ public sealed record SalvarPreferenciasRequest
 {
     public required IReadOnlyList<PreferenciaRequest> Ativas { get; init; }
 }
+
+/// <summary>O que importar: a fonte, o JSON colado e, opcionalmente, a aplicação que recebe o que for descoberto.</summary>
+public sealed record DescobertaRequest
+{
+    /// <summary>openapi ou git.</summary>
+    /// <example>openapi</example>
+    public required string Fonte { get; init; }
+
+    /// <summary>O contrato OpenAPI (JSON) ou o inventário Git (lista JSON de {nome, url, linguagem}).</summary>
+    /// <example>{"info": {"title": "API Simulação", "version": "2.1"}, "paths": {"/simulacoes": {"get": {"summary": "Lista simulações"}}}}</example>
+    public required string Conteudo { get; init; }
+
+    /// <summary>A aplicação sob a qual a API ou os repositórios entram. Sem ela, entram sem pai.</summary>
+    public Guid? IdPai { get; init; }
+}
+
+/// <summary>A triagem de descobertas, em lote.</summary>
+public sealed record TriagemRequest
+{
+    /// <summary>Os ativos da bandeja.</summary>
+    public required IReadOnlyList<Guid> Ids { get; init; }
+
+    /// <summary>aceitar (vira cadastro humano, segue rascunho) ou descartar (arquiva).</summary>
+    /// <example>aceitar</example>
+    public required string Acao { get; init; }
+}

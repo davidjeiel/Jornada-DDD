@@ -145,6 +145,19 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
             "c.tipoItem = @tipoItem AND c.nomeNormalizado = @nome AND c.id != @exceto", parametros, ct) > 0;
     }
 
+    public async Task<Ativo?> ObterPorNomeAsync(string tipoItem, string nome, CancellationToken ct = default)
+    {
+        var nomeNormalizado = Mapeamento.Normalizar(nome);
+        var novo = _ativos.Values.Select(r => r.Entidade).FirstOrDefault(a =>
+            a.TipoItem.Equals(tipoItem, StringComparison.OrdinalIgnoreCase) && Mapeamento.Normalizar(a.Nome) == nomeNormalizado);
+        if (novo is not null) return novo;
+
+        var documentos = await _acesso.ConsultarAsync<DocumentoDeAtivo>(TiposDeDocumento.Ativo,
+            "c.tipoItem = @tipoItem AND c.nomeNormalizado = @nome", "ORDER BY c.criadoEm",
+            new Dictionary<string, object?> { ["@tipoItem"] = tipoItem.ToLowerInvariant(), ["@nome"] = nomeNormalizado }, ct);
+        return documentos.Count == 0 ? null : Rastrear(documentos[0]);
+    }
+
     public Task<int> ProximoSequencialAsync(string tipoItem, CancellationToken ct = default) =>
         _acesso.IncrementarAsync(tipoItem.ToLowerInvariant(), ct);
 

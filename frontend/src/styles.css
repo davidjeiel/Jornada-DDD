@@ -825,3 +825,14 @@ a.validation-row > :not(:first-child) { flex: none; width: auto; }
 .link-button:hover { text-decoration: underline; }
 .link-button:disabled { color: var(--muted); cursor: default; }
 .aviso-de-sucesso { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: var(--success-weak); color: var(--success); }
+
+/* Descobertas: a prévia antes de gravar e a bandeja de triagem. */
+.descobertas { display: grid; gap: 18px; }
+.descobertas textarea.mono { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+.fontes-de-descoberta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; border: 0; }
+.fontes-de-descoberta legend { margin-bottom: 6px; font-weight: 600; }
+.previa { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.previa h3 { margin: 4px 0 0; }
+.acao-do-plano { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); color: var(--muted); }
+.acao-do-plano.acao-criar { border-color: var(--success); background: var(--success-weak); color: var(--success); }
+.acao-do-plano.acao-atualizar { border-color: var(--warning); background: var(--warning-weak); color: var(--pending-ink); }

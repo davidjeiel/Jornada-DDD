@@ -39,4 +39,7 @@ public static class AcoesAuditadas
     public const string AbrirRevisao = "abrir_revisao";
     public const string Descontinuar = "descontinuar";
     public const string Arquivar = "arquivar";
+    public const string Importar = "importar";
+    public const string TriagemAceitar = "triagem_aceitar";
+    public const string TriagemDescartar = "triagem_descartar";
 }

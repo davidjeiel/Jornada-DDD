@@ -1,5 +1,6 @@
 using Jornada.Aplicacao.Acesso;
 using Jornada.Aplicacao.Catalogo.Consultas;
+using Jornada.Aplicacao.Catalogo.Descobertas;
 using Jornada.Aplicacao.Catalogo.Mapas;
 using Jornada.Aplicacao.Governanca;
 using Jornada.Aplicacao.Notificacoes;
@@ -710,3 +711,52 @@ public sealed record DespachoResponse(int Despachadas, IReadOnlyDictionary<strin
 /// <param name="SlaVencendo">Avisos de prazo vencendo em menos de 24h.</param>
 /// <param name="SlaVencido">Avisos de prazo vencido.</param>
 public sealed record VigiaDeSlaResponse(int SlaVencendo, int SlaVencido);
+
+/// <summary>Uma fonte de descoberta.</summary>
+/// <param name="Chave">openapi ou git.</param>
+/// <param name="Rotulo">A fonte, por extenso.</param>
+/// <param name="Ajuda">O formato esperado.</param>
+/// <param name="TipoDoPai">O tipo do ativo que recebe o que for descoberto.</param>
+public sealed record FonteDeDescobertaResponse(string Chave, string Rotulo, string Ajuda, string TipoDoPai);
+
+/// <summary>A tela de descobertas: as fontes e a bandeja.</summary>
+/// <param name="Fontes">De onde se importa.</param>
+/// <param name="Bandeja">O que a importação trouxe e ninguém triou: origem automática, em rascunho, o mais recente primeiro.</param>
+public sealed record DescobertasResponse(IReadOnlyList<FonteDeDescobertaResponse> Fontes, IReadOnlyList<ItemDoCatalogoResponse> Bandeja);
+
+/// <summary>Uma linha da prévia.</summary>
+/// <param name="Acao">criar, manter (já existe) ou atualizar (repositório existente recebe os atributos).</param>
+/// <param name="Tipo">O tipo, por extenso.</param>
+/// <param name="Nome">O nome que o ativo terá.</param>
+/// <param name="Detalhe">Versão, resumo da operação ou linguagem.</param>
+public sealed record AcaoDoPlanoResponse(string Acao, string Tipo, string Nome, string Detalhe);
+
+/// <summary>A prévia: o que a importação faria. Nada foi gravado.</summary>
+/// <param name="Fonte">openapi ou git.</param>
+/// <param name="Titulo">O título do contrato, ou quantos repositórios.</param>
+/// <param name="Versao">A versão do contrato; vazia no inventário Git.</param>
+/// <param name="Criar">Quantos ativos seriam criados.</param>
+/// <param name="Manter">Quantos já existem.</param>
+/// <param name="Acoes">Uma linha por ativo.</param>
+/// <param name="IdPai">A aplicação escolhida.</param>
+public sealed record PlanoDeImportacaoResponse(string Fonte, string Titulo, string Versao, int Criar, int Manter, IReadOnlyList<AcaoDoPlanoResponse> Acoes, Guid? IdPai)
+{
+    public static PlanoDeImportacaoResponse De(ImportarDescobertas.Plano p) => new(
+        p.Fonte, p.Titulo, p.Versao, p.Criar, p.Manter, p.Acoes.Select(a => new AcaoDoPlanoResponse(a.Acao, a.Tipo, a.Nome, a.Detalhe)).ToArray(), p.IdPai?.Valor);
+}
+
+/// <summary>O resultado da importação.</summary>
+/// <param name="Criados">Ativos novos, em rascunho, com origem automática: estão na bandeja.</param>
+/// <param name="Atualizados">Repositórios existentes que receberam os atributos novos.</param>
+/// <param name="Mantidos">Os que já existiam e ficaram como estavam.</param>
+/// <param name="Novos">Os ids dos criados.</param>
+public sealed record ImportacaoResponse(int Criados, int Atualizados, int Mantidos, IReadOnlyList<Guid> Novos)
+{
+    public static ImportacaoResponse De(ImportarDescobertas.Saida s) => new(s.Criados, s.Atualizados, s.Mantidos, s.Novos.Select(n => n.Valor).ToArray());
+}
+
+/// <summary>O resultado da triagem.</summary>
+/// <param name="Acao">aceitar ou descartar.</param>
+/// <param name="Tratados">Quantos saíram da bandeja.</param>
+/// <param name="Ignorados">Os que não eram descoberta pendente (cadastro humano, já triado) ou que a pessoa não pode triar.</param>
+public sealed record TriagemResponse(string Acao, int Tratados, int Ignorados);
