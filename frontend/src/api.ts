@@ -480,3 +480,24 @@ export type Mesa = { minhasValidacoes: ItemDaFila[]; filaLivre: ItemDaFila[]; me
 export function consultarMesa(): Promise<Mesa> {
   return requisicao('/v1/mesa');
 }
+
+// ── Catálogo com recorte, ordem e página (fase 5) ────────────────────────
+
+export type ItemDoCatalogo = { ativo: AtivoResumo; origem: string; idSquad: string | null; temResponsavel: boolean; atualizadoEm: string };
+
+export type PaginaDoCatalogo = {
+  itens: ItemDoCatalogo[]; total: number; pagina: number; paginas: number; porPagina: number;
+  primeiro: number; ultimo: number; ordem: string; descendente: boolean; truncado: boolean;
+};
+
+/** Os parâmetros vão como chegam da URL do catálogo: a API confere e aplica os padrões. */
+export function buscarNoCatalogo(parametros: URLSearchParams): Promise<PaginaDoCatalogo> {
+  const texto = parametros.toString();
+  return requisicao(`/v1/catalogo${texto ? `?${texto}` : ''}`);
+}
+
+export type Sugestao = { id: string; codigo: string; nome: string; tipo: string; status: string; url: string };
+
+export function sugerirAtivos(termo: string): Promise<{ termo: string; itens: Sugestao[] }> {
+  return requisicao(`/v1/busca/sugestoes?termo=${encodeURIComponent(termo)}`);
+}

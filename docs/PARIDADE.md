@@ -40,6 +40,12 @@ original no título, para facilitar a busca.
   `dominio` ou `squad`. O papel de squad vale nos ativos daquele squad; squad
   inativo não recebe ativo novo nem concessão nova, mas os vínculos que já
   existem continuam valendo.
+- **Busca do catálogo.** O filtro roda no banco; a ordenação e a página, na
+  aplicação, sobre o recorte inteiro, até 5.000 ativos (acima disso a resposta
+  avisa `truncado`). Assim a ordem por criticidade, que não é alfabética, vale
+  igual nos dois adaptadores. Não há ordenação por score: o painel guarda o
+  score em `qualidade_catalogo`; o Jornada o calcula no pré-check. Os filtros
+  guardados ficam no navegador, não na sessão do servidor.
 - **Gestão de acessos.** No painel, salvar o cadastro troca todos os papéis por
   um papel na empresa inteira, e um papel de domínio some sem ninguém pedir. No
   Jornada a correção dos dados e os papéis são operações separadas: concede-se e
@@ -85,9 +91,9 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 
 | Situação | Comportamentos |
 |---|---|
-| ✅ coberto | 106 |
-| 🟡 parcial | 4 |
-| ⬜ pendente | 42 |
+| ✅ coberto | 118 |
+| 🟡 parcial | 3 |
+| ⬜ pendente | 31 |
 | — não se aplica | 1 |
 | **Total** | **153** |
 
@@ -101,7 +107,7 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | 2 | Pessoas e acesso | 43 | 2 | 0 |
 | 3 | Ficha e cadastro | 22 | 0 | 0 |
 | 4 | Validação e mesa | 8 | 0 | 0 |
-| 5 | Catálogo e busca | 0 | 1 | 11 |
+| 5 | Catálogo e busca | 12 | 0 | 0 |
 | 6 | Mapas e grafo | 0 | 0 | 12 |
 | 7 | Visão executiva | 0 | 0 | 3 |
 | 8 | Notificações | 0 | 1 | 6 |
@@ -262,13 +268,13 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 | `test_tela_do_ativo_mostra_a_trilha_clicavel` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |
 | `test_menu_continua_marcado_dentro_de_um_ativo` | 3 | ✅ | `navegacao.test.ts` e `telas/PaginaDoAtivo.test.tsx`: `/ativos/{id}` é a página do ativo |
 | `test_menu_marca_o_cadastro_no_wizard` | 0 | ✅ | `navegacao.test.ts` |
-| `test_busca_global_sugere_ativos_por_termo` | 5 | ⬜ | A busca do topo já leva ao catálogo filtrado; as sugestões chegam na fase 5. |
-| `test_busca_global_ignora_termo_curto` | 5 | ⬜ |  |
+| `test_busca_global_sugere_ativos_por_termo` | 5 | ✅ | `BuscaGlobalSugereAtivosPorTermo` (`GET /v1/busca/sugestoes`) e `telas/Busca.test.tsx`: cada sugestão leva a `/ativos/{id}` |
+| `test_busca_global_ignora_termo_curto` | 5 | ✅ | `BuscaGlobalIgnoraTermoCurto` e `telas/Busca.test.tsx` |
 | `test_campo_de_busca_existe_em_todas_as_telas` | 0 | ✅ | `Layout.test.tsx` |
-| `test_filtros_voltam_na_visita_seguinte` | 5 | ⬜ |  |
-| `test_chip_remove_apenas_o_proprio_filtro` | 5 | 🟡 | Chip da busca existe; falta para os demais filtros. |
-| `test_limpar_zera_os_filtros_guardados` | 5 | ⬜ |  |
-| `test_filtro_sem_owner_isola_os_ativos_sem_responsavel` | 5 | ⬜ |  |
+| `test_filtros_voltam_na_visita_seguinte` | 5 | ✅ | `telas/Busca.test.tsx`: o recorte fica guardado no navegador (no painel, na sessão do servidor) |
+| `test_chip_remove_apenas_o_proprio_filtro` | 5 | ✅ | `telas/Busca.test.tsx` |
+| `test_limpar_zera_os_filtros_guardados` | 5 | ✅ | `telas/Busca.test.tsx` |
+| `test_filtro_sem_owner_isola_os_ativos_sem_responsavel` | 5 | ✅ | `FiltroSemOwnerIsolaOsAtivosSemResponsavel` e o contrato de persistência (responsável encerrado não conta) |
 | `test_kpis_do_painel_levam_ao_recorte` | 7 | ⬜ |  |
 | `test_queda_de_pendencia_e_lida_como_melhora` — Cair é bom em 'sem responsável': a cor tem de acompanhar o sentido. | 7 | ⬜ |  |
 | `test_variacao_compara_as_duas_ultimas_competencias` | 7 | ⬜ |  |
@@ -293,12 +299,12 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 | `test_lote_ignora_o_proprio_ativo` | 3 | ✅ | `LoteIgnoraOProprioAtivo` |
 | `test_tela_de_lote_marca_o_que_ja_existe` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |
 | `test_post_do_lote_volta_para_a_aba_de_relacoes` | 3 | ✅ | `telas/PaginaDoAtivo.test.tsx` |
-| `test_pagina_traz_o_total_real_e_nao_o_tamanho_da_pagina` | 5 | ⬜ |  |
-| `test_pagina_fora_do_intervalo_volta_para_a_ultima` | 5 | ⬜ |  |
-| `test_ordenacao_por_score_e_por_nome` | 5 | ⬜ |  |
-| `test_ordenacao_desconhecida_cai_no_padrao` | 5 | ⬜ |  |
-| `test_catalogo_mostra_total_e_paginacao` | 5 | ⬜ |  |
-| `test_filtro_de_origem_separa_o_que_a_maquina_trouxe` | 5 | ⬜ |  |
+| `test_pagina_traz_o_total_real_e_nao_o_tamanho_da_pagina` | 5 | ✅ | `PaginaTrazOTotalReal` (`GET /v1/catalogo`) |
+| `test_pagina_fora_do_intervalo_volta_para_a_ultima` | 5 | ✅ | `PaginaForaDoIntervaloVoltaParaAUltima` |
+| `test_ordenacao_por_score_e_por_nome` | 5 | ✅ | `OrdenacaoPorNomeEPorCriticidade`: nome, inversa e criticidade, como o teste do painel confere; ordenar por score não existe (ver diferenças) |
+| `test_ordenacao_desconhecida_cai_no_padrao` | 5 | ✅ | `OrdenacaoDesconhecidaCaiNoPadrao` |
+| `test_catalogo_mostra_total_e_paginacao` | 5 | ✅ | `telas/Busca.test.tsx` |
+| `test_filtro_de_origem_separa_o_que_a_maquina_trouxe` | 5 | ✅ | `FiltroDeOrigemSeparaOQueAMaquinaTrouxe`, o contrato de persistência e `telas/Busca.test.tsx` |
 | `test_arvore_de_negocio_desce_quatro_niveis` | 6 | ⬜ |  |
 | `test_arvore_tecnica_usa_a_mesma_mecanica` | 6 | ⬜ |  |
 | `test_arvore_conta_implementacoes_da_capacidade` | 6 | ⬜ |  |

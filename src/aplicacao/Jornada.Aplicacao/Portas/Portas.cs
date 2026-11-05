@@ -35,6 +35,13 @@ public interface IRepositorioDeAtivos
 
     public Task AdicionarAsync(Ativo ativo, CancellationToken ct = default);
 
+    /// <summary>
+    /// Os ativos que passam no filtro do catálogo, até <paramref name="teto"/>.
+    /// O filtro roda no banco; ordenar e paginar fica com o caso de uso
+    /// (<see cref="Catalogo.Consultas.BuscarNoCatalogo"/>), que precisa do total real.
+    /// </summary>
+    public Task<IReadOnlyList<Ativo>> BuscarAsync(FiltroDoCatalogo filtro, int teto, CancellationToken ct = default);
+
     /// <summary>A trilha hierárquica até a raiz. Equivale a <c>servicos.trilha</c>.</summary>
     public Task<IReadOnlyList<Ativo>> TrilhaAsync(IdDeAtivo id, CancellationToken ct = default);
 
@@ -45,6 +52,22 @@ public interface IRepositorioDeAtivos
     /// <summary>Próximo sequencial para o código, por tipo. De <c>servicos.gerar_codigo</c>.</summary>
     public Task<int> ProximoSequencialAsync(string tipoItem, CancellationToken ct = default);
 }
+
+/// <summary>
+/// O recorte do catálogo (<c>servicos._filtro_busca</c>). Campo nulo ou vazio
+/// não filtra. <paramref name="Termo"/> procura em nome, código e descrição,
+/// sem diferenciar maiúsculas. <paramref name="SemOwner"/> deixa só os ativos
+/// sem responsável vigente em <paramref name="Hoje"/>.
+/// </summary>
+public sealed record FiltroDoCatalogo(
+    string? Termo = null,
+    string? TipoItem = null,
+    StatusCicloVida? Status = null,
+    Guid? IdSquad = null,
+    Criticidade? Criticidade = null,
+    bool SemOwner = false,
+    OrigemDoAtivo? Origem = null,
+    DateOnly Hoje = default);
 
 /// <summary>
 /// Uma aresta do grafo de relações, já resolvida para os dois lados. A

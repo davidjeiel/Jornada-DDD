@@ -1786,6 +1786,197 @@ paths:
         - Bearer: [ ]
         - X-Empresa: [ ]
           X-Pessoa: [ ]
+  /v1/catalogo:
+    get:
+      tags:
+        - Catálogo
+      summary: 'Busca no catálogo, com filtros, ordem e página'
+      description: 'termo procura em nome, código e descrição. Filtros: tipo, status, squad, criticidade, semOwner (sem responsável vigente) e origem (manual ou automatica). ordenar: tipo (padrão), nome, status, criticidade, atualizado ou codigo; desconhecida vira tipo. pagina fora do intervalo devolve a última; porPagina vai de 1 a 200. total é o do recorte inteiro.'
+      operationId: buscarNoCatalogo
+      parameters:
+        - name: termo
+          in: query
+          schema:
+            type: string
+        - name: tipo
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: squad
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: criticidade
+          in: query
+          schema:
+            type: string
+        - name: semOwner
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: origem
+          in: query
+          schema:
+            type: string
+        - name: ordenar
+          in: query
+          schema:
+            type: string
+        - name: desc
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: pagina
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 1
+        - name: porPagina
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 50
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaDoCatalogoResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  /v1/busca/sugestoes:
+    get:
+      tags:
+        - Catálogo
+      summary: Sugestões para a busca do topo
+      description: 'Até 8 ativos cujo nome, código ou descrição contém o termo, os que começam pelo termo primeiro. Termo com menos de 2 letras devolve lista vazia.'
+      operationId: sugerirAtivos
+      parameters:
+        - name: termo
+          in: query
+          schema:
+            type: string
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SugestoesResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   '/v1/ativos/{id}':
     get:
       tags:
@@ -4932,6 +5123,33 @@ components:
           description: '"vencido", horas (abaixo de 48) ou dias.'
       additionalProperties: false
       description: 'Uma etapa aberta na fila, com o ativo e o tempo que falta.'
+    ItemDoCatalogoResponse:
+      required:
+        - ativo
+        - origem
+        - temResponsavel
+        - atualizadoEm
+      type: object
+      properties:
+        ativo:
+          $ref: '#/components/schemas/AtivoResumoResponse'
+        origem:
+          type: string
+          description: manual ou automatica (descoberta automática).
+        idSquad:
+          type: string
+          description: O squad que cuida do ativo.
+          format: uuid
+          nullable: true
+        temResponsavel:
+          type: boolean
+          description: Há responsável vigente hoje.
+        atualizadoEm:
+          type: string
+          description: A última alteração.
+          format: date-time
+      additionalProperties: false
+      description: Um ativo na lista do catálogo.
     LinhaDaMatrizResponse:
       required:
         - acao
@@ -5112,6 +5330,60 @@ components:
             $ref: '#/components/schemas/MecanismoResponse'
       additionalProperties: false
       description: 'O metamodelo da empresa: tipos de ativo, tipos de relação e mecanismos.'
+    PaginaDoCatalogoResponse:
+      required:
+        - itens
+        - total
+        - pagina
+        - paginas
+        - porPagina
+        - primeiro
+        - ultimo
+        - ordem
+        - descendente
+        - truncado
+      type: object
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemDoCatalogoResponse'
+          description: Os ativos desta página.
+        total:
+          type: integer
+          description: 'Ativos no recorte inteiro, não só nesta página.'
+          format: int32
+        pagina:
+          type: integer
+          description: 'A página devolvida; fora do intervalo, a última.'
+          format: int32
+        paginas:
+          type: integer
+          description: Quantas páginas o recorte tem.
+          format: int32
+        porPagina:
+          type: integer
+          description: Tamanho da página.
+          format: int32
+        primeiro:
+          type: integer
+          description: Posição do primeiro item da página (1 em diante; 0 sem itens).
+          format: int32
+        ultimo:
+          type: integer
+          description: Posição do último item da página.
+          format: int32
+        ordem:
+          type: string
+          description: 'A ordenação aplicada: tipo, nome, status, criticidade, atualizado ou codigo. Desconhecida vira tipo.'
+        descendente:
+          type: boolean
+          description: Ordem invertida.
+        truncado:
+          type: boolean
+          description: O recorte passou do teto de leitura; refine os filtros.
+      additionalProperties: false
+      description: 'Uma página do catálogo, com o total real do recorte.'
     PainelDoValidadorResponse:
       required:
         - validacao
@@ -5800,6 +6072,51 @@ components:
         score: 97
         etapasAbertas:
           - tecnica
+    SugestaoResponse:
+      required:
+        - id
+        - codigo
+        - nome
+        - tipo
+        - status
+        - url
+      type: object
+      properties:
+        id:
+          type: string
+          description: O ativo.
+          format: uuid
+        codigo:
+          type: string
+          description: Código do ativo.
+        nome:
+          type: string
+          description: Nome do ativo.
+        tipo:
+          type: string
+          description: Chave do tipo.
+        status:
+          type: string
+          description: Estado do ciclo de vida.
+        url:
+          type: string
+          description: O caminho da página do ativo na interface.
+      additionalProperties: false
+      description: Uma sugestão da busca do topo.
+    SugestoesResponse:
+      required:
+        - termo
+        - itens
+      type: object
+      properties:
+        termo:
+          type: string
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/SugestaoResponse'
+      additionalProperties: false
+      description: 'As sugestões para o termo: até 8, nenhuma com menos de 2 letras.'
     TipoDeAtivoResponse:
       required:
         - chave

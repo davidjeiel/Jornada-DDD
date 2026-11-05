@@ -755,3 +755,16 @@ a.validation-row > :not(:first-child) { flex: none; width: auto; }
 .formulario-pagina label.caixa-de-marcar input { width: auto; margin: 0; }
 .painel-do-validador .detail-actions { justify-content: flex-start; }
 .painel-do-validador .detail-actions button { width: auto; }
+
+/* Catálogo: filtros, chips e sugestões da busca do topo. */
+.formulario-pagina.filtros-do-catalogo { display: grid; max-width: none; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 14px; align-items: end; }
+.formulario-pagina.filtros-do-catalogo label.caixa-de-marcar { align-self: center; display: flex; align-items: center; gap: 6px; }
+.filtros-do-catalogo label.caixa-de-marcar input { width: auto; }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.chips .chip a { display: inline-flex; margin-left: 4px; color: inherit; }
+.resultado-do-recorte { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.resultado-do-recorte strong { color: var(--ink); }
+.busca-global { position: relative; }
+.sugestoes { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); box-shadow: 0 12px 28px -14px var(--shadow); }
+.sugestoes a { display: block; padding: 7px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+.sugestoes a:hover, .sugestoes a:focus { background: var(--surface-hover); }

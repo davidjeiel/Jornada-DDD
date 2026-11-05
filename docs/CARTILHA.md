@@ -57,6 +57,11 @@ A escolha fica salva no seu navegador — ao voltar, você continua como a mesma
   caminho até a publicação.
 - **Catálogo** — o mapa dos quatro níveis da Estrutura DDD, a lista completa de ativos, e o
   cadastro de item novo.
+- **Catálogo** — o recorte do catálogo: filtre por tipo, status, criticidade, squad,
+  origem (cadastro manual ou descoberta automática) ou só os ativos **sem responsável**,
+  e ordene como quiser. Cada filtro ativo vira um chip que se remove sozinho, o total é
+  o do recorte inteiro, e o recorte volta na sua próxima visita até você **limpar**. A
+  busca do topo sugere ativos a partir de duas letras.
 - **Validações** — a fila de etapas abertas, com uma aba por etapa e a contagem de cada
   uma, a mais crítica primeiro e o tempo até o prazo. Ao abrir uma etapa, o painel mostra
   as evidências, os responsáveis e **o que mudou** desde a revisão anterior. **Assuma** a
