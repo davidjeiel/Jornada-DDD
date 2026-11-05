@@ -156,7 +156,8 @@ function App() {
         tela = <VisaoExecutiva ativos={ativos} validacoes={validacoes} nomeDaEmpresa={nomeDaEmpresa} podeEscrever={podeEscrever} />;
         break;
       case 'catalogo':
-        tela = <Catalogo ativos={ativos} carregando={carregando} termo={local.busca.get('termo') ?? ''} idSelecionado={local.busca.get('ativo')} papeis={papeis} idPessoa={perfil?.pessoa?.id ?? null} podeEscrever={podeEscrever} onAlterado={carregar} onErro={setErro} />;
+        tela = <Catalogo key={identidade.empresaId} busca={local.busca} idSelecionado={local.busca.get('ativo')} metamodelo={metamodelo} squads={squads}
+          papeis={papeis} idPessoa={perfil?.pessoa?.id ?? null} podeEscrever={podeEscrever} onAlterado={carregar} onErro={setErro} />;
         break;
       case 'novo':
         tela = <NovoAtivo key={`${blocos.join('|')}-${metamodelo ? 'm' : ''}`} ativos={ativos} metamodelo={metamodelo} squads={squads} blocos={blocos}

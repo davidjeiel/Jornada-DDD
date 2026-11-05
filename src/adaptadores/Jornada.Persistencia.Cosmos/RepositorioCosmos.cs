@@ -78,6 +78,36 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
         return documentos.Select(Rastrear).ToArray();
     }
 
+    public async Task<IReadOnlyList<Ativo>> BuscarAsync(FiltroDoCatalogo filtro, int teto, CancellationToken ct = default)
+    {
+        var filtros = new List<string> { "true" };
+        var parametros = new Dictionary<string, object?>();
+        void Igual(string campo, string nome, object valor) { filtros.Add($"c.{campo} = {nome}"); parametros[nome] = valor; }
+
+        var termo = (filtro.Termo ?? "").Trim();
+        if (termo.Length > 0)
+        {
+            filtros.Add("(CONTAINS(c.nome, @termo, true) OR CONTAINS(c.codigo, @termo, true) OR CONTAINS(c.descricao, @termo, true))");
+            parametros["@termo"] = termo;
+        }
+        if (!string.IsNullOrWhiteSpace(filtro.TipoItem)) Igual("tipoItem", "@tipoItem", filtro.TipoItem.ToLowerInvariant());
+        if (filtro.Status is { } s) Igual("status", "@status", MaquinaDeCicloDeVida.Rotulo(s));
+        if (filtro.IdSquad is { } sq) Igual("idSquad", "@idSquad", Mapeamento.Texto(sq));
+        if (filtro.Criticidade is { } c) Igual("criticidade", "@criticidade", c.Chave());
+        if (filtro.Origem is { } o) Igual("origem", "@origem", o.ToString());
+        if (filtro.SemOwner)
+        {
+            // Vigente: começou até hoje e não terminou antes de hoje. As datas são texto ISO: a ordem de texto é a de data.
+            filtros.Add("NOT EXISTS(SELECT VALUE r FROM r IN c.responsaveis WHERE r.inicioVigencia <= @hoje " +
+                        "AND (NOT IS_DEFINED(r.fimVigencia) OR IS_NULL(r.fimVigencia) OR r.fimVigencia >= @hoje))");
+            parametros["@hoje"] = filtro.Hoje.ToString("yyyy-MM-dd");
+        }
+
+        var documentos = await _acesso.ConsultarAsync<DocumentoDeAtivo>(TiposDeDocumento.Ativo,
+            string.Join(" AND ", filtros), $"OFFSET 0 LIMIT {Math.Max(teto, 0)}", parametros, ct);
+        return documentos.Select(Rastrear).ToArray();
+    }
+
     public Task AdicionarAsync(Ativo ativo, CancellationToken ct = default)
     {
         // Só marca: a gravação acontece no ConfirmarAsync.

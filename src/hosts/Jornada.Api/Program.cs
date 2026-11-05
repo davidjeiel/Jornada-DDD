@@ -127,6 +127,7 @@ builder.Services.AddScoped<ConsultarHistorico>();
 builder.Services.AddScoped<CompararRevisoes>();
 builder.Services.AddScoped<AvaliarPreCheck>();
 builder.Services.AddScoped<ObterVisaoDoAtivo>();
+builder.Services.AddScoped<BuscarNoCatalogo>();
 builder.Services.AddScoped<SolicitarAcesso>();
 builder.Services.AddScoped<DecidirPleito>();
 builder.Services.AddScoped<ListarPleitos>();
@@ -301,6 +302,55 @@ catalogo.MapGet("/ativos", async (IRepositorioDeAtivos repo, string? tipo, Cance
     .WithName("listarAtivos")
     .WithSummary("Lista os ativos da empresa")
     .WithDescription("Até 200 ativos, ordenados por código. O parâmetro tipo filtra pela chave do metamodelo (ex.: sistema).");
+
+// O catálogo com recorte, ordem e página (servicos.buscar_pagina). /ativos continua
+// sendo a lista simples, que os formulários usam para escolher pai e destino.
+catalogo.MapGet("/catalogo", async Task<Results<Ok<PaginaDoCatalogoResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, BuscarNoCatalogo caso, IRelogio relogio, CancellationToken ct,
+    string? termo = null, string? tipo = null, string? status = null, Guid? squad = null, string? criticidade = null,
+    bool semOwner = false, string? origem = null, string? ordenar = null, bool desc = false, int pagina = 1, int porPagina = 50) =>
+{
+    StatusCicloVida? st = null;
+    if (!string.IsNullOrWhiteSpace(status))
+    {
+        if (!Enum.TryParse<StatusCicloVida>(status.Replace("_", ""), ignoreCase: true, out var s))
+            return Erro(http, CodigosDeErro.RequisicaoInvalida, "status deve ser rascunho, em_validacao, publicado, em_revisao, descontinuado ou arquivado.");
+        st = s;
+    }
+    Criticidade? crit = null;
+    if (!string.IsNullOrWhiteSpace(criticidade))
+    {
+        if (criticidade.ToLowerInvariant() is not ("baixa" or "media" or "alta" or "critica"))
+            return Erro(http, CodigosDeErro.RequisicaoInvalida, "criticidade deve ser baixa, media, alta ou critica.");
+        crit = CriticidadeExtensoes.De(criticidade);
+    }
+    OrigemDoAtivo? org = (origem ?? "").ToLowerInvariant() switch
+    {
+        "" => null,
+        "manual" => OrigemDoAtivo.Manual,
+        "automatica" => OrigemDoAtivo.Automatica,
+        _ => (OrigemDoAtivo)(-1),
+    };
+    if (org == (OrigemDoAtivo)(-1)) return Erro(http, CodigosDeErro.RequisicaoInvalida, "origem deve ser manual ou automatica.");
+
+    var filtro = new FiltroDoCatalogo(termo, tipo, st, squad, crit, semOwner, org, relogio.Hoje);
+    var r = await caso.ExecutarAsync(filtro, ordenar, desc, pagina, porPagina, ct);
+    return TypedResults.Ok(PaginaDoCatalogoResponse.De(r, relogio.Hoje));
+})
+    .WithName("buscarNoCatalogo")
+    .WithSummary("Busca no catálogo, com filtros, ordem e página")
+    .WithDescription("termo procura em nome, código e descrição. Filtros: tipo, status, squad, criticidade, semOwner (sem responsável vigente) e origem (manual ou automatica). ordenar: tipo (padrão), nome, status, criticidade, atualizado ou codigo; desconhecida vira tipo. pagina fora do intervalo devolve a última; porPagina vai de 1 a 200. total é o do recorte inteiro.")
+    .ComErros(StatusCodes.Status400BadRequest);
+
+catalogo.MapGet("/busca/sugestoes", async (BuscarNoCatalogo caso, CancellationToken ct, string? termo = null) =>
+{
+    var achados = await caso.SugerirAsync(termo, ct);
+    return TypedResults.Ok(new SugestoesResponse((termo ?? "").Trim(), achados.Select(a => new SugestaoResponse(
+        a.Id.Valor, a.Codigo.Valor, a.Nome, a.TipoItem, MaquinaDeCicloDeVida.Rotulo(a.Status), $"/ativos/{a.Id.Valor}")).ToArray()));
+})
+    .WithName("sugerirAtivos")
+    .WithSummary("Sugestões para a busca do topo")
+    .WithDescription("Até 8 ativos cujo nome, código ou descrição contém o termo, os que começam pelo termo primeiro. Termo com menos de 2 letras devolve lista vazia.");
 
 catalogo.MapPost("/ativos", async Task<Results<Created<AtivoCriadoResponse>, JsonHttpResult<ApiError>>> (
     HttpContext http, CadastrarAtivo caso, CadastrarAtivoRequest corpo, CancellationToken ct) =>

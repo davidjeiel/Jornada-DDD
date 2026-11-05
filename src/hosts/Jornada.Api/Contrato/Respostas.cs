@@ -523,3 +523,48 @@ public sealed record CartilhaResponse(
             r.Politica.Etapas.Select(e => e.ToString().ToLowerInvariant()).ToArray(),
             r.Politica.EvidenciaMinima, r.Politica.ScoreMinimo, r.Politica.SlaHoras, r.Politica.PeriodicidadeRevisaoDias)).ToArray());
 }
+
+/// <summary>Um ativo na lista do catálogo.</summary>
+/// <param name="Ativo">Código, nome, tipo, status e criticidade.</param>
+/// <param name="Origem">manual ou automatica (descoberta automática).</param>
+/// <param name="IdSquad">O squad que cuida do ativo.</param>
+/// <param name="TemResponsavel">Há responsável vigente hoje.</param>
+/// <param name="AtualizadoEm">A última alteração.</param>
+public sealed record ItemDoCatalogoResponse(AtivoResumoResponse Ativo, string Origem, Guid? IdSquad, bool TemResponsavel, DateTimeOffset AtualizadoEm)
+{
+    public static ItemDoCatalogoResponse De(Ativo a, DateOnly hoje) => new(
+        AtivoResumoResponse.De(a), a.Origem == OrigemDoAtivo.Automatica ? "automatica" : "manual", a.IdSquad,
+        a.Responsaveis.Any(r => r.Vigente(hoje)), a.AtualizadoEm);
+}
+
+/// <summary>Uma página do catálogo, com o total real do recorte.</summary>
+/// <param name="Itens">Os ativos desta página.</param>
+/// <param name="Total">Ativos no recorte inteiro, não só nesta página.</param>
+/// <param name="Pagina">A página devolvida; fora do intervalo, a última.</param>
+/// <param name="Paginas">Quantas páginas o recorte tem.</param>
+/// <param name="PorPagina">Tamanho da página.</param>
+/// <param name="Primeiro">Posição do primeiro item da página (1 em diante; 0 sem itens).</param>
+/// <param name="Ultimo">Posição do último item da página.</param>
+/// <param name="Ordem">A ordenação aplicada: tipo, nome, status, criticidade, atualizado ou codigo. Desconhecida vira tipo.</param>
+/// <param name="Descendente">Ordem invertida.</param>
+/// <param name="Truncado">O recorte passou do teto de leitura; refine os filtros.</param>
+public sealed record PaginaDoCatalogoResponse(
+    IReadOnlyList<ItemDoCatalogoResponse> Itens, int Total, int Pagina, int Paginas, int PorPagina, int Primeiro, int Ultimo,
+    string Ordem, bool Descendente, bool Truncado)
+{
+    public static PaginaDoCatalogoResponse De(BuscarNoCatalogo.Saida s, DateOnly hoje) => new(
+        s.Itens.Select(a => ItemDoCatalogoResponse.De(a, hoje)).ToArray(), s.Total, s.Pagina, s.Paginas, s.PorPagina,
+        s.Primeiro, s.Ultimo, s.Ordem, s.Descendente, s.Truncado);
+}
+
+/// <summary>Uma sugestão da busca do topo.</summary>
+/// <param name="Id">O ativo.</param>
+/// <param name="Codigo">Código do ativo.</param>
+/// <param name="Nome">Nome do ativo.</param>
+/// <param name="Tipo">Chave do tipo.</param>
+/// <param name="Status">Estado do ciclo de vida.</param>
+/// <param name="Url">O caminho da página do ativo na interface.</param>
+public sealed record SugestaoResponse(Guid Id, string Codigo, string Nome, string Tipo, string Status, string Url);
+
+/// <summary>As sugestões para o termo: até 8, nenhuma com menos de 2 letras.</summary>
+public sealed record SugestoesResponse(string Termo, IReadOnlyList<SugestaoResponse> Itens);

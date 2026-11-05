@@ -114,6 +114,24 @@ public sealed class RepositorioDeAtivosEmMemoria(
             q.OrderBy(a => a.Codigo.Valor, StringComparer.Ordinal).Take(limite).ToArray());
     }
 
+    public Task<IReadOnlyList<Ativo>> BuscarAsync(FiltroDoCatalogo filtro, int teto, CancellationToken ct = default)
+    {
+        var termo = (filtro.Termo ?? "").Trim();
+        IEnumerable<Ativo> q = _ativos.Values.Where(MinhaEmpresa);
+        if (termo.Length > 0)
+            q = q.Where(a => a.Nome.Contains(termo, StringComparison.OrdinalIgnoreCase)
+                             || a.Codigo.Valor.Contains(termo, StringComparison.OrdinalIgnoreCase)
+                             || a.Descricao.Contains(termo, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(filtro.TipoItem))
+            q = q.Where(a => a.TipoItem.Equals(filtro.TipoItem, StringComparison.OrdinalIgnoreCase));
+        if (filtro.Status is { } s) q = q.Where(a => a.Status == s);
+        if (filtro.IdSquad is { } sq) q = q.Where(a => a.IdSquad == sq);
+        if (filtro.Criticidade is { } c) q = q.Where(a => a.Criticidade == c);
+        if (filtro.Origem is { } o) q = q.Where(a => a.Origem == o);
+        if (filtro.SemOwner) q = q.Where(a => !a.Responsaveis.Any(r => r.Vigente(filtro.Hoje)));
+        return Task.FromResult<IReadOnlyList<Ativo>>(q.Take(Math.Max(teto, 0)).ToArray());
+    }
+
     public Task AdicionarAsync(Ativo ativo, CancellationToken ct = default)
     {
         if (ativo.Empresa != Empresa)

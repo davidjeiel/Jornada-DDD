@@ -474,6 +474,42 @@ public abstract class ContratoDePersistencia
         Verificar.Igual(3, (await s.Ativos.ListarAsync()).Count);
     }
 
+    [Teste("a busca filtra no banco por termo, tipo, status, squad, criticidade, origem e responsável")]
+    public async Task BuscaFiltraNoBanco()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var squad = Guid.NewGuid();
+        var hoje = Relogio.Hoje;
+        var tipo = Tipos.Obter("sistema");
+        var comDono = Ativo.Rascunhar(empresa, tipo, CodigoDeAtivo.De("SIS-0001"), "Core Bancário", Relogio,
+            descricao: "Contas e lançamentos", criticidade: Criticidade.Alta, idSquad: squad);
+        comDono.AtribuirResponsavel(Guid.NewGuid(), PapelDeOwnership.OwnerTecnico, Relogio);
+        var descoberto = Ativo.Rascunhar(empresa, Tipos.Obter("api"), CodigoDeAtivo.De("API-0001"), "API de Pagamentos", Relogio,
+            origem: OrigemDoAtivo.Automatica);
+        // Responsável que já saiu: a vigência terminou ontem.
+        var vencido = Ativo.Reidratar(IdDeAtivo.Novo(), empresa, "sistema", CodigoDeAtivo.De("SIS-0002"), "Legado", "",
+            null, Criticidade.Media, StatusCicloVida.Rascunho, OrigemDoAtivo.Manual, 0, Relogio.Agora, Relogio.Agora,
+            responsaveis: [new Responsabilidade(Guid.NewGuid(), PapelDeOwnership.OwnerTecnico, hoje.AddDays(-30), hoje.AddDays(-1))]);
+        foreach (var a in new[] { comDono, descoberto, vencido }) await Gravar(empresa, a);
+        var outra = IdDeEmpresa.Novo();
+        await Gravar(outra, Ativo.Rascunhar(outra, tipo, CodigoDeAtivo.De("SIS-0001"), "Core de fora", Relogio));
+
+        await using var s = Abrir(empresa);
+        async Task<string> Codigos(FiltroDoCatalogo f) =>
+            string.Join(",", (await s.Ativos.BuscarAsync(f with { Hoje = hoje }, 100)).Select(a => a.Codigo.Valor).Order());
+
+        Verificar.Igual("SIS-0001", await Codigos(new FiltroDoCatalogo(Termo: "core")), "termo sem diferenciar maiúsculas, só nesta empresa");
+        Verificar.Igual("SIS-0001", await Codigos(new FiltroDoCatalogo(Termo: "lançamentos")), "termo na descrição");
+        Verificar.Igual("SIS-0001", await Codigos(new FiltroDoCatalogo(Termo: "sis-0001")), "termo no código");
+        Verificar.Igual("SIS-0001,SIS-0002", await Codigos(new FiltroDoCatalogo(TipoItem: "sistema")));
+        Verificar.Igual("SIS-0001", await Codigos(new FiltroDoCatalogo(IdSquad: squad)));
+        Verificar.Igual("SIS-0001", await Codigos(new FiltroDoCatalogo(Criticidade: Criticidade.Alta)));
+        Verificar.Igual("API-0001", await Codigos(new FiltroDoCatalogo(Origem: OrigemDoAtivo.Automatica)));
+        Verificar.Igual("API-0001,SIS-0002", await Codigos(new FiltroDoCatalogo(SemOwner: true)), "responsável encerrado não conta");
+        Verificar.Igual("API-0001,SIS-0001,SIS-0002", await Codigos(new FiltroDoCatalogo(Status: StatusCicloVida.Rascunho)));
+        Verificar.Igual(2, (await s.Ativos.BuscarAsync(new FiltroDoCatalogo(Hoje: hoje), 2)).Count, "o teto vale");
+    }
+
     [Teste("cancelamento de etapa persiste")]
     public async Task CancelamentoPersiste()
     {

@@ -1,9 +1,9 @@
-import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Bell, ChevronsLeft, ChevronsRight, HelpCircle, Search } from 'lucide-react';
 import { CARTILHA, itensVisiveis, type Grupo, type ItemDeMenu, type Secao } from './navegacao';
 import { estadoDoTema, type Tema } from './preferencias';
 import { Link } from './roteador';
-import type { Perfil } from './api';
+import { sugerirAtivos, type Perfil, type Sugestao } from './api';
 
 const GRUPOS: (Grupo | undefined)[] = [undefined, 'Trabalhar', 'Você', 'Administração'];
 
@@ -43,7 +43,20 @@ export function Layout({ secao, perfil, nomeDaEmpresa, tema, onAlternarTema, men
     return () => document.removeEventListener('keydown', atalho);
   }, []);
 
+  // Sugestões enquanto digita (/busca/sugestoes): a partir de 2 letras, com uma pausa curta.
+  const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
+  const espera = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function digitar(texto: string) {
+    if (espera.current) clearTimeout(espera.current);
+    const termo = texto.trim();
+    if (termo.length < 2) { setSugestoes([]); return; }
+    espera.current = setTimeout(() => {
+      sugerirAtivos(termo).then((r) => setSugestoes(r.itens)).catch(() => setSugestoes([]));
+    }, 200);
+  }
+
   function buscar(evento: FormEvent<HTMLFormElement>) {
+    setSugestoes([]);
     evento.preventDefault();
     onBuscar(new FormData(evento.currentTarget).get('termo')?.toString().trim() ?? '');
   }
@@ -92,8 +105,12 @@ export function Layout({ secao, perfil, nomeDaEmpresa, tema, onAlternarTema, men
                 placeholder="Buscar ativo por nome, código ou tipo"
                 aria-label="Buscar em todo o catálogo"
                 aria-describedby="busca-atalho"
+                aria-controls="sugestoes-da-busca"
+                onChange={(e) => digitar(e.target.value)}
+                onBlur={() => setTimeout(() => setSugestoes([]), 150)}
               />
               <kbd id="busca-atalho" title="Atalho: barra ou Ctrl+K">/</kbd>
+              <ListaDeSugestoes itens={sugestoes} onEscolher={() => setSugestoes([])} />
             </form>
             <div className="identidade">
               <button type="button" className="tema" onClick={onAlternarTema} title={`${estadoTema.rotulo} — clique para alternar`} aria-live="polite">
@@ -150,5 +167,19 @@ function ItemMenu({ item, ativo }: { item: ItemDeMenu; ativo: boolean }) {
       <span className="rotulo">{item.rotulo}</span>
       {item.fase !== undefined && <span className="em-breve" title={`Chega na fase ${item.fase} do plano de paridade`}>fase {item.fase}</span>}
     </Link>
+  );
+}
+
+/** As sugestões da busca do topo: cada uma leva à página do ativo. */
+export function ListaDeSugestoes({ itens, onEscolher }: { itens: Sugestao[]; onEscolher: () => void }) {
+  if (itens.length === 0) return null;
+  return (
+    <ul className="sugestoes" id="sugestoes-da-busca" role="listbox" aria-label="Sugestões">
+      {itens.map((s) => (
+        <li key={s.id} role="option" aria-selected="false">
+          <Link href={s.url} onClick={onEscolher}><strong>{s.nome}</strong> <span className="discreto">{s.codigo} · {s.tipo} · {s.status.replace('_', ' ')}</span></Link>
+        </li>
+      ))}
+    </ul>
   );
 }
