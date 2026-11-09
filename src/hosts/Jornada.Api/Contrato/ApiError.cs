@@ -79,6 +79,7 @@ public static class CodigosDeErro
         ["REVISAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["PLEITO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
         ["NOTIFICACAO_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
+        ["RESPONSAVEL_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,
         ["PESSOA_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["SQUAD_NAO_ENCONTRADA"] = StatusCodes.Status404NotFound,
         ["DESTINO_NAO_ENCONTRADO"] = StatusCodes.Status404NotFound,

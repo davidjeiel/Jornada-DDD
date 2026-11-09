@@ -211,6 +211,8 @@ export function Catalogo({ busca, idSelecionado, metamodelo, squads, papeis, idP
                 <div><span className="panel-label">ATIVO SELECIONADO</span><h3>{selecionado.nome}</h3><span className="code">{selecionado.codigo}</span></div>
                 <span className="detail-type">{rotuloDoTipo(selecionado.tipo)}</span>
               </div>
+              {/* A ficha é onde se edita tudo (responsáveis, relações, evidências): o atalho fica no alto, não no fim do painel. */}
+              <Link className="primary-button abrir-ficha" href={`/ativos/${selecionado.id}`}>Abrir a ficha completa <ArrowUpRight size={15} aria-hidden="true" /></Link>
               <div className="score-block">
                 <div><span className="panel-label">PRE-CHECK</span><strong>{preCheck?.score ?? '—'}<small>/100</small></strong></div>
                 <div className={preCheck?.aprovado ? 'score-ring good' : 'score-ring'}>{preCheck?.score ?? '—'}</div>
@@ -236,7 +238,7 @@ export function Catalogo({ busca, idSelecionado, metamodelo, squads, papeis, idP
                   <button className="primary-button" disabled={acao !== null || !preCheck?.aprovado} onClick={() => void executarAcao('submeter')}>{acao === 'submeter' ? 'Enviando...' : 'Submeter'}</button>
                 </div>
               )}
-              <Link className="text-button" href={`/ativos/${selecionado.id}`}>Abrir a ficha do ativo <ArrowUpRight size={15} aria-hidden="true" /></Link>
+              <Link className="text-button" href={`/ativos/${selecionado.id}?aba=pessoas`}>Editar os responsáveis na ficha <ArrowUpRight size={15} aria-hidden="true" /></Link>
             </>
           ) : (
             <div className="empty-detail"><span className="detail-placeholder"><LayoutGrid size={22} aria-hidden="true" /></span><h3>Selecione um ativo</h3><p>O pré-check e o caminho de publicação aparecem aqui.</p></div>

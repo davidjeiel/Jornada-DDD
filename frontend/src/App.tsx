@@ -165,6 +165,7 @@ function App() {
       ? <RelacoesEmLote id={idDoAtivo} tipo={local.busca.get('tipo') ?? ''} ativos={ativos} metamodelo={metamodelo} onAlterado={carregar} onErro={setErro} />
       : <PaginaDoAtivo key={idDoAtivo} id={idDoAtivo} aba={abaDaUrl(local.busca.get('aba'))} ativos={ativos} pessoas={pessoas} metamodelo={metamodelo} squads={squads}
           podeEscrever={podeEscrever} podeDescontinuar={podeEscrever && podeDescontinuar(papeis)} idPessoa={perfil?.pessoa?.id ?? null}
+          blocos={perfil?.blocosQueEscreve ?? []} identificado={!!perfil?.identificado} modoLeitura={!!perfil?.modoLeitura}
           onAlterado={carregar} onErro={setErro} />;
   } else if (item?.fase !== undefined) {
     tela = <EmBreve item={item} />;

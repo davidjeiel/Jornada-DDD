@@ -49,3 +49,42 @@ public sealed class AtribuirResponsavel(
         return Resultado<bool>.Ok(true);
     }
 }
+
+public sealed record ComandoEncerrarResponsavel(IdDeAtivo Id, Guid IdPessoa, PapelDeOwnership Papel);
+
+/// <summary>
+/// Encerra a responsabilidade de uma pessoa no ativo: o papel fica vago, e a
+/// história, guardada. Mesma regra de quem define: editar o ativo, e o ativo editável.
+/// </summary>
+public sealed class EncerrarResponsavel(
+    IRepositorioDeAtivos ativos,
+    IMetamodelo metamodelo,
+    IContextoDeTenantAtual tenant,
+    IAtorAtual atorAtual,
+    IUnidadeDeTrabalho uow,
+    ITrilhaDeAuditoria trilha,
+    IRelogio relogio)
+{
+    public async Task<Resultado<bool>> ExecutarAsync(ComandoEncerrarResponsavel cmd, CancellationToken ct = default)
+    {
+        var ativo = await ativos.ObterAsync(cmd.Id, ct);
+        if (ativo is null)
+            return Resultado<bool>.Recusado("ATIVO_NAO_ENCONTRADO", "Ativo não encontrado.");
+
+        var tipo = (await metamodelo.ObterAsync(ct)).Obter(ativo.TipoItem);
+        var ator = await atorAtual.ObterAsync(ct);
+        var alvo = await AlvoDoAtivo.ResolverAsync(ativos, tenant.Atual, ativo, tipo, ct);
+        if (!PoliticaDeAutorizacao.Pode(ator, Acao.Editar, alvo, relogio.Hoje))
+            return Recusa.Para<bool>(ator, "Sem permissão para editar este ativo.");
+        if (!ativo.Editavel)
+            return Resultado<bool>.Recusado("ATIVO_NAO_EDITAVEL", ativo.MotivoDeNaoEditavel);
+
+        try { ativo.EncerrarResponsavel(cmd.IdPessoa, cmd.Papel, relogio); }
+        catch (ErroDeDominio e) { return Resultado<bool>.Recusado(e.Codigo, e.Message); }
+
+        await trilha.RegistrarAsync(RegistroDeAuditoria.De(ativo, AcoesAuditadas.EncerrarResponsavel, ator.IdPessoa, relogio,
+            depois: new Dictionary<string, string> { ["papel"] = cmd.Papel.ToString(), ["idPessoa"] = cmd.IdPessoa.ToString() }), ct);
+        await uow.ConfirmarAsync(ct);
+        return Resultado<bool>.Ok(true);
+    }
+}

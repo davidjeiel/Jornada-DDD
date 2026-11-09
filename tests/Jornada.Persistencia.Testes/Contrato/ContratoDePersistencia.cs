@@ -651,6 +651,29 @@ public abstract class ContratoDePersistencia
         Verificar.Vazio(await nova.Ativos.BuscarAsync(new FiltroDoCatalogo(Origem: OrigemDoAtivo.Automatica), 10));
     }
 
+    [Teste("a troca de responsável persiste o encerramento do anterior")]
+    public async Task TrocaDeResponsavelPersiste()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var ativo = Novo(empresa, "sistema", "SIS-0001", "X");
+        var antes = Guid.NewGuid();
+        ativo.AtribuirResponsavel(antes, PapelDeOwnership.OwnerTecnico, Relogio);
+        await Gravar(empresa, ativo);
+
+        var amanha = new RelogioFixo(Relogio.Agora.AddDays(1));
+        var depois = Guid.NewGuid();
+        await using (var s = Abrir(empresa))
+        {
+            (await s.Ativos.ObterAsync(ativo.Id))!.AtribuirResponsavel(depois, PapelDeOwnership.OwnerTecnico, amanha);
+            await s.Unidade.ConfirmarAsync();
+        }
+        await using var nova = Abrir(empresa);
+        var lido = (await nova.Ativos.ObterAsync(ativo.Id))!;
+        Verificar.Igual(2, lido.Responsaveis.Count);
+        Verificar.Igual<DateOnly?>(amanha.Hoje, lido.Responsaveis.Single(r => r.IdPessoa == antes).FimVigencia);
+        Verificar.Igual(depois, lido.Responsaveis.Single(r => r.Vigente(amanha.Hoje)).IdPessoa);
+    }
+
     [Teste("cancelamento de etapa persiste")]
     public async Task CancelamentoPersiste()
     {

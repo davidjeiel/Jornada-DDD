@@ -13,8 +13,12 @@ public sealed record Responsabilidade(
     DateOnly InicioVigencia,
     DateOnly? FimVigencia = null)
 {
+    /// <summary>
+    /// O fim é exclusivo: encerrada hoje, já não vale hoje. É o
+    /// <c>fim_vigencia IS NULL</c> do painel, que grava a data do encerramento.
+    /// </summary>
     public bool Vigente(DateOnly hoje) =>
-        InicioVigencia <= hoje && (FimVigencia is null || FimVigencia >= hoje);
+        InicioVigencia <= hoje && (FimVigencia is null || FimVigencia > hoje);
 }
 
 /// <summary>Evidência anexada (ADR, OpenAPI, repositório, documento, link).</summary>
@@ -194,12 +198,42 @@ public sealed class Ativo : RaizDeAgregado
         Tocar(relogio);
     }
 
+    /// <summary>
+    /// Define quem responde pelo papel (<c>servicos.definir_responsavel</c>).
+    /// Um papel tem uma pessoa só: quem o ocupava é encerrado hoje, e a
+    /// história fica. Definir de novo quem já ocupa o papel não muda nada.
+    /// </summary>
     public void AtribuirResponsavel(Guid idPessoa, PapelDeOwnership papel, IRelogio relogio)
     {
         ExigirEditavel();
-        _responsaveis.RemoveAll(r => r.IdPessoa == idPessoa && r.Papel == papel);
-        _responsaveis.Add(new Responsabilidade(idPessoa, papel, relogio.Hoje));
+        var hoje = relogio.Hoje;
+        if (_responsaveis.Any(r => r.IdPessoa == idPessoa && r.Papel == papel && r.Vigente(hoje))) return;
+
+        Encerrar(r => r.Papel == papel, hoje);
+        _responsaveis.Add(new Responsabilidade(idPessoa, papel, hoje));
         Tocar(relogio);
+    }
+
+    /// <summary>Encerra hoje a responsabilidade vigente da pessoa no papel. O papel fica vago.</summary>
+    public void EncerrarResponsavel(Guid idPessoa, PapelDeOwnership papel, IRelogio relogio)
+    {
+        ExigirEditavel();
+        if (Encerrar(r => r.IdPessoa == idPessoa && r.Papel == papel, relogio.Hoje) == 0)
+            throw new ErroDeDominio("RESPONSAVEL_NAO_ENCONTRADO", "Essa pessoa não responde por esse papel neste ativo.");
+        Tocar(relogio);
+    }
+
+    private int Encerrar(Func<Responsabilidade, bool> quais, DateOnly hoje)
+    {
+        var encerradas = 0;
+        for (var i = 0; i < _responsaveis.Count; i++)
+        {
+            var r = _responsaveis[i];
+            if (!r.Vigente(hoje) || !quais(r)) continue;
+            _responsaveis[i] = r with { FimVigencia = hoje };
+            encerradas++;
+        }
+        return encerradas;
     }
 
     public void AnexarEvidencia(string tipo, string titulo, string? url, IRelogio relogio)
