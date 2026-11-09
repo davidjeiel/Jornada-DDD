@@ -525,12 +525,38 @@ export function consultarArvore(visao: 'negocio' | 'tecnica'): Promise<{ visao: 
 }
 
 export type FotografiaDosIndicadores = { competencia: string; valores: Record<string, number>; geradaEm: string };
+export type CoberturaDoDominio = { id: string; nome: string; total: number; cobertas: number; percentual: number };
+export type PendenciaPrioritaria = { chave: string; titulo: string; total: number; tipoItem: string | null; semResponsavel: boolean; tela: string | null };
 export type Indicadores = {
   atuais: Record<string, number>;
   variacao: Record<string, number>;
   quantoMenosMelhor: string[];
   serie: FotografiaDosIndicadores[];
+  coberturaPorDominio: CoberturaDoDominio[];
+  pendencias: PendenciaPrioritaria[];
 };
+
+export type OpcaoDeRecorte = { id: string; nome: string; idPai: string | null };
+export type RecorteDoGrafo = { dominio?: string | null; subdominio?: string | null; item?: string | null };
+export type GrafoDoCatalogo = {
+  nos: AtivoResumo[];
+  arestas: Aresta[];
+  filtrado: boolean;
+  truncado: boolean;
+  teto: number;
+  dominios: OpcaoDeRecorte[];
+  subdominios: OpcaoDeRecorte[];
+};
+
+export function consultarGrafoDoCatalogo(recorte: RecorteDoGrafo = {}): Promise<GrafoDoCatalogo> {
+  const busca = new URLSearchParams();
+  for (const chave of ['dominio', 'subdominio', 'item'] as const) {
+    const valor = recorte[chave];
+    if (valor) busca.set(chave, valor);
+  }
+  const texto = busca.toString();
+  return requisicao(`/v1/mapa/grafo${texto ? `?${texto}` : ''}`);
+}
 
 export function consultarIndicadores(): Promise<Indicadores> {
   return requisicao('/v1/indicadores');

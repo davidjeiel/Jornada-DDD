@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  consultarMetamodelo, consultarPerfil, contarNotificacoes, definirAoFaltarIdentificacao, definirIdentidade, listarAtivos, listarPessoas, listarSquads, listarValidacoes, obterIdentidade,
-  type AtivoResumo, type Metamodelo, type Perfil as DadosDoPerfil, type Pessoa, type Squad, type Validacao,
+  consultarMetamodelo, consultarPerfil, contarNotificacoes, definirAoFaltarIdentificacao, definirIdentidade, listarAtivos, listarPessoas, listarSquads, obterIdentidade,
+  type AtivoResumo, type Metamodelo, type Perfil as DadosDoPerfil, type Pessoa, type Squad,
 } from './api';
 import { Erro } from './componentes';
 import { gravarIdentidade, type Identidade } from './identidade';
@@ -43,7 +43,6 @@ function App() {
   const [perfil, setPerfil] = useState<DadosDoPerfil | null>(null);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [ativos, setAtivos] = useState<AtivoResumo[]>([]);
-  const [validacoes, setValidacoes] = useState<Validacao[]>([]);
   const [metamodelo, setMetamodelo] = useState<Metamodelo | null>(null);
   const [naoLidas, setNaoLidas] = useState(0);
   const [squads, setSquads] = useState<Squad[]>([]);
@@ -97,9 +96,8 @@ function App() {
   async function carregar() {
     setCarregando(true);
     try {
-      const [resposta, fila] = await Promise.all([listarAtivos(), listarValidacoes()]);
+      const resposta = await listarAtivos();
       setAtivos(resposta.ativos);
-      setValidacoes(fila.validacoes);
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível carregar o catálogo.');
     } finally {
@@ -132,10 +130,7 @@ function App() {
   function trocarIdentidade(nova: Identidade) {
     definirIdentidade(nova);
     gravarIdentidade(nova);
-    if (nova.empresaId !== identidade.empresaId) {
-      setAtivos([]);
-      setValidacoes([]);
-    }
+    if (nova.empresaId !== identidade.empresaId) setAtivos([]);
     setPerfil(null);
     setIdentidade(nova);
   }
@@ -172,7 +167,7 @@ function App() {
   } else {
     switch (secao) {
       case 'painel':
-        tela = <VisaoExecutiva validacoes={validacoes} nomeDaEmpresa={nomeDaEmpresa} podeEscrever={podeEscrever}
+        tela = <VisaoExecutiva key={identidade.empresaId} busca={local.busca} nomeDaEmpresa={nomeDaEmpresa} podeEscrever={podeEscrever}
           podeFotografar={podeEscrever && papeis.includes('admin')} onErro={setErro} />;
         break;
       case 'catalogo':

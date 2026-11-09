@@ -2079,12 +2079,101 @@ paths:
         - Bearer: [ ]
         - X-Empresa: [ ]
           X-Pessoa: [ ]
+  /v1/mapa/grafo:
+    get:
+      tags:
+        - Catálogo
+      summary: 'O grafo do catálogo, inteiro ou recortado pela hierarquia'
+      description: 'Sem recorte: os ativos não arquivados, as arestas pai → filho e as relações entre eles. dominio, subdominio ou item recortam aos descendentes (domínio e subdomínio juntos são a interseção; item vence domínio), e então só a hierarquia é desenhada. Recorte que não existe devolve o grafo vazio. teto limita os nós (padrão 300, máximo 1000); passou do teto, truncado é true. Traz também os domínios e os subdomínios para os seletores.'
+      operationId: consultarGrafoDoCatalogo
+      parameters:
+        - name: dominio
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: subdominio
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: item
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: teto
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 300
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      responses:
+        '200':
+          description: Operação concluída com sucesso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrafoDoCatalogoResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   /v1/indicadores:
     get:
       tags:
         - Catálogo
       summary: Os indicadores da visão executiva e a variação no mês
-      description: 'Domínios e capacidades em vigor, cobertura de capacidades por implementação (%), publicados sem responsável, APIs e APIs governadas (%), etapas pendentes e vencidas, publicados e dependências críticas. variacao compara as duas últimas fotografias mensais.'
+      description: 'Domínios e capacidades em vigor, cobertura de capacidades por implementação (%), publicados sem responsável, APIs e APIs governadas (%), etapas pendentes e vencidas, publicados, qualidade média (%) e dependências críticas. variacao compara as duas últimas fotografias mensais. coberturaPorDominio e pendencias são os quadros da visão executiva.'
       operationId: consultarIndicadores
       parameters:
         - name: x-correlation-id
@@ -5802,7 +5891,7 @@ components:
           format: uuid
         tipo:
           type: string
-          description: 'implementa, expoe, consome, produz, depende_de ou persiste_em.'
+          description: 'implementa, expoe, consome, produz, depende_de ou persiste_em; no grafo do catálogo, também hierarquia (pai → filho).'
         criticidade:
           type: string
           description: A criticidade da dependência.
@@ -6100,6 +6189,36 @@ components:
           description: O rito de cada tipo de ativo.
       additionalProperties: false
       description: 'As tabelas de referência da cartilha, lidas do código.'
+    CoberturaDoDominioResponse:
+      required:
+        - id
+        - nome
+        - total
+        - cobertas
+        - percentual
+      type: object
+      properties:
+        id:
+          type: string
+          description: O domínio.
+          format: uuid
+        nome:
+          type: string
+          description: O nome do domínio.
+        total:
+          type: integer
+          description: 'Capacidades abaixo dele, em qualquer nível.'
+          format: int32
+        cobertas:
+          type: integer
+          description: Quantas têm pelo menos um ativo que as implementa.
+          format: int32
+        percentual:
+          type: integer
+          description: 'Cobertas sobre o total, de 0 a 100.'
+          format: int32
+      additionalProperties: false
+      description: A cobertura de capacidades de um domínio.
     ComparacaoResponse:
       required:
         - a
@@ -6624,6 +6743,49 @@ components:
           format: date-time
       additionalProperties: false
       description: A fotografia dos indicadores numa competência.
+    GrafoDoCatalogoResponse:
+      required:
+        - nos
+        - arestas
+        - filtrado
+        - truncado
+        - teto
+        - dominios
+        - subdominios
+      type: object
+      properties:
+        nos:
+          type: array
+          items:
+            $ref: '#/components/schemas/AtivoResumoResponse'
+          description: 'Os ativos, por tipo e nome.'
+        arestas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArestaResponse'
+          description: 'Pai → filho (tipo hierarquia) e, sem recorte, as relações entre os nós.'
+        filtrado:
+          type: boolean
+          description: 'Há recorte: só a hierarquia é desenhada.'
+        truncado:
+          type: boolean
+          description: O catálogo passou do teto e o grafo foi cortado.
+        teto:
+          type: integer
+          description: O máximo de nós.
+          format: int32
+        dominios:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpcaoDeRecorteResponse'
+          description: 'Os domínios, para o seletor.'
+        subdominios:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpcaoDeRecorteResponse'
+          description: 'Todos os subdomínios, cada um com o seu domínio em idPai.'
+      additionalProperties: false
+      description: 'O grafo do catálogo, inteiro ou recortado pela hierarquia.'
     HistoricoResponse:
       required:
         - revisoes
@@ -6745,6 +6907,8 @@ components:
         - variacao
         - quantoMenosMelhor
         - serie
+        - coberturaPorDominio
+        - pendencias
       type: object
       properties:
         atuais:
@@ -6752,7 +6916,7 @@ components:
           additionalProperties:
             type: number
             format: double
-          description: Indicador → valor agora. Cobertura e APIs governadas são porcentagens.
+          description: 'Indicador → valor agora. Cobertura, APIs governadas e qualidade média são porcentagens.'
         variacao:
           type: object
           additionalProperties:
@@ -6769,6 +6933,16 @@ components:
           items:
             $ref: '#/components/schemas/FotografiaResponse'
           description: 'As fotografias, da mais antiga para a mais recente.'
+        coberturaPorDominio:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoberturaDoDominioResponse'
+          description: 'Por domínio, as capacidades e quantas têm implementação.'
+        pendencias:
+          type: array
+          items:
+            $ref: '#/components/schemas/PendenciaPrioritariaResponse'
+          description: 'As pendências prioritárias, na ordem do painel.'
       additionalProperties: false
       description: Os indicadores da visão executiva.
     ItemDaFilaResponse:
@@ -7089,6 +7263,26 @@ components:
           nullable: true
       additionalProperties: false
       description: Um aviso da caixa.
+    OpcaoDeRecorteResponse:
+      required:
+        - id
+        - nome
+      type: object
+      properties:
+        id:
+          type: string
+          description: O ativo.
+          format: uuid
+        nome:
+          type: string
+          description: O nome.
+        idPai:
+          type: string
+          description: O domínio do subdomínio; nulo no domínio.
+          format: uuid
+          nullable: true
+      additionalProperties: false
+      description: Um domínio ou subdomínio oferecido como recorte do grafo.
     PaginaDoCatalogoResponse:
       required:
         - itens
@@ -7254,6 +7448,37 @@ components:
           description: 'As mensagens desses bloqueios, para a tela.'
       additionalProperties: false
       description: Passo do caminho até a publicação.
+    PendenciaPrioritariaResponse:
+      required:
+        - chave
+        - titulo
+        - total
+        - semResponsavel
+      type: object
+      properties:
+        chave:
+          type: string
+          description: 'capacidade_sem_owner, api_sem_capacidade, repositorio_sem_mantenedor, sla_vencido ou dependencia_critica_sem_evidencia.'
+        titulo:
+          type: string
+          description: O que a tela mostra.
+        total:
+          type: integer
+          description: Quantos casos há agora.
+          format: int32
+        tipoItem:
+          type: string
+          description: 'O tipo que filtra o catálogo, quando a pendência é de ativos.'
+          nullable: true
+        semResponsavel:
+          type: boolean
+          description: O recorte também filtra os ativos sem responsável vigente.
+        tela:
+          type: string
+          description: 'Outra tela que explica a pendência (validacoes), quando não é o catálogo.'
+          nullable: true
+      additionalProperties: false
+      description: Uma pendência prioritária e o recorte que a explica.
     PerfilResponse:
       required:
         - identificado

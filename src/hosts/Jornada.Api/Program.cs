@@ -142,6 +142,7 @@ builder.Services.AddScoped<ObterVisaoDoAtivo>();
 builder.Services.AddScoped<BuscarNoCatalogo>();
 builder.Services.AddScoped<ConsultarVizinhanca>();
 builder.Services.AddScoped<MontarArvore>();
+builder.Services.AddScoped<MontarGrafoDoCatalogo>();
 builder.Services.AddScoped<Indicadores>();
 builder.Services.AddScoped<ImportarDescobertas>();
 builder.Services.AddScoped<TriarDescobertas>();
@@ -405,11 +406,22 @@ catalogo.MapGet("/mapa/arvore", async Task<Results<Ok<ArvoreResponse>, JsonHttpR
     .WithDescription("negocio: Domínio → Subdomínio → Contexto → Capacidade, com quantos ativos implementam cada capacidade. tecnica: Sistema → Aplicação → API → Endpoint e Base de dados → Objeto de dado. Arquivados ficam de fora.")
     .ComErros(StatusCodes.Status400BadRequest);
 
+catalogo.MapGet("/mapa/grafo", async (MontarGrafoDoCatalogo caso, CancellationToken ct,
+    Guid? dominio = null, Guid? subdominio = null, Guid? item = null, int teto = MontarGrafoDoCatalogo.TetoPadrao) =>
+{
+    static IdDeAtivo? Id(Guid? g) => g is { } v ? new IdDeAtivo(v) : null;
+    var saida = await caso.ExecutarAsync(new MontarGrafoDoCatalogo.Recorte(Id(dominio), Id(subdominio), Id(item)), Math.Clamp(teto, 1, 1000), ct);
+    return TypedResults.Ok(GrafoDoCatalogoResponse.De(saida));
+})
+    .WithName("consultarGrafoDoCatalogo")
+    .WithSummary("O grafo do catálogo, inteiro ou recortado pela hierarquia")
+    .WithDescription("Sem recorte: os ativos não arquivados, as arestas pai → filho e as relações entre eles. dominio, subdominio ou item recortam aos descendentes (domínio e subdomínio juntos são a interseção; item vence domínio), e então só a hierarquia é desenhada. Recorte que não existe devolve o grafo vazio. teto limita os nós (padrão 300, máximo 1000); passou do teto, truncado é true. Traz também os domínios e os subdomínios para os seletores.");
+
 catalogo.MapGet("/indicadores", async (Indicadores caso, CancellationToken ct) =>
     TypedResults.Ok(IndicadoresResponse.De(await caso.ConsultarAsync(ct))))
     .WithName("consultarIndicadores")
     .WithSummary("Os indicadores da visão executiva e a variação no mês")
-    .WithDescription("Domínios e capacidades em vigor, cobertura de capacidades por implementação (%), publicados sem responsável, APIs e APIs governadas (%), etapas pendentes e vencidas, publicados e dependências críticas. variacao compara as duas últimas fotografias mensais.");
+    .WithDescription("Domínios e capacidades em vigor, cobertura de capacidades por implementação (%), publicados sem responsável, APIs e APIs governadas (%), etapas pendentes e vencidas, publicados, qualidade média (%) e dependências críticas. variacao compara as duas últimas fotografias mensais. coberturaPorDominio e pendencias são os quadros da visão executiva.");
 
 catalogo.MapPost("/indicadores/fotografias", async Task<Results<Created<FotografiaResponse>, JsonHttpResult<ApiError>>> (
     HttpContext http, Indicadores caso, CancellationToken ct, string? competencia = null) =>

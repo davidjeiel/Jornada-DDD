@@ -132,6 +132,67 @@ public sealed class MapasTestes
         Verificar.Igual("Motor de Simulação", string.Join(",", analise.Criticos.Select(c => c.Nome)));
     }
 
+    [Teste("o grafo do catálogo, sem recorte, traz todos os ativos, a hierarquia e as relações")]
+    public void GrafoDoCatalogoSemRecorte()
+    {
+        var m = new MundoDaFicha();
+        var (dom, sub, _, cap) = m.Capacidade();
+        var app = m.Aplicacao();
+        m.Exigir(m.Relacionar(app, cap, "implementa"));
+
+        var grafo = Grafo(m, new());
+        Verificar.Igual(6, grafo.Nos.Count, "domínio, subdomínio, contexto, capacidade, sistema e aplicação");
+        Verificar.Falso(grafo.Filtrado);
+        Verificar.Igual(4, grafo.Arestas.Count(a => a.Tipo == MontarGrafoDoCatalogo.Hierarquia));
+        Verificar.Verdadeiro(grafo.Arestas.Any(a => a.Tipo == "implementa" && a.Origem == app && a.Destino == cap));
+        Verificar.Verdadeiro(grafo.Arestas.Any(a => a.Tipo == MontarGrafoDoCatalogo.Hierarquia && a.Origem == dom && a.Destino == sub));
+        Verificar.Igual("Contrato", string.Join(",", grafo.Dominios.Select(d => d.Nome)));
+    }
+
+    [Teste("o grafo recortado traz só os descendentes e só a hierarquia")]
+    public void GrafoRecortadoSoHierarquia()
+    {
+        var m = new MundoDaFicha();
+        var (dom, sub, ctx, cap) = m.Capacidade();
+        var outro = m.Cadastrar("subdominio", "Formalização", dom, new() { ["classificacao"] = "suporte" });
+        m.Exigir(m.Relacionar(m.Aplicacao(), cap, "implementa"));
+
+        var porDominio = Grafo(m, new(Dominio: dom));
+        Verificar.Igual(Ids(dom, sub, ctx, cap, outro), Ids(porDominio.Nos.Select(n => n.Id).ToArray()));
+        Verificar.Verdadeiro(porDominio.Filtrado);
+        Verificar.Verdadeiro(porDominio.Arestas.All(a => a.Tipo == MontarGrafoDoCatalogo.Hierarquia), "recortado, só pai → filho");
+
+        var interseccao = Grafo(m, new(Dominio: dom, Subdominio: sub));
+        Verificar.Igual(Ids(sub, ctx, cap), Ids(interseccao.Nos.Select(n => n.Id).ToArray()));
+
+        var porItem = Grafo(m, new(Dominio: dom, Item: ctx));
+        Verificar.Igual(Ids(ctx, cap), Ids(porItem.Nos.Select(n => n.Id).ToArray()), "o item clicado vence o domínio");
+
+        Verificar.Igual(0, Grafo(m, new(Item: IdDeAtivo.Novo())).Nos.Count, "recorte que não existe é vazio");
+        var subdominios = Grafo(m, new()).Subdominios;
+        Verificar.Igual("Formalização,Originação", string.Join(",", subdominios.Select(s => s.Nome)));
+        Verificar.Verdadeiro(subdominios.All(s => s.IdPai == dom), "cada subdomínio vem com o domínio, para o seletor");
+    }
+
+    [Teste("o grafo do catálogo deixa o arquivado de fora e avisa o corte")]
+    public void GrafoDoCatalogoSemArquivadoEComTeto()
+    {
+        var m = new MundoDaFicha();
+        m.Capacidade();
+        var arquivado = Ativo.Reidratar(IdDeAtivo.Novo(), Cenario.EmpresaA, "sistema", CodigoDeAtivo.De("SIS-0099"), "Legado", "x", null,
+            Criticidade.Media, StatusCicloVida.Arquivado, OrigemDoAtivo.Manual, 1, Cenario.Relogio.Agora, Cenario.Relogio.Agora);
+        m.Repo.AdicionarAsync(arquivado).Wait();
+
+        Verificar.Falso(Grafo(m, new()).Nos.Any(n => n.Id == arquivado.Id));
+        var cortado = Grafo(m, new(), teto: 2);
+        Verificar.Verdadeiro(cortado.Truncado);
+        Verificar.Igual(2, cortado.Nos.Count);
+        Verificar.Falso(Grafo(m, new()).Truncado);
+    }
+
+    private static MontarGrafoDoCatalogo.Saida Grafo(MundoDaFicha m, MontarGrafoDoCatalogo.Recorte recorte, int teto = MontarGrafoDoCatalogo.TetoPadrao) =>
+        new MontarGrafoDoCatalogo(m.Repo, m.Repo).ExecutarAsync(recorte, teto).Result;
+
     private static ConsultarVizinhanca.Saida Vizinhanca(MundoDaFicha m, IdDeAtivo id, int saltos, string[]? tipos = null, int teto = ConsultarVizinhanca.TetoPadrao) =>
         m.Exigir(new ConsultarVizinhanca(m.Repo, m.Repo).ExecutarAsync(id, saltos, tipos, teto).Result);
 

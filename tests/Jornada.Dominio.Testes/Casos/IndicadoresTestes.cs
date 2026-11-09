@@ -52,7 +52,67 @@ public sealed class IndicadoresTestes
         Verificar.Igual(1.0, atuais[Indicadores.SlaVencido]);
         Verificar.Igual(3.0, atuais[Indicadores.Publicados]);
         Verificar.Igual(1.0, atuais[Indicadores.DependenciasCriticas]);
+        Verificar.Verdadeiro(atuais[Indicadores.QualidadeMedia] is > 0 and <= 100, $"qualidade média {atuais[Indicadores.QualidadeMedia]}");
     }
+
+    [Teste("a qualidade média é a média do score de cada ativo, como no pré-check")]
+    public void QualidadeMediaEhAMediaDoPreCheck()
+    {
+        var m = new MundoDaFicha();
+        var (dom, sub, ctx, cap) = m.Capacidade();
+        m.Completar(cap);
+        var ids = new[] { dom, sub, ctx, cap }.Concat(((IRepositorioDeAtivos)m.Repo).ListarAsync().Result
+            .Where(a => a.TipoItem is "sistema" or "aplicacao").Select(a => a.Id)).ToArray();
+        var esperado = Math.Round(ids.Average(id => (double)m.PreCheck(id).Score.Total));
+
+        var atuais = IndicadoresDe(m).ConsultarAsync().Result.Atuais;
+        Verificar.Igual(esperado, atuais[Indicadores.QualidadeMedia]);
+    }
+
+    [Teste("a cobertura por domínio conta as capacidades abaixo do domínio e as que têm implementação")]
+    public void CoberturaPorDominioContaAsCapacidades()
+    {
+        var m = new MundoDaFicha();
+        var (dom, _, ctx, cap) = m.Capacidade();
+        m.Cadastrar("capacidade", "Renegociar", ctx, new() { ["resultado_esperado"] = "x" });
+        m.Exigir(m.Relacionar(m.Aplicacao(), cap, "implementa"));
+        m.Cadastrar("dominio", "Sem subdomínio", null, new() { ["visao"] = "x" });
+
+        var cobertura = IndicadoresDe(m).ConsultarAsync().Result.CoberturaPorDominio;
+        Verificar.Igual(1, cobertura.Count, "domínio sem subdomínio não entra, como no painel");
+        Verificar.Igual((dom, 2, 1, 50), (cobertura[0].Id, cobertura[0].Total, cobertura[0].Cobertas, cobertura[0].Percentual));
+    }
+
+    [Teste("as pendências prioritárias contam o que falta e dizem onde olhar")]
+    public void PendenciasPrioritariasContamEApontamORecorte()
+    {
+        var m = new MundoDaFicha();
+        var (_, _, _, cap) = m.Capacidade();
+        var app = m.Aplicacao();
+        var api = m.Api(app, "API Simulação");
+        m.Api(app, "API Taxas");
+        m.Exigir(m.Relacionar(api, cap, "implementa"));
+        m.Exigir(m.Relacionar(app, api, "depende_de", Criticidade.Alta));
+        m.Cadastrar("repositorio", "motor-simulacao", app, new() { ["url"] = "https://git.exemplo/motor" });
+
+        var pendencias = IndicadoresDe(m).ConsultarAsync().Result.Pendencias.ToDictionary(p => p.Chave);
+        Verificar.Igual("capacidade_sem_owner,api_sem_capacidade,repositorio_sem_mantenedor,sla_vencido,dependencia_critica_sem_evidencia",
+            string.Join(",", pendencias.Keys));
+        Verificar.Igual(1, pendencias["capacidade_sem_owner"].Total);
+        Verificar.Igual(1, pendencias["api_sem_capacidade"].Total, "a API Taxas não implementa nada");
+        Verificar.Igual(("api", false), (pendencias["api_sem_capacidade"].TipoItem, pendencias["api_sem_capacidade"].SemResponsavel));
+        Verificar.Igual((1, true), (pendencias["repositorio_sem_mantenedor"].Total, pendencias["repositorio_sem_mantenedor"].SemResponsavel));
+        Verificar.Igual("validacoes", pendencias["sla_vencido"].Tela);
+        Verificar.Igual(1, pendencias["dependencia_critica_sem_evidencia"].Total);
+
+        m.Completar(cap);
+        Verificar.Igual(0, IndicadoresDe(m).ConsultarAsync().Result.Pendencias.Single(p => p.Chave == "capacidade_sem_owner").Total,
+            "com owner negocial, a capacidade sai da pendência");
+    }
+
+    private static Indicadores IndicadoresDe(MundoDaFicha m) =>
+        new(m.Repo, m.Repo, m.Repo, new RepositorioDeIndicadoresEmMemoria(new ArmazemEmMemoria(), ContextoDeTenantFixo.Para(Cenario.EmpresaA)),
+            new MetamodeloPadrao(), new PoliticasPadrao(), ContextoDeTenantFixo.Para(Cenario.EmpresaA), new AtorFixo(MundoDeAcesso.Admin), Cenario.Relogio);
 
     [Teste("só admin fotografa; a mesma competência é substituída, e a variação sai das fotografias")]
     public void FotografiaMensal()
@@ -90,6 +150,7 @@ public sealed class IndicadoresTestes
         }
 
         public Indicadores Caso(Ator quem) =>
-            new(Repo, Repo, Repo, new RepositorioDeIndicadoresEmMemoria(_armazem, _tenant), _tenant, new AtorFixo(quem), Cenario.Relogio);
+            new(Repo, Repo, Repo, new RepositorioDeIndicadoresEmMemoria(_armazem, _tenant), new MetamodeloPadrao(), new PoliticasPadrao(),
+                _tenant, new AtorFixo(quem), Cenario.Relogio);
     }
 }

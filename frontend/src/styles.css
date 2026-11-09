@@ -850,3 +850,33 @@ a.validation-row > :not(:first-child) { flex: none; width: auto; }
 .aviso-somente-leitura a { margin-left: 6px; font-weight: 600; }
 .ficha-row .link-button { margin-left: 8px; }
 .abrir-ficha { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin: 4px 0 14px; text-decoration: none; }
+
+/* Visão executiva: exposição do catálogo, cobertura por domínio, qualidade, pendências e fila. */
+.exposicao { margin-top: 16px; }
+.exposicao .controles-do-grafo { align-items: flex-end; margin-bottom: 8px; }
+.acoes-do-grafo { display: flex; gap: 8px; }
+.grafo.resumo .aresta-resumo { stroke: var(--line-strong); stroke-width: 1.2; }
+.grafo.resumo .aresta-resumo.hierarquia { stroke: var(--brand); stroke-dasharray: 5 3; stroke-width: 1.6; }
+.grafo.resumo .aresta-resumo.criticidade-alta, .grafo.resumo .aresta-resumo.criticidade-critica { stroke: var(--danger); }
+.grafo.resumo .no-resumo circle { fill: var(--paper); stroke: var(--brand); stroke-width: 2; }
+.grafo.resumo .no-resumo.criticidade-alta circle { stroke: var(--warning); }
+.grafo.resumo .no-resumo.criticidade-critica circle { stroke: var(--danger); }
+.grafo.resumo .no-resumo text { fill: var(--ink); font-size: 11px; text-anchor: middle; }
+.grafo.resumo a:hover circle, .grafo.resumo a:focus-visible circle { stroke-width: 3.5; }
+.legenda-do-grafo { margin-top: 8px; }
+.grade-executiva { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
+.coluna-executiva { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.coluna-executiva .screen-panel { margin: 0; }
+@media (max-width: 900px) { .grade-executiva { grid-template-columns: minmax(0, 1fr); } }
+.lista-de-barras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.linha-da-barra { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; margin-bottom: 4px; }
+.barra { height: 8px; overflow: hidden; border-radius: 999px; background: var(--track); }
+.barra span { display: block; height: 100%; background: var(--brand); }
+.barra.baixa span { background: var(--warning); }
+.valor-grande { display: inline-block; font-size: 34px; font-weight: 700; line-height: 1.1; margin-bottom: 8px; }
+.valor-grande.bom, .contagem.bom { color: var(--success); }
+.valor-grande.alerta { color: var(--warning); }
+.valor-grande.risco, .contagem.ruim { color: var(--danger); }
+.tabela td.numero { text-align: right; }
+.linha-da-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.linha-da-fila a { flex: 1 1 auto; }

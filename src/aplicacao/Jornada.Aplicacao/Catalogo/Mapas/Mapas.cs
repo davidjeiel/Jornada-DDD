@@ -104,3 +104,80 @@ public sealed class MontarArvore(IRepositorioDeAtivos ativos, IRepositorioDeRela
             .ToArray();
     }
 }
+
+/// <summary>
+/// O grafo do catálogo inteiro, ou de um recorte da hierarquia, para a visão
+/// executiva. Portado de <c>servicos.grafo_catalogo</c>.
+///
+/// Sem recorte: todos os ativos não arquivados, as arestas pai → filho e as
+/// relações entre eles. Com recorte (domínio, subdomínio ou um item), só os
+/// descendentes do recorte e só a hierarquia, como o painel faz desde
+/// "Restringe grafo filtrado a hierarquia": dentro de um ramo, o que importa é
+/// a composição. Domínio e subdomínio juntos são a interseção dos dois ramos.
+///
+/// O painel desenha tudo; aqui há um teto, e <see cref="Saida.Truncado"/>
+/// avisa quando ele cortou (a mesma regra da vizinhança).
+/// </summary>
+public sealed class MontarGrafoDoCatalogo(IRepositorioDeAtivos ativos, IRepositorioDeRelacoes relacoes)
+{
+    public const int TetoPadrao = 300;
+    public const string Hierarquia = "hierarquia";
+
+    public sealed record Recorte(IdDeAtivo? Dominio = null, IdDeAtivo? Subdominio = null, IdDeAtivo? Item = null)
+    {
+        public bool Filtrado => Dominio is not null || Subdominio is not null || Item is not null;
+    }
+
+    public sealed record Saida(
+        IReadOnlyList<Ativo> Nos, IReadOnlyList<RelacaoResumo> Arestas, bool Filtrado, bool Truncado, int Teto,
+        IReadOnlyList<Ativo> Dominios, IReadOnlyList<Ativo> Subdominios);
+
+    public async Task<Saida> ExecutarAsync(Recorte recorte, int teto = TetoPadrao, CancellationToken ct = default)
+    {
+        var todos = (await ativos.BuscarAsync(new FiltroDoCatalogo(), Consultas.BuscarNoCatalogo.Teto, ct))
+            .Where(a => a.Status != StatusCicloVida.Arquivado)
+            .ToArray();
+        var nome = StringComparer.CurrentCultureIgnoreCase;
+        var filhos = todos.Where(a => a.IdPai is not null).ToLookup(a => a.IdPai!.Value);
+
+        HashSet<IdDeAtivo> Descendentes(IdDeAtivo raiz)
+        {
+            var achados = new HashSet<IdDeAtivo>();
+            var pilha = new Stack<IdDeAtivo>();
+            if (todos.Any(a => a.Id == raiz)) pilha.Push(raiz);
+            while (pilha.Count > 0)
+            {
+                var atual = pilha.Pop();
+                if (!achados.Add(atual)) continue;
+                foreach (var f in filhos[atual]) pilha.Push(f.Id);
+            }
+            return achados;
+        }
+
+        // O item clicado vence o domínio (id_item or id_dominio, como no painel).
+        var raizes = new[] { recorte.Item ?? recorte.Dominio, recorte.Subdominio }.OfType<IdDeAtivo>().ToArray();
+        var escopo = raizes.Length == 0 ? null
+            : raizes.Select(Descendentes).Aggregate((a, b) => { a.IntersectWith(b); return a; });
+
+        var candidatos = todos.Where(a => escopo is null || escopo.Contains(a.Id))
+            .OrderBy(a => a.TipoItem, StringComparer.Ordinal).ThenBy(a => a.Nome, nome)
+            .ToArray();
+        teto = Math.Max(teto, 1);
+        var nos = candidatos.Take(teto).ToArray();
+        var presentes = nos.Select(a => a.Id).ToHashSet();
+
+        var arestas = nos.Where(a => a.IdPai is { } p && presentes.Contains(p))
+            .Select(a => new RelacaoResumo(a.IdPai!.Value, a.Id, Hierarquia))
+            .ToList();
+        if (!recorte.Filtrado)
+            arestas.AddRange((await relacoes.ListarArestasAsync(ct: ct))
+                .Where(r => presentes.Contains(r.Origem) && presentes.Contains(r.Destino))
+                .OrderBy(r => r.Tipo, StringComparer.Ordinal));
+
+        var dominios = todos.Where(a => a.TipoItem == "dominio").OrderBy(a => a.Nome, nome).ToArray();
+        // Todos os subdomínios, cada um com o seu domínio: a tela filtra o seletor sem ir ao servidor.
+        var subdominios = todos.Where(a => a.TipoItem == "subdominio").OrderBy(a => a.Nome, nome).ToArray();
+
+        return new Saida(nos, arestas, recorte.Filtrado, candidatos.Length > nos.Length, teto, dominios, subdominios);
+    }
+}
