@@ -2,7 +2,7 @@
 // Portado de servicos.posicionar_vizinhanca: layout escrito à mão, sem
 // biblioteca. O anel diz a distância de relação, e o mesmo grafo desenha igual
 // toda vez, o que um layout de força não garante.
-import type { Aresta, NoDaVizinhanca, Vizinhanca } from './api';
+import type { Aresta, AtivoResumo, NoDaVizinhanca, Vizinhanca } from './api';
 
 export type NoPosicionado = NoDaVizinhanca & { x: number; y: number };
 export type ArestaPosicionada = Aresta & { x1: number; y1: number; x2: number; y2: number };
@@ -37,6 +37,36 @@ export function posicionar(dados: Vizinhanca, largura = 900, altura = 560): { no
       return { ...no, x: arredondar(x), y: arredondar(y) };
     }),
     arestas: dados.arestas.filter((a) => posicoes.has(a.origem) && posicoes.has(a.destino)).map((a) => {
+      const [x1, y1] = posicoes.get(a.origem)!;
+      const [x2, y2] = posicoes.get(a.destino)!;
+      return { ...a, x1: arredondar(x1), y1: arredondar(y1), x2: arredondar(x2), y2: arredondar(y2) };
+    }),
+  };
+}
+
+export type AtivoPosicionado = AtivoResumo & { x: number; y: number };
+
+/**
+ * O catálogo inteiro numa elipse, na ordem que a API devolve (tipo e nome),
+ * a partir do topo. Portado de servicos.grafo_catalogo: todos os nós têm o
+ * mesmo peso, e o que se lê são as ligações.
+ */
+export function posicionarEmCirculo(nos: AtivoResumo[], arestas: Aresta[], largura = 900, altura = 520): { nos: AtivoPosicionado[]; arestas: ArestaPosicionada[] } {
+  const cx = largura / 2;
+  const cy = altura / 2;
+  const rx = largura / 2 - 80;
+  const ry = altura / 2 - 75;
+  const posicoes = new Map<string, [number, number]>();
+  nos.forEach((no, i) => {
+    const angulo = (2 * Math.PI * i) / nos.length - Math.PI / 2;
+    posicoes.set(no.id, nos.length === 1 ? [cx, cy] : [cx + rx * Math.cos(angulo), cy + ry * Math.sin(angulo)]);
+  });
+  return {
+    nos: nos.map((no) => {
+      const [x, y] = posicoes.get(no.id)!;
+      return { ...no, x: arredondar(x), y: arredondar(y) };
+    }),
+    arestas: arestas.filter((a) => posicoes.has(a.origem) && posicoes.has(a.destino)).map((a) => {
       const [x1, y1] = posicoes.get(a.origem)!;
       const [x2, y2] = posicoes.get(a.destino)!;
       return { ...a, x1: arredondar(x1), y1: arredondar(y1), x2: arredondar(x2), y2: arredondar(y2) };

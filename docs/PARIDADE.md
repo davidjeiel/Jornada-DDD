@@ -59,6 +59,10 @@ original no título, para facilitar a busca.
   de mandar `forcar`. No Jornada é um mecanismo só, na API: com consumidor
   crítico, a confirmação é o código do ativo. Assim um cliente da API não
   contorna a confirmação. O motivo é obrigatório.
+- **Grafo do catálogo.** O painel desenha todos os ativos na visão
+  executiva. No Jornada há um teto de 300 nós (até 1.000 pela API), e passar
+  dele marca `truncado` e a tela avisa, a mesma regra da vizinhança. Arquivados
+  ficam fora do grafo, da cobertura por domínio e das pendências prioritárias.
 - **Relações de um ativo descontinuado.** O painel encerra cada relação
   (`fim_vigencia`). No Jornada a relação mora na partição de quem aponta
   (ADR-0016), e encerrá-las seria um lote por consumidor, sem atomicidade.
@@ -112,6 +116,36 @@ tela. Ao fechar um PR, atualize a linha correspondente aqui.
 | 7 | Visão executiva | 3 | 0 | 0 |
 | 8 | Notificações | 7 | 0 | 0 |
 | 9 | Descobertas | 10 | 0 | 0 |
+
+### Sem teste no painel
+
+A matriz acima nasceu dos testes do painel, e o que o painel faz sem teste
+próprio ficou fora dela. Uma revisão tela a tela, rota a rota e função a função
+achou o que segue. A coluna "PR" diz em qual entrega cada item entra.
+
+| Comportamento do painel | PR | Situação | No Jornada |
+|---|---|---|---|
+| Exposição do catálogo: grafo de todos os ativos, recorte por domínio e subdomínio, clique no nó recorta (`servicos.grafo_catalogo`) | A | ✅ | `GrafoDoCatalogoSemRecorte`, `GrafoRecortadoSoHierarquia`, `GrafoDoCatalogoSemArquivadoEComTeto` (`GET /v1/mapa/grafo`) e `telas/VisaoExecutiva.test.tsx` |
+| Cobertura de capacidades por domínio (`cobertura_por_dominio`) | A | ✅ | `CoberturaPorDominioContaAsCapacidades` e `telas/VisaoExecutiva.test.tsx` |
+| Pendências prioritárias, cada uma levando ao recorte (`pendencias_prioritarias`) | A | ✅ | `PendenciasPrioritariasContamEApontamORecorte` e `telas/VisaoExecutiva.test.tsx`; sem origem da evidência na relação (item abaixo), "dependência crítica sem evidência" conta todas as dependências críticas |
+| As cinco primeiras da fila de validação na visão executiva | A | ✅ | `telas/VisaoExecutiva.test.tsx` (`FilaResumida`, de `GET /v1/validacoes/fila`) |
+| Qualidade cadastral média, também na fotografia mensal (`qualidade.media_geral`) | A | ✅ | `QualidadeMediaEhAMediaDoPreCheck`: a mesma calculadora do pré-check, sobre o catálogo já carregado |
+| Ficha: dimensões de qualidade | B | ⬜ | |
+| Ficha: alertas do pré-check e o rito da política | B | ⬜ | |
+| Ficha: motivo da revisão ao submeter | B | ⬜ | |
+| Ficha: próxima revisão (`qualidade.proxima_revisao`) | B | ⬜ | |
+| Ficha: filhos na aba Relações | B | ⬜ | |
+| Ficha: o que o tipo exige de responsáveis, na aba Pessoas | B | ⬜ | |
+| Relação: origem da evidência (manual ou automática) | B | ⬜ | |
+| Validação: checklist de governança no painel do validador | B | ⬜ | |
+| Políticas: matriz mínima de aprovação por tipo de mudança (`governanca.MATRIZ_MUDANCA`) | B | ⬜ | |
+| Catálogo: colunas pai, squad e qualidade; busca por texto na própria tela | C | ⬜ | |
+| Mapa: expandir e recolher tudo; atalhos de cadastro na árvore vazia | C | ⬜ | |
+| Grafo do ativo: tabela "Ativos no grafo" | C | ⬜ | |
+| Minha mesa: qualidade, atualização e squad | C | ⬜ | |
+| Novo ativo: "O que vem depois" e "Exigências deste tipo" | C | ⬜ | |
+| Solicitar acesso: "O que cada papel exerce" e "O que acontece depois" | C | ⬜ | |
+| Bandeja de descobertas: pai e quem trouxe | C | ⬜ | |
 
 A fase 1 também porta o que o painel faz sem teste próprio: o retrato de cada
 revisão com SHA-256 (`servicos._snapshot`), a comparação entre revisões

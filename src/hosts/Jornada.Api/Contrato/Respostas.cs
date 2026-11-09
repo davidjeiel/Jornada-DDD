@@ -581,7 +581,7 @@ public sealed record NoDaVizinhancaResponse(AtivoResumoResponse Ativo, int Salto
 /// <summary>Uma aresta da vizinhança, na direção real.</summary>
 /// <param name="Origem">Quem aponta.</param>
 /// <param name="Destino">Para quem aponta.</param>
-/// <param name="Tipo">implementa, expoe, consome, produz, depende_de ou persiste_em.</param>
+/// <param name="Tipo">implementa, expoe, consome, produz, depende_de ou persiste_em; no grafo do catálogo, também hierarquia (pai → filho).</param>
 /// <param name="Criticidade">A criticidade da dependência.</param>
 /// <param name="Mecanismo">Como a relação acontece, quando informado.</param>
 public sealed record ArestaResponse(Guid Origem, Guid Destino, string Tipo, string Criticidade, string? Mecanismo);
@@ -626,17 +626,65 @@ public sealed record FotografiaResponse(string Competencia, IReadOnlyDictionary<
     public static FotografiaResponse De(FotografiaDosIndicadores f) => new(f.Competencia, f.Valores, f.GeradaEm);
 }
 
+/// <summary>A cobertura de capacidades de um domínio.</summary>
+/// <param name="Id">O domínio.</param>
+/// <param name="Nome">O nome do domínio.</param>
+/// <param name="Total">Capacidades abaixo dele, em qualquer nível.</param>
+/// <param name="Cobertas">Quantas têm pelo menos um ativo que as implementa.</param>
+/// <param name="Percentual">Cobertas sobre o total, de 0 a 100.</param>
+public sealed record CoberturaDoDominioResponse(Guid Id, string Nome, int Total, int Cobertas, int Percentual);
+
+/// <summary>Uma pendência prioritária e o recorte que a explica.</summary>
+/// <param name="Chave">capacidade_sem_owner, api_sem_capacidade, repositorio_sem_mantenedor, sla_vencido ou dependencia_critica_sem_evidencia.</param>
+/// <param name="Titulo">O que a tela mostra.</param>
+/// <param name="Total">Quantos casos há agora.</param>
+/// <param name="TipoItem">O tipo que filtra o catálogo, quando a pendência é de ativos.</param>
+/// <param name="SemResponsavel">O recorte também filtra os ativos sem responsável vigente.</param>
+/// <param name="Tela">Outra tela que explica a pendência (validacoes), quando não é o catálogo.</param>
+public sealed record PendenciaPrioritariaResponse(string Chave, string Titulo, int Total, string? TipoItem, bool SemResponsavel, string? Tela);
+
 /// <summary>Os indicadores da visão executiva.</summary>
-/// <param name="Atuais">Indicador → valor agora. Cobertura e APIs governadas são porcentagens.</param>
+/// <param name="Atuais">Indicador → valor agora. Cobertura, APIs governadas e qualidade média são porcentagens.</param>
 /// <param name="Variacao">Indicador → diferença entre as duas últimas fotografias; ausente com menos de duas.</param>
 /// <param name="QuantoMenosMelhor">Os indicadores em que cair é melhora (sem responsável, pendências, SLA vencido, dependências críticas).</param>
 /// <param name="Serie">As fotografias, da mais antiga para a mais recente.</param>
+/// <param name="CoberturaPorDominio">Por domínio, as capacidades e quantas têm implementação.</param>
+/// <param name="Pendencias">As pendências prioritárias, na ordem do painel.</param>
 public sealed record IndicadoresResponse(
     IReadOnlyDictionary<string, double> Atuais, IReadOnlyDictionary<string, double> Variacao,
-    IReadOnlyList<string> QuantoMenosMelhor, IReadOnlyList<FotografiaResponse> Serie)
+    IReadOnlyList<string> QuantoMenosMelhor, IReadOnlyList<FotografiaResponse> Serie,
+    IReadOnlyList<CoberturaDoDominioResponse> CoberturaPorDominio, IReadOnlyList<PendenciaPrioritariaResponse> Pendencias)
 {
     public static IndicadoresResponse De(Indicadores.Saida s) => new(
-        s.Atuais, s.Variacao, Indicadores.QuantoMenosMelhor.Order().ToArray(), s.Serie.Select(FotografiaResponse.De).ToArray());
+        s.Atuais, s.Variacao, Indicadores.QuantoMenosMelhor.Order().ToArray(), s.Serie.Select(FotografiaResponse.De).ToArray(),
+        s.CoberturaPorDominio.Select(c => new CoberturaDoDominioResponse(c.Id.Valor, c.Nome, c.Total, c.Cobertas, c.Percentual)).ToArray(),
+        s.Pendencias.Select(p => new PendenciaPrioritariaResponse(p.Chave, p.Titulo, p.Total, p.TipoItem, p.SemResponsavel, p.Tela)).ToArray());
+}
+
+/// <summary>Um domínio ou subdomínio oferecido como recorte do grafo.</summary>
+/// <param name="Id">O ativo.</param>
+/// <param name="Nome">O nome.</param>
+/// <param name="IdPai">O domínio do subdomínio; nulo no domínio.</param>
+public sealed record OpcaoDeRecorteResponse(Guid Id, string Nome, Guid? IdPai);
+
+/// <summary>O grafo do catálogo, inteiro ou recortado pela hierarquia.</summary>
+/// <param name="Nos">Os ativos, por tipo e nome.</param>
+/// <param name="Arestas">Pai → filho (tipo hierarquia) e, sem recorte, as relações entre os nós.</param>
+/// <param name="Filtrado">Há recorte: só a hierarquia é desenhada.</param>
+/// <param name="Truncado">O catálogo passou do teto e o grafo foi cortado.</param>
+/// <param name="Teto">O máximo de nós.</param>
+/// <param name="Dominios">Os domínios, para o seletor.</param>
+/// <param name="Subdominios">Todos os subdomínios, cada um com o seu domínio em idPai.</param>
+public sealed record GrafoDoCatalogoResponse(
+    IReadOnlyList<AtivoResumoResponse> Nos, IReadOnlyList<ArestaResponse> Arestas, bool Filtrado, bool Truncado, int Teto,
+    IReadOnlyList<OpcaoDeRecorteResponse> Dominios, IReadOnlyList<OpcaoDeRecorteResponse> Subdominios)
+{
+    public static GrafoDoCatalogoResponse De(MontarGrafoDoCatalogo.Saida s) => new(
+        s.Nos.Select(AtivoResumoResponse.De).ToArray(),
+        s.Arestas.Select(a => new ArestaResponse(a.Origem.Valor, a.Destino.Valor, a.Tipo, a.Criticidade.Chave(), a.Mecanismo)).ToArray(),
+        s.Filtrado, s.Truncado, s.Teto,
+        s.Dominios.Select(d => new OpcaoDeRecorteResponse(d.Id.Valor, d.Nome, null)).ToArray(),
+        s.Subdominios.Select(d => new OpcaoDeRecorteResponse(d.Id.Valor, d.Nome, d.IdPai?.Valor)).ToArray());
 }
 
 /// <summary>Um aviso da caixa.</summary>
