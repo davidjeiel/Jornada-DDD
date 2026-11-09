@@ -6,7 +6,7 @@ import type { PaginaDoCatalogo, Squad } from '../api';
 import { chipsDosFiltros, filtrosEfetivos, urlDoCatalogo } from '../filtrosDoCatalogo';
 import { ListaDeSugestoes } from '../Layout';
 import { metamodeloDeTeste } from '../testes/perfis';
-import { ChipsDosFiltros, FormularioDeFiltros, ListaDoCatalogo } from './Catalogo';
+import { ChipsDosFiltros, FormularioDeFiltros, ListaDoCatalogo, classeDoScore } from './Catalogo';
 
 const nada = () => {};
 
@@ -32,7 +32,9 @@ function pagina(total: number, numero = 1): PaginaDoCatalogo {
     total, pagina: numero, paginas, porPagina, primeiro, ultimo, ordem: 'tipo', descendente: false, truncado: false,
     itens: Array.from({ length: Math.max(0, ultimo - primeiro + 1) }, (_, i) => ({
       ativo: { id: `a-${i}`, codigo: `APP-${i}`, nome: `Aplicação ${i}`, tipo: 'aplicacao', status: 'rascunho', criticidade: 'media' },
-      origem: 'manual', idSquad: null, temResponsavel: true, atualizadoEm: '2026-11-05T12:00:00Z',
+      origem: 'manual', idSquad: i === 0 ? 'sq-1' : null, temResponsavel: true, atualizadoEm: '2026-11-05T12:00:00Z',
+      pai: i === 0 ? { id: 's-1', codigo: 'SIS-0001', nome: 'Plataforma', tipo: 'sistema', status: 'publicado', criticidade: 'media' } : null,
+      score: i === 0 ? 85 : 40, criadoPor: null,
     })),
   };
 }
@@ -118,5 +120,22 @@ describe('busca do topo', () => {
 
   it('sem sugestões, não há lista (test_busca_global_ignora_termo_curto)', () => {
     expect(renderToStaticMarkup(<ListaDeSugestoes itens={[]} onEscolher={nada} />)).toBe('');
+  });
+});
+
+describe('colunas do catálogo', () => {
+  it('cada linha diz o pai, o squad e a qualidade, como as colunas do painel', () => {
+    const html = renderToStaticMarkup(<ListaDoCatalogo pagina={pagina(2)} filtros={busca('')} idSelecionado={null} squads={squads} />);
+    expect(html).toContain('em Plataforma · CRED');
+    expect(html).toContain('raiz · sem squad');
+    expect(html).toContain('<span class="score bom" title="Qualidade (score do pré-check)">85%</span>');
+    expect(html).toContain('class="score ruim"');
+    expect([classeDoScore(80), classeDoScore(60), classeDoScore(59)]).toEqual(['bom', 'medio', 'ruim']);
+  });
+
+  it('a busca por texto fica na própria tela e volta preenchida', () => {
+    const html = renderToStaticMarkup(<FormularioDeFiltros filtros={busca('termo=simul')} metamodelo={metamodeloDeTeste} squads={squads} onMudar={nada} />);
+    expect(html).toContain('name="termo"');
+    expect(html).toContain('value="simul"');
   });
 });

@@ -43,8 +43,10 @@ original no título, para facilitar a busca.
 - **Busca do catálogo.** O filtro roda no banco; a ordenação e a página, na
   aplicação, sobre o recorte inteiro, até 5.000 ativos (acima disso a resposta
   avisa `truncado`). Assim a ordem por criticidade, que não é alfabética, vale
-  igual nos dois adaptadores. Não há ordenação por score: o painel guarda o
-  score em `qualidade_catalogo`; o Jornada o calcula no pré-check. Os filtros
+  igual nos dois adaptadores. Cada linha mostra o score, calculado com a
+  mesma conta do pré-check, mas não há ordenação por score: o painel guarda o
+  score em `qualidade_catalogo`, e o Jornada teria de calcular o recorte inteiro
+  para ordenar. Os filtros
   guardados ficam no navegador, não na sessão do servidor.
 - **Gestão de acessos.** No painel, salvar o cadastro troca todos os papéis por
   um papel na empresa inteira, e um papel de domínio some sem ninguém pedir. No
@@ -139,13 +141,13 @@ achou o que segue. A coluna "PR" diz em qual entrega cada item entra.
 | Relação: origem da evidência (manual, git, openapi, cmdb, cicd) | B | ✅ | `OrigemDaEvidenciaChegaAFicha`, o contrato `RelacaoGuardaAOrigemDaEvidencia` e `PendenciasPrioritariasContamEApontamORecorte`; `origemDaEvidencia` opcional em `POST /v1/ativos/{id}/relacoes` (400 `ORIGEM_DE_EVIDENCIA_INVALIDA`) |
 | Validação: checklist de governança no painel do validador | B | ✅ | `telas/Validacoes.test.tsx` (`ChecklistDeGovernanca`) |
 | Políticas: matriz mínima de aprovação por tipo de mudança (`governanca.MATRIZ_MUDANCA`) | B | ✅ | `MatrizDeMudancaVemDoPainel` (`matrizDeMudanca` em `GET /v1/cartilha`) e `telas/Cartilha.test.tsx` |
-| Catálogo: colunas pai, squad e qualidade; busca por texto na própria tela | C | ⬜ | |
-| Mapa: expandir e recolher tudo; atalhos de cadastro na árvore vazia | C | ⬜ | |
-| Grafo do ativo: tabela "Ativos no grafo" | C | ⬜ | |
-| Minha mesa: qualidade, atualização e squad | C | ⬜ | |
-| Novo ativo: "O que vem depois" e "Exigências deste tipo" | C | ⬜ | |
-| Solicitar acesso: "O que cada papel exerce" e "O que acontece depois" | C | ⬜ | |
-| Bandeja de descobertas: pai e quem trouxe | C | ⬜ | |
+| Catálogo: colunas pai, squad e qualidade; busca por texto na própria tela | C | ✅ | `ItensTrazemPaiEScoreDoPreCheck` (`ItensDoCatalogo`: `pai`, `score` e `criadoPor` em cada item de `GET /v1/catalogo`) e `telas/Busca.test.tsx` |
+| Mapa: expandir e recolher tudo; atalhos de cadastro na árvore vazia | C | ✅ | `telas/Mapas.test.tsx` |
+| Grafo do ativo: tabela "Ativos no grafo" | C | ✅ | `telas/Mapas.test.tsx` (`AtivosNoGrafo`) |
+| Minha mesa: qualidade, atualização e squad | C | ✅ | `GET /v1/mesa` devolve os ativos com os mesmos itens do catálogo; `telas/Validacoes.test.tsx` |
+| Novo ativo: "O que vem depois" e "Exigências deste tipo" | C | ✅ | `telas/NovoAtivo.test.tsx` (`ExigenciasDoTipo`) |
+| Solicitar acesso: "O que cada papel exerce" e "O que acontece depois" | C | ✅ | `telas/Acesso.test.tsx`; os blocos de cada papel vêm de `GET /v1/cartilha` |
+| Bandeja de descobertas: pai e quem trouxe | C | ✅ | `telas/Descobertas.test.tsx`; os mesmos itens do catálogo |
 
 A fase 1 também porta o que o painel faz sem teste próprio: o retrato de cada
 revisão com SHA-256 (`servicos._snapshot`), a comparação entre revisões

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { AtivoResumo, Rito, Squad } from '../api';
 import { metamodeloDeTeste } from '../testes/perfis';
-import { AssistenteDeCadastro, etapasDoRito, tiposOferecidos, type Formulario } from './NovoAtivo';
+import { AssistenteDeCadastro, ExigenciasDoTipo, etapasDoRito, tiposOferecidos, type Formulario } from './NovoAtivo';
 
 const nada = () => {};
 const ritoApiCritica: Rito = { tipoItem: 'api', rotulo: 'API', criticidade: 'critica', etapas: ['negocial', 'tecnica', 'arquitetural'], evidenciaMinima: 2, scoreMinimo: 80, slaHoras: 24, revisarACadaDias: 90 };
@@ -58,5 +58,23 @@ describe('assistente de cadastro', () => {
 
   it('sem rito ainda, avisa que está consultando', () => {
     expect(assistente(vazio, null)).toContain('Consultando o rito');
+  });
+});
+
+describe('o que o assistente antecipa', () => {
+  it('as exigências do tipo: owners, vínculo com o pai e campos obrigatórios', () => {
+    const subdominio = { ...metamodeloDeTeste.tipos[1], exigeOwnerNegocial: true };
+    const html = renderToStaticMarkup(<ExigenciasDoTipo tipo={subdominio} rotuloDoPai="Domínio" />);
+    expect(html).toContain('<li class="pendente">Owner negocial obrigatório</li>');
+    expect(html).toContain('<li class="ok">Owner técnico opcional</li>');
+    expect(html).toContain('Vínculo com Domínio');
+    expect(html).toContain('Classificação é obrigatório para publicar');
+  });
+
+  it('o assistente mostra as exigências e o que vem depois', () => {
+    const html = assistente(vazio);
+    expect(html).toContain('Exigências deste tipo');
+    expect(html).toContain('O que vem depois');
+    expect(html).toContain('Enviar para validação: o pré-check roda antes');
   });
 });

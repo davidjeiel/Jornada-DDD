@@ -81,7 +81,7 @@ export function CartaoDeDescontinuacao({ impacto, onDescontinuar }: PropsDescont
   }
 
   return (
-    <form className="detail-section cartao-saida" onSubmit={enviar} aria-labelledby="descontinuar-titulo">
+    <form className="detail-section cartao-saida formulario-pagina" onSubmit={enviar} aria-labelledby="descontinuar-titulo">
       <span className="panel-label" id="descontinuar-titulo">Descontinuar este ativo</span>
       <p className="muted">O ativo sai de vigência e não volta a publicado. {contagem(impacto)}</p>
       {impacto.total > 0 && (

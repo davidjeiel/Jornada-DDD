@@ -54,9 +54,13 @@ describe('descobertas', () => {
 
   it('a bandeja lista as descobertas com seleção, e avisa quando está vazia', () => {
     const itens: ItemDoCatalogo[] = [{ ativo: { id: 'a1', codigo: 'API-0001', nome: 'API Simulação', tipo: 'api', status: 'rascunho', criticidade: 'media' },
-      origem: 'automatica', idSquad: null, temResponsavel: false, atualizadoEm: '2026-11-05T10:00:00Z' }];
+      origem: 'automatica', idSquad: null, temResponsavel: false, atualizadoEm: '2026-11-05T10:00:00Z',
+      pai: { id: 'app', codigo: 'APP-0001', nome: 'Motor', tipo: 'aplicacao', status: 'publicado', criticidade: 'media' }, score: 55,
+      criadoPor: '40000000-0000-0000-0000-000000000002' }];
     const html = renderToStaticMarkup(<BandejaDeDescobertas itens={itens} selecionados={['a1']} ocupado={false} onSelecionar={nada} onTriar={nada} />);
     expect(html).toContain('href="/ativos/a1"');
+    expect(html).toContain('href="/ativos/app"');            // o pai, como a coluna Contexto/pai do painel
+    expect(html).toContain('Trazido por');
     expect(html).toContain('1 por triar');
     expect(html).toContain('Aceitar 1');
     expect(renderToStaticMarkup(<BandejaDeDescobertas itens={[]} selecionados={[]} ocupado={false} onSelecionar={nada} onTriar={nada} />)).toContain('Nada na bandeja');

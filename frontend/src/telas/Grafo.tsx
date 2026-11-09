@@ -47,6 +47,29 @@ export function DesenhoDoGrafo({ dados }: { dados: Vizinhanca }) {
   );
 }
 
+/** Os mesmos nós do desenho, em tabela: quem não enxerga o grafo lê a lista (o "Ativos no grafo" do painel). */
+export function AtivosNoGrafo({ dados }: { dados: Vizinhanca }) {
+  return (
+    <section className="detail-section ativos-no-grafo" aria-labelledby="ativos-no-grafo">
+      <span className="panel-label" id="ativos-no-grafo">Ativos no grafo ({dados.nos.length})</span>
+      <div className="rolagem">
+        <table className="tabela">
+          <thead><tr><th scope="col">Ativo</th><th scope="col">Tipo</th><th scope="col">Salto</th></tr></thead>
+          <tbody>
+            {dados.nos.map((n) => (
+              <tr key={n.ativo.id}>
+                <td><Link href={`/ativos/${n.ativo.id}`}>{n.ativo.nome}</Link> <span className="mono discreto">{n.ativo.codigo}</span></td>
+                <td>{n.ativo.tipo}</td>
+                <td>{n.salto === 0 ? 'centro' : n.salto}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 type PropsDaVisao = {
   dados: Vizinhanca;
   impacto: Impacto | null;
@@ -84,6 +107,7 @@ export function VisaoDoGrafo({ dados, impacto, metamodelo, tipos, onSaltos, onTi
         )}
         <p className="discreto">{dados.nos.length} ativo(s) e {dados.arestas.length} relação(ões). Clique num ativo para centrar o grafo nele.</p>
         <DesenhoDoGrafo dados={dados} />
+        <AtivosNoGrafo dados={dados} />
         {centro && <p><Link href={caminhoDaAba(centro.id, 'relacoes')}>Voltar às relações de {centro.codigo}</Link></p>}
       </section>
       <section className="panel screen-panel">

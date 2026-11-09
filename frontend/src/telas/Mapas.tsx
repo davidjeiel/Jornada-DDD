@@ -39,12 +39,25 @@ function Ramo({ no, aberto }: { no: NoDaArvore; aberto: boolean }) {
   );
 }
 
-/** As raízes e os descendentes; com filtro, tudo aberto para mostrar onde está o que casou. */
-export function ArvoreDoCatalogo({ raizes, filtro }: { raizes: NoDaArvore[]; filtro: string }) {
+/** A árvore vazia aponta por onde começar, como o mapa do painel. */
+function ArvoreVazia({ visao }: { visao: 'negocio' | 'tecnica' }) {
+  return visao === 'negocio'
+    ? <p className="vazio">Nenhum domínio cadastrado ainda. Comece pelo <Link href="/novo?tipo=dominio">cadastro de domínio</Link>.</p>
+    : <p className="vazio">Nenhum sistema cadastrado ainda. Comece pelo <Link href="/novo?tipo=sistema">cadastro de sistema</Link>, ou traga contratos e repositórios pela <Link href="/descobertas">tela de descobertas</Link>.</p>;
+}
+
+type PropsDaArvore = { raizes: NoDaArvore[]; filtro: string; visao?: 'negocio' | 'tecnica'; tudoAberto?: boolean | null };
+
+/**
+ * As raízes e os descendentes; com filtro, tudo aberto para mostrar onde está
+ * o que casou. "Expandir tudo" e "Recolher tudo" mandam em todos os ramos.
+ */
+export function ArvoreDoCatalogo({ raizes, filtro, visao = 'negocio', tudoAberto = null }: PropsDaArvore) {
   const visiveis = filtrarArvore(raizes, filtro);
-  if (raizes.length === 0) return <p className="vazio">Nenhum ativo nesta árvore ainda.</p>;
+  if (raizes.length === 0) return <ArvoreVazia visao={visao} />;
   if (visiveis.length === 0) return <p className="vazio">Nada na árvore casa com “{filtro}”.</p>;
-  return <ul className="arvore">{visiveis.map((r) => <Ramo key={r.ativo.id} no={r} aberto={!!filtro.trim() || visiveis.length <= 3} />)}</ul>;
+  const aberto = tudoAberto ?? (!!filtro.trim() || visiveis.length <= 3);
+  return <ul className="arvore">{visiveis.map((r) => <Ramo key={r.ativo.id} no={r} aberto={aberto} />)}</ul>;
 }
 
 type Props = { visao: 'negocio' | 'tecnica'; onErro: (mensagem: string) => void };
@@ -55,6 +68,10 @@ type Props = { visao: 'negocio' | 'tecnica'; onErro: (mensagem: string) => void 
 export function Mapas({ visao, onErro }: Props) {
   const [raizes, setRaizes] = useState<NoDaArvore[] | null>(null);
   const [filtro, setFiltro] = useState('');
+  // null: a abertura padrão; true ou false: o último botão apertado. A versão remonta os ramos.
+  const [tudoAberto, setTudoAberto] = useState<boolean | null>(null);
+  const [versao, setVersao] = useState(0);
+  const abrirTudo = (aberto: boolean) => { setTudoAberto(aberto); setVersao((v) => v + 1); };
 
   useEffect(() => {
     setRaizes(null);
@@ -70,9 +87,13 @@ export function Mapas({ visao, onErro }: Props) {
       </nav>
       <section className="panel screen-panel">
         <label className="busca-na-arvore">Buscar na árvore
-          <input id="filtro-arvore" type="search" value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Nome ou código" />
+          <input id="filtro-arvore" type="search" value={filtro} onChange={(e) => { setFiltro(e.target.value); setTudoAberto(null); }} placeholder="Nome ou código" />
         </label>
-        {raizes ? <ArvoreDoCatalogo raizes={raizes} filtro={filtro} /> : <p className="vazio">Carregando o mapa...</p>}
+        <div className="acoes-da-arvore">
+          <button type="button" className="outline-button" onClick={() => abrirTudo(true)}>Expandir tudo</button>
+          <button type="button" className="outline-button" onClick={() => abrirTudo(false)}>Recolher tudo</button>
+        </div>
+        {raizes ? <ArvoreDoCatalogo key={`${visao}-${versao}`} raizes={raizes} filtro={filtro} visao={visao} tudoAberto={tudoAberto} /> : <p className="vazio">Carregando o mapa...</p>}
       </section>
     </>
   );

@@ -4,7 +4,6 @@ using Jornada.Dominio.Acesso;
 using Jornada.Dominio.Catalogo;
 using Jornada.Dominio.Comum;
 using Jornada.Dominio.Governanca;
-using Jornada.Dominio.Qualidade;
 
 namespace Jornada.Aplicacao.Catalogo.Consultas;
 
@@ -162,20 +161,13 @@ public sealed class Indicadores(
         var regras = await politicas.ObterAsync(ct);
         var porId = b.Todos.ToDictionary(a => a.Id);
         var saidas = b.Arestas.ToLookup(r => r.Origem);
-        var implementacoes = b.Arestas.Where(r => r.Tipo == "implementa").GroupBy(r => r.Destino).ToDictionary(g => g.Key, g => g.Count());
+        var implementacoes = ItensDoCatalogo.Implementacoes(b.Arestas);
 
-        var scores = new List<int>();
-        foreach (var ativo in b.NaoArquivados.Where(a => tipos.Existe(a.TipoItem)))
-        {
-            var pai = ativo.IdPai is { } idPai ? porId.GetValueOrDefault(idPai) : null;
-            var contexto = new ContextoDeQualidade(
-                PaiExiste: pai is not null,
-                PaiForaDeVigencia: pai is not null && MaquinaDeCicloDeVida.ForaDeVigencia(pai.Status),
-                RelacoesParaAtivosForaDeVigencia: saidas[ativo.Id].Count(r => porId.TryGetValue(r.Destino, out var d) && MaquinaDeCicloDeVida.ForaDeVigencia(d.Status)),
-                ImplementacoesDaCapacidade: ativo.TipoItem == "capacidade" ? implementacoes.GetValueOrDefault(ativo.Id) : 0);
-            scores.Add(CalculadoraDeQualidade.Avaliar(ativo, tipos.Obter(ativo.TipoItem), regras.Para(ativo.TipoItem, ativo.Criticidade), contexto, relogio).Total);
-        }
-        return scores.Count == 0 ? 0 : Math.Round(scores.Average());
+        var scores = b.NaoArquivados
+            .Select(a => ItensDoCatalogo.Score(a, tipos, regras, id => porId.GetValueOrDefault(id), saidas[a.Id], implementacoes, relogio))
+            .OfType<int>()
+            .ToArray();
+        return scores.Length == 0 ? 0 : Math.Round(scores.Average());
     }
 
     /// <summary>

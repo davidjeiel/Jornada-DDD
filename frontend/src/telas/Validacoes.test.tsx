@@ -92,12 +92,15 @@ describe('fila de validação', () => {
 
 describe('minha mesa', () => {
   it('separa o que é meu (test_minha_mesa_separa_o_que_e_meu)', () => {
-    const mesa: Mesa = { minhasValidacoes: [item('1', 'tecnica', 'p-1')], filaLivre: [item('2')], meusRascunhos: [], aguardandoDecisao: [item('3').ativo] };
+    const mesa: Mesa = { minhasValidacoes: [item('1', 'tecnica', 'p-1')], filaLivre: [item('2')], meusRascunhos: [], aguardandoDecisao: [{
+      ativo: item('3').ativo, origem: 'manual', idSquad: 'sq-1', temResponsavel: true, atualizadoEm: '2026-11-05T12:00:00Z', pai: null, score: 72, criadoPor: 'p-1',
+    }] };
     const html = renderToStaticMarkup(<QuadroDaMesa mesa={mesa} />);
     expect(html).toContain('Minhas validações (1)');
     expect(html).toContain('Fila livre (1)');
     expect(html).toContain('Nada cadastrado por você em rascunho ou revisão.');
     expect(html).toContain('Aguardando decisão (1)');
+    expect(html).toContain('<span class="score medio">72%</span>');   // a qualidade, como a coluna do painel
   });
 
   it('a tela da mesa entra no menu (test_tela_da_mesa_responde_e_entra_no_menu)', () => {

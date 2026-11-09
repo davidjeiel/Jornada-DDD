@@ -188,7 +188,7 @@ function App() {
         tela = <Mapas visao={local.busca.get('visao') === 'tecnica' ? 'tecnica' : 'negocio'} onErro={setErro} />;
         break;
       case 'mesa':
-        tela = <Mesa key={identidade.pessoaId ?? ''} onErro={setErro} />;
+        tela = <Mesa key={identidade.pessoaId ?? ''} squads={squads} onErro={setErro} />;
         break;
       case 'politicas':
         tela = <Politicas onErro={setErro} />;

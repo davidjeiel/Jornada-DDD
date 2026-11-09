@@ -7,7 +7,7 @@ import { metamodeloDeTeste, perfilDe, pleito } from '../testes/perfis';
 import { NovoAtivo } from './NovoAtivo';
 import { Perfil } from './Perfil';
 import { FilaDePleitos } from './Pleitos';
-import { SolicitarAcesso } from './SolicitarAcesso';
+import { OQueCadaPapelExerce, SolicitarAcesso } from './SolicitarAcesso';
 
 const nada = () => {};
 const assincrono = async () => {};
@@ -102,5 +102,21 @@ describe('escopo de squad', () => {
     expect(html).toContain('value="squad"');
     expect(html).toContain('CRED · Squad Crédito');
     expect(html).not.toContain('Antiga');
+  });
+});
+
+describe('ao lado do pedido de acesso', () => {
+  it('cada papel diz onde escreve, e consulta não escreve nada', () => {
+    const html = renderToStaticMarkup(<OQueCadaPapelExerce blocosPorPapel={{ negocio: ['Estrutura DDD'], techlead: ['Ativos técnicos'], admin: ['Estrutura DDD', 'Ativos técnicos'], consulta: [] }} />);
+    expect(html).toContain('Ativos técnicos e Estrutura DDD');
+    expect(html).toContain('nada: só consulta');
+    expect(html).toContain('href="/cartilha"');
+  });
+
+  it('a tela explica o que acontece depois do pedido', () => {
+    const html = renderToStaticMarkup(<SolicitarAcesso onCadastrado={() => {}} onErro={() => {}} />);
+    expect(html).toContain('O que cada papel exerce');
+    expect(html).toContain('O que acontece depois');
+    expect(html).toContain('não cria um segundo pedido');
   });
 });
