@@ -61,7 +61,8 @@ public interface IRepositorioDeAtivos
 /// O recorte do catálogo (<c>servicos._filtro_busca</c>). Campo nulo ou vazio
 /// não filtra. <paramref name="Termo"/> procura em nome, código e descrição,
 /// sem diferenciar maiúsculas. <paramref name="SemOwner"/> deixa só os ativos
-/// sem responsável vigente em <paramref name="Hoje"/>.
+/// sem responsável vigente em <paramref name="Hoje"/>. <paramref name="IdPai"/>
+/// deixa só os filhos diretos daquele ativo.
 /// </summary>
 public sealed record FiltroDoCatalogo(
     string? Termo = null,
@@ -71,7 +72,8 @@ public sealed record FiltroDoCatalogo(
     Criticidade? Criticidade = null,
     bool SemOwner = false,
     OrigemDoAtivo? Origem = null,
-    DateOnly Hoje = default);
+    DateOnly Hoje = default,
+    IdDeAtivo? IdPai = null);
 
 /// <summary>
 /// Uma aresta do grafo de relações, já resolvida para os dois lados. A
@@ -80,7 +82,8 @@ public sealed record FiltroDoCatalogo(
 /// decide se a descontinuação do destino exige confirmação.
 /// </summary>
 public sealed record RelacaoResumo(
-    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media, string? Mecanismo = null);
+    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media, string? Mecanismo = null,
+    string OrigemDaEvidencia = CatalogoDeRelacoes.OrigemManual);
 
 /// <summary>Consultas e escrita sobre o grafo de relações.</summary>
 public interface IRepositorioDeRelacoes
@@ -94,7 +97,8 @@ public interface IRepositorioDeRelacoes
 
     /// <summary>Grava uma aresta (origem → destino). Não valida regra de negócio — isso é do caso de uso.</summary>
     public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo,
-        Criticidade criticidade = Criticidade.Media, string? mecanismo = null, CancellationToken ct = default);
+        Criticidade criticidade = Criticidade.Media, string? mecanismo = null,
+        string origemDaEvidencia = CatalogoDeRelacoes.OrigemManual, CancellationToken ct = default);
 
     /// <summary>
     /// Há caminho de <c>depende_de</c> de <paramref name="de"/> até <paramref name="ate"/>?

@@ -106,6 +106,9 @@ internal sealed class DocumentoDeRelacao : DocumentoDoCatalogo
 
     /// <summary>sincrono, assincrono, batch, arquivo ou biblioteca. Ausente: não informado.</summary>
     public string? Mecanismo { get; init; }
+
+    /// <summary>manual, git, openapi, cmdb ou cicd. Ausente (documento anterior ao campo) vale manual.</summary>
+    public string? OrigemDaEvidencia { get; init; }
     public DateTimeOffset CriadoEm { get; init; }
 }
 

@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { AtivoResumo, FichaDoAtivo, Metamodelo, PreCheck } from '../api';
 import { secaoDoCaminho } from '../navegacao';
 import {
-  VisaoDoAtivo, abaDaUrl, caminhoDaAba, candidatosAoDestino, destinoDigitado, motivoDeSoLeitura, problemaDaRelacao, type Acoes, type Aba,
+  DimensoesDeQualidade, RitoEAlertas, VisaoDoAtivo, abaDaUrl, caminhoDaAba, candidatosAoDestino, destinoDigitado, exigenciaDoTipo, motivoDeSoLeitura,
+  problemaDaRelacao, type Acoes, type Aba,
 } from './PaginaDoAtivo';
 import { SelecaoDoLote } from './RelacoesEmLote';
 
@@ -22,7 +23,7 @@ const ativos = [
 ];
 
 const metamodelo: Metamodelo = {
-  tipos: [{ chave: 'capacidade', rotulo: 'Capacidade de negócio', bloco: 'Estrutura DDD', pai: 'contexto', campos: [{ nome: 'resultado_esperado', rotulo: 'Resultado esperado', tipo: 'area', obrigatorio: true, opcoes: [] }] }],
+  tipos: [{ chave: 'capacidade', rotulo: 'Capacidade de negócio', bloco: 'Estrutura DDD', pai: 'contexto', campos: [{ nome: 'resultado_esperado', rotulo: 'Resultado esperado', tipo: 'area', obrigatorio: true, opcoes: [] }], exigeOwnerNegocial: true, exigeOwnerTecnico: true }],
   relacoes: [{ chave: 'implementa', rotulo: 'implementa a capacidade', destinosSugeridos: ['capacidade'] },
     { chave: 'expoe', rotulo: 'expõe', destinosSugeridos: ['api', 'endpoint', 'evento'] }],
   mecanismos: [{ chave: 'sincrono', rotulo: 'Síncrono (HTTP/RPC)' }, { chave: 'assincrono', rotulo: 'Assíncrono (evento/fila)' }],
@@ -35,13 +36,15 @@ function ficha(status = 'rascunho'): FichaDoAtivo {
     trilha: [{ id: 'd-1', codigo: 'DOM-0001', nome: 'Contrato', tipoItem: 'dominio' }, { id: 's-1', codigo: 'SUB-0001', nome: 'Originação', tipoItem: 'subdominio' },
       { id: 'c-1', codigo: 'CTX-0001', nome: 'Simulação', tipoItem: 'contexto' }],
     atributos: { resultado_esperado: 'Proposta simulada' }, evidencias: [], responsaveis: [],
-    relacoes: [{ direcao: 'saida', ativoId: 'a-1', codigo: 'API-0001', nome: 'API Simulação', tipo: 'expoe', criticidade: 'media', mecanismo: 'sincrono' }],
+    relacoes: [{ direcao: 'saida', ativoId: 'a-1', codigo: 'API-0001', nome: 'API Simulação', tipo: 'expoe', criticidade: 'media', mecanismo: 'sincrono', origemDaEvidencia: 'openapi' }],
+    filhos: [],
   };
 }
 
 const preCheck: PreCheck = {
   aprovado: false, score: 62, dimensoes: {}, bloqueios: [], alertas: [],
-  politica: { scoreMinimo: 70, evidenciaMinima: 1, slaHoras: 48, etapas: ['negocial', 'tecnica'] },
+  politica: { scoreMinimo: 70, evidenciaMinima: 1, slaHoras: 48, etapas: ['negocial', 'tecnica'], revisarACadaDias: 180 },
+  proximaRevisao: '2027-03-21',
   caminho: [
     { passo: 'descrever', rotulo: 'Descrever o ativo', concluido: true, impedimentos: [], pendencias: [] },
     { passo: 'responsaveis', rotulo: 'Definir responsáveis', concluido: false, impedimentos: ['owner'], pendencias: ['Falta o owner negocial.'] },
@@ -148,7 +151,7 @@ describe('relações', () => {
 
 describe('relações em lote', () => {
   const lote = () => renderToStaticMarkup(
-    <SelecaoDoLote ficha={{ ...ficha(), id: 'a-0', relacoes: [{ direcao: 'saida', ativoId: 'a-1', codigo: 'API-0001', nome: 'API Simulação', tipo: 'expoe', criticidade: 'media', mecanismo: null }] }}
+    <SelecaoDoLote ficha={{ ...ficha(), id: 'a-0', relacoes: [{ direcao: 'saida', ativoId: 'a-1', codigo: 'API-0001', nome: 'API Simulação', tipo: 'expoe', criticidade: 'media', mecanismo: null, origemDaEvidencia: 'manual' }] }}
       tipo="expoe" ativos={ativos} metamodelo={metamodelo} ocupado={false} onTipo={nada} onEnviar={nada} />,
   );
 
@@ -200,3 +203,54 @@ describe('responsáveis e só leitura', () => {
     expect(html).not.toContain('só permite consulta');
   });
 });
+
+describe('o que a visão 360° do painel mostra além das abas', () => {
+  const visao = (aba: Aba, f: FichaDoAtivo = ficha(), p: PreCheck = preCheck, podeEscrever = true) => renderToStaticMarkup(
+    <VisaoDoAtivo ficha={f} preCheck={p} aba={aba} ativos={ativos} pessoas={[]} metamodelo={metamodelo} squads={[]}
+      historico={null} comparacao={null} impacto={null} podeEscrever={podeEscrever} podeDescontinuar={false} idPessoa={null}
+      ocupado={false} acoes={acoes} onErro={nada} />);
+
+  it('as dimensões de qualidade, cada uma com a barra, e a baixa destacada', () => {
+    const html = renderToStaticMarkup(<DimensoesDeQualidade preCheck={{ ...preCheck, dimensoes: { completude: 100, consistencia: 90, ownership: 50, evidencia: 0, temporalidade: 100 } }} />);
+    for (const rotulo of ['Completude', 'Consistência', 'Ownership', 'Evidência', 'Temporalidade']) expect(html).toContain(rotulo);
+    expect(html.match(/class="barra baixa"/g)).toHaveLength(2);
+    expect(html).toContain('width:50%');
+    expect(visao('resumo')).toContain('Dimensões de qualidade');
+  });
+
+  it('o rito da política e os alertas; em edição, os bloqueios ficam no caminho', () => {
+    const comAlerta = { ...preCheck, alertas: ['Relação com ativo fora de vigência.'], bloqueios: [{ codigo: 'score', mensagem: 'Score abaixo do mínimo.' }] };
+    const emEdicao = renderToStaticMarkup(<RitoEAlertas preCheck={comAlerta} emEdicao />);
+    expect(emEdicao).toContain('Rito e alertas');
+    expect(emEdicao).toContain('negocial → tecnica · evidência mínima 1 · score mínimo 70% · prazo 48h por etapa · revisar a cada 180 dias');
+    expect(emEdicao).toContain('<li class="pendente">Relação com ativo fora de vigência.</li>');
+    expect(emEdicao).not.toContain('Score abaixo do mínimo.');
+    const publicado = renderToStaticMarkup(<RitoEAlertas preCheck={comAlerta} emEdicao={false} />);
+    expect(publicado).toContain('Pré-check de publicação');
+    expect(publicado).toContain('<li class="bloqueio">Score abaixo do mínimo.</li>');
+    expect(renderToStaticMarkup(<RitoEAlertas preCheck={{ ...preCheck, aprovado: true }} emEdicao />)).toContain('Tudo pronto para publicar');
+  });
+
+  it('a submissão pede o motivo da revisão, e o resumo diz a próxima revisão', () => {
+    const html = visao('resumo');
+    expect(html).toContain('Motivo da revisão');
+    expect(html).toContain('name="motivo"');
+    expect(html).toContain('Próxima revisão <strong>2027-03-21</strong>');
+    expect(visao('resumo', ficha(), preCheck, false)).not.toContain('Motivo da revisão');
+  });
+
+  it('as relações dizem a origem da evidência, e os filhos aparecem', () => {
+    const html = visao('relacoes', { ...ficha(), filhos: [ativo('f-1', 'END-0009', 'GET /taxas', 'endpoint')] });
+    expect(html).toContain('evidência OpenAPI');
+    expect(html).toContain('Compõem este ativo (1)');
+    expect(html).toContain('href="/ativos/f-1"');
+    expect(visao('relacoes')).not.toContain('Compõem este ativo');
+  });
+
+  it('a aba Pessoas diz o que o tipo exige', () => {
+    expect(visao('pessoas')).toContain('Este tipo exige owner negocial e owner técnico.');
+    expect(exigenciaDoTipo({ exigeOwnerNegocial: false, exigeOwnerTecnico: true })).toBe('Este tipo exige owner técnico.');
+    expect(exigenciaDoTipo({ exigeOwnerNegocial: false, exigeOwnerTecnico: false })).toBe('Este tipo não tem papel obrigatório.');
+  });
+});
+

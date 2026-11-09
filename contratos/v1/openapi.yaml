@@ -6156,6 +6156,7 @@ components:
         - etapasPorPapel
         - blocosPorPapel
         - ritos
+        - matrizDeMudanca
       type: object
       properties:
         papeis:
@@ -6187,6 +6188,11 @@ components:
           items:
             $ref: '#/components/schemas/RitoResponse'
           description: O rito de cada tipo de ativo.
+        matrizDeMudanca:
+          type: array
+          items:
+            $ref: '#/components/schemas/MudancaResponse'
+          description: 'Por tipo de mudança, se cada etapa é obrigatoria, condicional, opcional ou nao.'
       additionalProperties: false
       description: 'As tabelas de referência da cartilha, lidas do código.'
     CoberturaDoDominioResponse:
@@ -6570,6 +6576,7 @@ components:
         - evidencias
         - responsaveis
         - relacoes
+        - filhos
       type: object
       properties:
         id:
@@ -6628,6 +6635,11 @@ components:
           items:
             $ref: '#/components/schemas/RelacaoResponse'
           description: Relações nos dois sentidos.
+        filhos:
+          type: array
+          items:
+            $ref: '#/components/schemas/AtivoResumoResponse'
+          description: 'Os filhos diretos na hierarquia, sem os arquivados.'
       additionalProperties: false
       description: Ficha completa do ativo (visão 360°).
       example:
@@ -6653,7 +6665,22 @@ components:
             inicioVigencia: '2026-10-09'
             fimVigencia: null
             vigente: true
-        relacoes: [ ]
+        relacoes:
+          - direcao: saida
+            ativoId: 01a12128-82a1-7c3e-9d10-4f2b6a8c0e21
+            codigo: BDD-0001
+            nome: DB2 Contas
+            tipo: persiste_em
+            criticidade: alta
+            mecanismo: sincrono
+            origemDaEvidencia: manual
+        filhos:
+          - id: 01a12128-82b4-7a51-8e22-3c9d0f6b1a32
+            codigo: APP-0001
+            nome: Motor de Lançamentos
+            tipo: aplicacao
+            status: publicado
+            criticidade: alta
     FilaDePleitosResponse:
       required:
         - total
@@ -7179,6 +7206,32 @@ components:
             $ref: '#/components/schemas/MecanismoResponse'
       additionalProperties: false
       description: 'O metamodelo da empresa: tipos de ativo, tipos de relação e mecanismos.'
+    MudancaResponse:
+      required:
+        - mudanca
+        - rotulo
+        - negocial
+        - tecnica
+        - arquitetural
+      type: object
+      properties:
+        mudanca:
+          type: string
+          description: 'texto, escopo, contrato, dependencia ou descontinuacao.'
+        rotulo:
+          type: string
+          description: 'A mudança, por extenso.'
+        negocial:
+          type: string
+          description: 'obrigatoria, condicional, opcional ou nao.'
+        tecnica:
+          type: string
+          description: 'obrigatoria, condicional, opcional ou nao.'
+        arquitetural:
+          type: string
+          description: 'obrigatoria, condicional, opcional ou nao.'
+      additionalProperties: false
+      description: Uma linha da matriz mínima de aprovação por tipo de mudança.
     NoDaArvoreResponse:
       required:
         - ativo
@@ -7694,21 +7747,30 @@ components:
         - evidenciaMinima
         - slaHoras
         - etapas
+        - revisarACadaDias
       type: object
       properties:
         scoreMinimo:
           type: integer
+          description: Score de qualidade mínimo para publicar.
           format: int32
         evidenciaMinima:
           type: integer
+          description: Quantas evidências o rito exige.
           format: int32
         slaHoras:
           type: integer
+          description: 'Prazo de cada etapa de validação, em horas.'
           format: int32
         etapas:
           type: array
           items:
             type: string
+          description: 'As etapas do rito, na ordem.'
+        revisarACadaDias:
+          type: integer
+          description: De quantos em quantos dias o ativo deve ser revisto.
+          format: int32
       additionalProperties: false
       description: Política de governança que vale para este ativo (tipo × criticidade).
     PreCheckResponse:
@@ -7720,6 +7782,7 @@ components:
         - alertas
         - politica
         - caminho
+        - proximaRevisao
       type: object
       properties:
         aprovado:
@@ -7743,6 +7806,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PassoResponse'
+        proximaRevisao:
+          type: string
+          format: date
       additionalProperties: false
       description: 'Resultado do pré-check: o que falta para o ativo poder ser submetido.'
       example:
@@ -7765,6 +7831,7 @@ components:
           slaHoras: 72
           etapas:
             - tecnica
+          revisarACadaDias: 180
         caminho:
           - passo: responsaveis
             rotulo: Definir responsáveis
@@ -7773,6 +7840,7 @@ components:
               - OWNER_NAO_DEFINIDO
             pendencias:
               - Owner técnico não definido
+        proximaRevisao: '2027-04-07'
     PreferenciaDoTipoResponse:
       required:
         - tipo
@@ -7847,6 +7915,7 @@ components:
         - nome
         - tipo
         - criticidade
+        - origemDaEvidencia
       type: object
       properties:
         direcao:
@@ -7872,6 +7941,9 @@ components:
           type: string
           description: 'Como a relação acontece (sincrono, assincrono, batch, arquivo, biblioteca); nulo se não informado.'
           nullable: true
+        origemDaEvidencia:
+          type: string
+          description: 'De onde veio a evidência: manual, git, openapi, cmdb ou cicd.'
       additionalProperties: false
       description: Relação vista a partir deste ativo.
     RelacionarAtivosRequest:
@@ -7897,6 +7969,11 @@ components:
           description: 'Como a relação acontece: sincrono, assincrono, batch, arquivo ou biblioteca. Opcional.'
           nullable: true
           example: assincrono
+        origemDaEvidencia:
+          type: string
+          description: 'De onde veio a evidência da relação: manual (padrão), git, openapi, cmdb ou cicd. "Dependência crítica sem evidência" conta só as manuais.'
+          nullable: true
+          example: openapi
       additionalProperties: false
       description: Relação deste ativo (origem) com outro (destino).
     RelacionarEmLoteRequest:
@@ -8214,6 +8291,8 @@ components:
         - rotulo
         - bloco
         - campos
+        - exigeOwnerNegocial
+        - exigeOwnerTecnico
       type: object
       properties:
         chave:
@@ -8234,6 +8313,12 @@ components:
           items:
             $ref: '#/components/schemas/CampoDoTipoResponse'
           description: Os campos específicos do tipo.
+        exigeOwnerNegocial:
+          type: boolean
+          description: Publicar exige owner negocial vigente.
+        exigeOwnerTecnico:
+          type: boolean
+          description: Publicar exige owner técnico vigente.
       additionalProperties: false
       description: Um tipo de ativo do metamodelo da empresa.
     TipoDeRelacaoResponse:

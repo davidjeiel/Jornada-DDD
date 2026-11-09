@@ -58,6 +58,7 @@ public static class CodigosDeErro
         ["SIGLA_INVALIDA"] = StatusCodes.Status400BadRequest,
         ["TIPO_DE_RELACAO_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["MECANISMO_INVALIDO"] = StatusCodes.Status400BadRequest,
+        ["ORIGEM_DE_EVIDENCIA_INVALIDA"] = StatusCodes.Status400BadRequest,
         ["COMPETENCIA_INVALIDA"] = StatusCodes.Status400BadRequest,
         ["TIPO_DE_NOTIFICACAO_INVALIDO"] = StatusCodes.Status400BadRequest,
         ["CANAL_INVALIDO"] = StatusCodes.Status400BadRequest,

@@ -105,6 +105,10 @@ public sealed class IndicadoresTestes
         Verificar.Igual("validacoes", pendencias["sla_vencido"].Tela);
         Verificar.Igual(1, pendencias["dependencia_critica_sem_evidencia"].Total);
 
+        m.Exigir(m.Relacionar(app, m.Api(app, "API Catálogo"), "depende_de", Criticidade.Critica, origemDaEvidencia: "openapi"));
+        Verificar.Igual(1, IndicadoresDe(m).ConsultarAsync().Result.Pendencias.Single(p => p.Chave == "dependencia_critica_sem_evidencia").Total,
+            "a dependência que veio do contrato tem evidência");
+
         m.Completar(cap);
         Verificar.Igual(0, IndicadoresDe(m).ConsultarAsync().Result.Pendencias.Single(p => p.Chave == "capacidade_sem_owner").Total,
             "com owner negocial, a capacidade sai da pendência");

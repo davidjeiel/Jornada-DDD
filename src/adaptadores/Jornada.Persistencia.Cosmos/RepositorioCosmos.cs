@@ -96,6 +96,7 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
         if (filtro.IdSquad is { } sq) Igual("idSquad", "@idSquad", Mapeamento.Texto(sq));
         if (filtro.Criticidade is { } c) Igual("criticidade", "@criticidade", c.Chave());
         if (filtro.Origem is { } o) Igual("origem", "@origem", o.ToString());
+        if (filtro.IdPai is { } pai) Igual("idPai", "@idPai", Mapeamento.Texto(pai.Valor));
         if (filtro.SemOwner)
         {
             // Vigente: começou até hoje e não terminou antes de hoje. As datas são texto ISO: a ordem de texto é a de data.
@@ -164,7 +165,8 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
     // ───────────────────────────────────────────────── IRepositorioDeRelacoes
 
     public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo,
-        Criticidade criticidade = Criticidade.Media, string? mecanismo = null, CancellationToken ct = default) =>
+        Criticidade criticidade = Criticidade.Media, string? mecanismo = null,
+        string origemDaEvidencia = CatalogoDeRelacoes.OrigemManual, CancellationToken ct = default) =>
         // Grava na hora: a porta não passa pela unidade de trabalho.
         _acesso.CriarAsync(new DocumentoDeRelacao
         {
@@ -175,6 +177,7 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
             TipoRelacao = tipo,
             Criticidade = criticidade.Chave(),
             Mecanismo = mecanismo,
+            OrigemDaEvidencia = origemDaEvidencia,
             CriadoEm = DateTimeOffset.UtcNow,
         }, ct);
 
@@ -434,7 +437,7 @@ public sealed partial class RepositorioCosmos : IRepositorioDeAtivos, IRepositor
 
     private static RelacaoResumo Resumo(DocumentoDeRelacao r) => new(
         new IdDeAtivo(Guid.Parse(r.IdAtivo)), new IdDeAtivo(Guid.Parse(r.Destino)), r.TipoRelacao,
-        CriticidadeExtensoes.De(r.Criticidade), r.Mecanismo);
+        CriticidadeExtensoes.De(r.Criticidade), r.Mecanismo, r.OrigemDaEvidencia ?? CatalogoDeRelacoes.OrigemManual);
 
     private sealed class Rastreado<T>
     {

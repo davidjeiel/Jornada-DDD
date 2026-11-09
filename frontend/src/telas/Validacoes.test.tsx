@@ -22,9 +22,12 @@ const ficha: FichaDoAtivo = {
   descricao: 'Calcula condições.', revisaoAtual: 2, idSquad: null, trilha: [], atributos: {},
   evidencias: [{ id: 'e-1', tipo: 'documento', titulo: 'Política de crédito', url: null }],
   responsaveis: [{ idPessoa: '50000000-0000-0000-0000-000000000001', papel: 'OwnerNegocial', inicioVigencia: '2026-10-01', fimVigencia: null, vigente: true }],
-  relacoes: [],
+  relacoes: [], filhos: [],
 };
-const preCheck = { aprovado: true, score: 90, dimensoes: {}, bloqueios: [], alertas: [], politica: { scoreMinimo: 70, evidenciaMinima: 1, slaHoras: 48, etapas: ['negocial'] }, caminho: [] };
+const preCheck = {
+  aprovado: true, score: 90, dimensoes: {}, bloqueios: [], alertas: ['Relação com ativo fora de vigência.'],
+  politica: { scoreMinimo: 70, evidenciaMinima: 1, slaHoras: 48, etapas: ['negocial'], revisarACadaDias: 180 }, caminho: [], proximaRevisao: '2027-03-21',
+};
 
 function painel(dados: Partial<Painel> = {}, idPessoa: string | null = 'p-1', podeDecidir = true) {
   const p: Painel = { validacao: validacao('1'), ficha, preCheck, mudancas: null, primeiraRevisao: true, ...dados };
@@ -103,4 +106,18 @@ describe('minha mesa', () => {
     expect(secaoDoCaminho(mesa.caminho)).toBe('mesa');
     expect(MENU.find((m) => m.secao === 'politicas')?.fase).toBeUndefined();
   });
+
 });
+
+describe('checklist de governança', () => {
+  it('o painel do validador mostra o checklist de governança', () => {
+    const html = painel();
+    expect(html).toContain('Checklist de governança');
+    expect(html).toContain('<li class="pendente">Relação com ativo fora de vigência.</li>');
+    expect(html).toContain('Pré-check sem bloqueios (score 90%)');
+    const bloqueado = painel({ preCheck: { ...preCheck, aprovado: false, bloqueios: [{ codigo: 'owner', mensagem: 'Falta o owner técnico.' }] } });
+    expect(bloqueado).toContain('<li class="bloqueio">Falta o owner técnico.</li>');
+    expect(bloqueado).not.toContain('Pré-check sem bloqueios');
+  });
+});
+

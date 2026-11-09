@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   assumirValidacao, consultarFila, consultarPainel, decidirValidacao, liberarValidacao,
-  type FilaDeValidacao, type ItemDaFila, type PainelDoValidador as Painel,
+  type FilaDeValidacao, type ItemDaFila, type PainelDoValidador as Painel, type PreCheck,
 } from '../api';
 import { Cabecalho, Criticidade } from '../componentes';
 import { Link, navegar } from '../roteador';
@@ -22,6 +22,20 @@ export const ABAS_DA_FILA = [
 ] as const;
 
 /** O endereço da fila: a aba e, se houver, a etapa selecionada. */
+/** O que o pré-check diz da revisão, para quem decide: os bloqueios, os alertas e, sem bloqueio, o score. */
+export function ChecklistDeGovernanca({ preCheck }: { preCheck: PreCheck }) {
+  return (
+    <>
+      <h3>Checklist de governança</h3>
+      <ul className="lista-checagem">
+        {preCheck.bloqueios.map((b) => <li key={b.codigo} className="bloqueio">{b.mensagem}</li>)}
+        {preCheck.alertas.map((a) => <li key={a} className="pendente">{a}</li>)}
+        {preCheck.bloqueios.length === 0 && <li className="ok">Pré-check sem bloqueios (score {preCheck.score}%)</li>}
+      </ul>
+    </>
+  );
+}
+
 export function caminhoDaFila(aba: string, idValidacao?: string | null): string {
   const busca = new URLSearchParams();
   if (aba) busca.set('etapa', aba);
@@ -137,6 +151,8 @@ export function PainelDoValidador({ painel, idPessoa, podeDecidir, ocupado, onAs
             : <ul className="lista-simples">{ficha.responsaveis.filter((r) => r.vigente).map((r) => <li key={`${r.idPessoa}-${r.papel}`}>{nomeDaPessoa(r.idPessoa)} <span className="discreto">· {r.papel}</span></li>)}</ul>}
         </div>
       </div>
+
+      <ChecklistDeGovernanca preCheck={preCheck} />
 
       {podeDecidir && validacao.status === 'aberta' && (
         <>

@@ -97,6 +97,10 @@ public sealed record RelacionarAtivosRequest
     /// <summary>Como a relação acontece: sincrono, assincrono, batch, arquivo ou biblioteca. Opcional.</summary>
     /// <example>assincrono</example>
     public string? Mecanismo { get; init; }
+
+    /// <summary>De onde veio a evidência da relação: manual (padrão), git, openapi, cmdb ou cicd. "Dependência crítica sem evidência" conta só as manuais.</summary>
+    /// <example>openapi</example>
+    public string? OrigemDaEvidencia { get; init; }
 }
 
 /// <summary>Várias relações do mesmo tipo, com a mesma criticidade e o mesmo mecanismo.</summary>

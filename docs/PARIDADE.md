@@ -127,18 +127,18 @@ achou o que segue. A coluna "PR" diz em qual entrega cada item entra.
 |---|---|---|---|
 | Exposição do catálogo: grafo de todos os ativos, recorte por domínio e subdomínio, clique no nó recorta (`servicos.grafo_catalogo`) | A | ✅ | `GrafoDoCatalogoSemRecorte`, `GrafoRecortadoSoHierarquia`, `GrafoDoCatalogoSemArquivadoEComTeto` (`GET /v1/mapa/grafo`) e `telas/VisaoExecutiva.test.tsx` |
 | Cobertura de capacidades por domínio (`cobertura_por_dominio`) | A | ✅ | `CoberturaPorDominioContaAsCapacidades` e `telas/VisaoExecutiva.test.tsx` |
-| Pendências prioritárias, cada uma levando ao recorte (`pendencias_prioritarias`) | A | ✅ | `PendenciasPrioritariasContamEApontamORecorte` e `telas/VisaoExecutiva.test.tsx`; sem origem da evidência na relação (item abaixo), "dependência crítica sem evidência" conta todas as dependências críticas |
+| Pendências prioritárias, cada uma levando ao recorte (`pendencias_prioritarias`) | A | ✅ | `PendenciasPrioritariasContamEApontamORecorte` e `telas/VisaoExecutiva.test.tsx`; "dependência crítica sem evidência" conta só as relações de origem manual, como no painel |
 | As cinco primeiras da fila de validação na visão executiva | A | ✅ | `telas/VisaoExecutiva.test.tsx` (`FilaResumida`, de `GET /v1/validacoes/fila`) |
 | Qualidade cadastral média, também na fotografia mensal (`qualidade.media_geral`) | A | ✅ | `QualidadeMediaEhAMediaDoPreCheck`: a mesma calculadora do pré-check, sobre o catálogo já carregado |
-| Ficha: dimensões de qualidade | B | ⬜ | |
-| Ficha: alertas do pré-check e o rito da política | B | ⬜ | |
-| Ficha: motivo da revisão ao submeter | B | ⬜ | |
-| Ficha: próxima revisão (`qualidade.proxima_revisao`) | B | ⬜ | |
-| Ficha: filhos na aba Relações | B | ⬜ | |
-| Ficha: o que o tipo exige de responsáveis, na aba Pessoas | B | ⬜ | |
-| Relação: origem da evidência (manual ou automática) | B | ⬜ | |
-| Validação: checklist de governança no painel do validador | B | ⬜ | |
-| Políticas: matriz mínima de aprovação por tipo de mudança (`governanca.MATRIZ_MUDANCA`) | B | ⬜ | |
+| Ficha: dimensões de qualidade | B | ✅ | `telas/PaginaDoAtivo.test.tsx` (`DimensoesDeQualidade`, das dimensões que o pré-check já devolvia) |
+| Ficha: alertas do pré-check e o rito da política | B | ✅ | `telas/PaginaDoAtivo.test.tsx` (`RitoEAlertas`): em edição, os bloqueios ficam no caminho até a publicação, como no painel |
+| Ficha: motivo da revisão ao submeter | B | ✅ | `telas/PaginaDoAtivo.test.tsx`: o motivo digitado vai para a submissão, o retrato e o histórico |
+| Ficha: próxima revisão (`qualidade.proxima_revisao`) | B | ✅ | `ProximaRevisaoSegueAPolitica` (`proximaRevisao` no pré-check, `revisarACadaDias` na política) e `telas/PaginaDoAtivo.test.tsx` |
+| Ficha: filhos na aba Relações | B | ✅ | `FichaListaOsFilhos`, o contrato `FiltroPorPaiTrazOsFilhosDiretos` (filtro `IdPai` nos dois adaptadores) e `telas/PaginaDoAtivo.test.tsx` |
+| Ficha: o que o tipo exige de responsáveis, na aba Pessoas | B | ✅ | `exigeOwnerNegocial` e `exigeOwnerTecnico` no metamodelo; `telas/PaginaDoAtivo.test.tsx` |
+| Relação: origem da evidência (manual, git, openapi, cmdb, cicd) | B | ✅ | `OrigemDaEvidenciaChegaAFicha`, o contrato `RelacaoGuardaAOrigemDaEvidencia` e `PendenciasPrioritariasContamEApontamORecorte`; `origemDaEvidencia` opcional em `POST /v1/ativos/{id}/relacoes` (400 `ORIGEM_DE_EVIDENCIA_INVALIDA`) |
+| Validação: checklist de governança no painel do validador | B | ✅ | `telas/Validacoes.test.tsx` (`ChecklistDeGovernanca`) |
+| Políticas: matriz mínima de aprovação por tipo de mudança (`governanca.MATRIZ_MUDANCA`) | B | ✅ | `MatrizDeMudancaVemDoPainel` (`matrizDeMudanca` em `GET /v1/cartilha`) e `telas/Cartilha.test.tsx` |
 | Catálogo: colunas pai, squad e qualidade; busca por texto na própria tela | C | ⬜ | |
 | Mapa: expandir e recolher tudo; atalhos de cadastro na árvore vazia | C | ⬜ | |
 | Grafo do ativo: tabela "Ativos no grafo" | C | ⬜ | |

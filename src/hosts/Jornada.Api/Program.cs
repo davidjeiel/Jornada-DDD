@@ -538,7 +538,7 @@ catalogo.MapPost("/ativos/{id:guid}/relacoes", async Task<Results<Ok<RelacaoRegi
     HttpContext http, Guid id, RelacionarAtivosRequest corpo, RelacionarAtivos caso, CancellationToken ct) =>
 {
     var r = await caso.ExecutarAsync(new ComandoRelacionarAtivos(new IdDeAtivo(id), new IdDeAtivo(corpo.IdDestino), corpo.Tipo,
-        CriticidadeExtensoes.De(corpo.Criticidade), corpo.Mecanismo), ct);
+        CriticidadeExtensoes.De(corpo.Criticidade), corpo.Mecanismo, corpo.OrigemDaEvidencia), ct);
     return r.Sucesso ? TypedResults.Ok(new RelacaoRegistradaResponse(r.Valor)) : Erro(http, r.Codigo!, r.Mensagem!);
 })
     .WithName("relacionarAtivos")
@@ -566,7 +566,8 @@ catalogo.MapGet("/metamodelo", async (IMetamodelo metamodelo, CancellationToken 
     var tipos = await metamodelo.ObterAsync(ct);
     return TypedResults.Ok(new MetamodeloResponse(
         tipos.Todos.Select(t => new TipoDeAtivoResponse(t.Chave, t.Rotulo, t.Bloco, t.Pai,
-            t.CamposDoTipo.Select(c => new CampoDoTipoResponse(c.Nome, c.Rotulo, c.Tipo, c.Obrigatorio, c.Opcoes ?? [])).ToArray())).ToArray(),
+            t.CamposDoTipo.Select(c => new CampoDoTipoResponse(c.Nome, c.Rotulo, c.Tipo, c.Obrigatorio, c.Opcoes ?? [])).ToArray(),
+            t.ExigeOwnerNegocial, t.ExigeOwnerTecnico)).ToArray(),
         CatalogoDeRelacoes.Tipos.Select(r => new TipoDeRelacaoResponse(r.Chave, r.Rotulo, r.DestinosSugeridos)).ToArray(),
         CatalogoDeRelacoes.Mecanismos.Select(m => new MecanismoResponse(m.Chave, m.Rotulo)).ToArray()));
 })

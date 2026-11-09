@@ -23,7 +23,7 @@ public sealed class ArmazemEmMemoria
     /// mesmo motivo do <c>tenant_id</c> em <c>relacao_ativo</c>: sem ela, uma
     /// empresa enxergaria as arestas de outra.
     /// </summary>
-    internal List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade, string? Mecanismo)> Relacoes { get; } = [];
+    internal List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade, string? Mecanismo, string OrigemDaEvidencia)> Relacoes { get; } = [];
     internal ConcurrentDictionary<Guid, ValidacaoEmProcesso> Validacoes { get; } = new();
     internal ConcurrentDictionary<(IdDeAtivo Ativo, int Numero), RevisaoDoAtivo> Revisoes { get; } = new();
     internal ConcurrentQueue<RegistroDeAuditoria> Auditoria { get; } = new();
@@ -82,10 +82,10 @@ public sealed class RepositorioDeAtivosEmMemoria(
     private ConcurrentDictionary<IdDeAtivo, Ativo> _ativos => armazem.Ativos;
     private ConcurrentDictionary<string, int> _sequenciais => armazem.Sequenciais;
     private List<EventoDeDominio> _eventosPublicados => armazem.Eventos;
-    private List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade, string? Mecanismo)> _relacoes => armazem.Relacoes;
+    private List<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade, string? Mecanismo, string OrigemDaEvidencia)> _relacoes => armazem.Relacoes;
 
     /// <summary>As relações desta empresa. Toda consulta ao grafo parte daqui.</summary>
-    private IEnumerable<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade, string? Mecanismo)> MinhasRelacoes =>
+    private IEnumerable<(IdDeEmpresa Empresa, IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade, string? Mecanismo, string OrigemDaEvidencia)> MinhasRelacoes =>
         _relacoes.Where(r => r.Empresa == Empresa);
     private ConcurrentDictionary<Guid, ValidacaoEmProcesso> _validacoes => armazem.Validacoes;
 
@@ -136,6 +136,7 @@ public sealed class RepositorioDeAtivosEmMemoria(
         if (filtro.Criticidade is { } c) q = q.Where(a => a.Criticidade == c);
         if (filtro.Origem is { } o) q = q.Where(a => a.Origem == o);
         if (filtro.SemOwner) q = q.Where(a => !a.Responsaveis.Any(r => r.Vigente(filtro.Hoje)));
+        if (filtro.IdPai is { } pai) q = q.Where(a => a.IdPai == pai);
         return Task.FromResult<IReadOnlyList<Ativo>>(q.Take(Math.Max(teto, 0)).ToArray());
     }
 
@@ -185,9 +186,10 @@ public sealed class RepositorioDeAtivosEmMemoria(
     // ───────────────────────────────────────────────── IRepositorioDeRelacoes
 
     public Task RelacionarAsync(IdDeAtivo origem, IdDeAtivo destino, string tipo,
-        Criticidade criticidade = Criticidade.Media, string? mecanismo = null, CancellationToken ct = default)
+        Criticidade criticidade = Criticidade.Media, string? mecanismo = null,
+        string origemDaEvidencia = CatalogoDeRelacoes.OrigemManual, CancellationToken ct = default)
     {
-        _relacoes.Add((Empresa, origem, destino, tipo, criticidade, mecanismo));
+        _relacoes.Add((Empresa, origem, destino, tipo, criticidade, mecanismo, origemDaEvidencia));
         return Task.CompletedTask;
     }
 
@@ -208,14 +210,14 @@ public sealed class RepositorioDeAtivosEmMemoria(
     public Task<IReadOnlyList<RelacaoResumo>> ListarArestasAsync(string? tipo = null, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<RelacaoResumo>>(MinhasRelacoes
             .Where(r => tipo is null || r.Tipo == tipo)
-            .Select(r => new RelacaoResumo(r.Origem, r.Destino, r.Tipo, r.Criticidade, r.Mecanismo))
+            .Select(r => new RelacaoResumo(r.Origem, r.Destino, r.Tipo, r.Criticidade, r.Mecanismo, r.OrigemDaEvidencia))
             .ToArray());
 
     public Task<IReadOnlyList<RelacaoResumo>> ListarRelacoesAsync(IdDeAtivo id, CancellationToken ct = default)
     {
         var lista = MinhasRelacoes
             .Where(r => r.Origem == id || r.Destino == id)
-            .Select(r => new RelacaoResumo(r.Origem, r.Destino, r.Tipo, r.Criticidade, r.Mecanismo))
+            .Select(r => new RelacaoResumo(r.Origem, r.Destino, r.Tipo, r.Criticidade, r.Mecanismo, r.OrigemDaEvidencia))
             .ToArray();
         return Task.FromResult<IReadOnlyList<RelacaoResumo>>(lista);
     }
@@ -230,7 +232,7 @@ public sealed class RepositorioDeAtivosEmMemoria(
         while (pilha.Count > 0)
         {
             var atual = pilha.Pop();
-            foreach (var (_, _, destino, _, _, _) in MinhasRelacoes.Where(
+            foreach (var (_, _, destino, _, _, _, _) in MinhasRelacoes.Where(
                          r => r.Origem == atual && r.Tipo == "depende_de"))
             {
                 if (destino == id) return Task.FromResult(true);

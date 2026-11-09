@@ -11,8 +11,10 @@ namespace Jornada.Aplicacao.Catalogo.Comandos;
 /// destino exigir confirmação (<see cref="DescontinuarAtivo"/>).
 /// </param>
 /// <param name="Mecanismo">Como a relação acontece: sincrono, assincrono, batch, arquivo ou biblioteca. Opcional.</param>
+/// <param name="OrigemDaEvidencia">De onde veio a evidência: manual (padrão), git, openapi, cmdb ou cicd.</param>
 public sealed record ComandoRelacionarAtivos(
-    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media, string? Mecanismo = null);
+    IdDeAtivo Origem, IdDeAtivo Destino, string Tipo, Criticidade Criticidade = Criticidade.Media, string? Mecanismo = null,
+    string? OrigemDaEvidencia = null);
 
 /// <summary>
 /// Grava uma aresta do grafo do catálogo (<c>implementa</c>, <c>expõe</c>,
@@ -42,10 +44,12 @@ public sealed class RelacionarAtivos(
 
         string tipo;
         string? mecanismo;
+        string origemDaEvidencia;
         try
         {
             tipo = CatalogoDeRelacoes.ConferirTipo(cmd.Tipo);
             mecanismo = CatalogoDeRelacoes.ConferirMecanismo(cmd.Mecanismo);
+            origemDaEvidencia = CatalogoDeRelacoes.ConferirOrigem(cmd.OrigemDaEvidencia);
         }
         catch (ErroDeDominio e) { return Resultado<bool>.Recusado(e.Codigo, e.Message); }
 
@@ -77,7 +81,7 @@ public sealed class RelacionarAtivos(
             return Resultado<bool>.Recusado("CICLO_DE_DEPENDENCIA",
                 $"A relação criaria dependência circular: {destino.Codigo} já depende de {origem.Codigo}.");
 
-        await relacoes.RelacionarAsync(cmd.Origem, cmd.Destino, tipo, cmd.Criticidade, mecanismo, ct);
+        await relacoes.RelacionarAsync(cmd.Origem, cmd.Destino, tipo, cmd.Criticidade, mecanismo, origemDaEvidencia, ct);
 
         // A aresta é gravada na hora (a porta não passa pela unidade de
         // trabalho); o registro de auditoria vai logo depois, na partição da origem.
@@ -85,7 +89,7 @@ public sealed class RelacionarAtivos(
             depois: new Dictionary<string, string>
             {
                 ["destino"] = destino.Codigo.Valor, ["tipo"] = tipo, ["criticidade"] = cmd.Criticidade.Chave(),
-                ["mecanismo"] = mecanismo ?? "",
+                ["mecanismo"] = mecanismo ?? "", ["origem"] = origemDaEvidencia,
             }), ct);
         await uow.ConfirmarAsync(ct);
         return Resultado<bool>.Ok(true);

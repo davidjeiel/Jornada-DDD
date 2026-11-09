@@ -339,6 +339,40 @@ public abstract class ContratoDePersistencia
         Verificar.Igual(null, arestas["persiste_em"].Mecanismo);
     }
 
+    [Teste("relação guarda a origem da evidência; sem ela, é manual")]
+    public async Task RelacaoGuardaAOrigemDaEvidencia()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var app = await Gravar(empresa, Novo(empresa, "aplicacao", "APP-0001", "Motor"));
+        var api = await Gravar(empresa, Novo(empresa, "api", "API-0001", "API"));
+        var bd = await Gravar(empresa, Novo(empresa, "base_dados", "BDD-0001", "Base"));
+
+        await using (var s = Abrir(empresa))
+        {
+            await s.Relacoes.RelacionarAsync(app.Id, api.Id, "consome", origemDaEvidencia: "openapi");
+            await s.Relacoes.RelacionarAsync(app.Id, bd.Id, "persiste_em");
+        }
+
+        await using var nova = Abrir(empresa);
+        var arestas = (await nova.Relacoes.ListarArestasAsync()).ToDictionary(r => r.Tipo);
+        Verificar.Igual("openapi", arestas["consome"].OrigemDaEvidencia);
+        Verificar.Igual("manual", arestas["persiste_em"].OrigemDaEvidencia);
+    }
+
+    [Teste("o filtro por pai traz só os filhos diretos")]
+    public async Task FiltroPorPaiTrazOsFilhosDiretos()
+    {
+        var empresa = IdDeEmpresa.Novo();
+        var sis = await Gravar(empresa, Novo(empresa, "sistema", "SIS-0001", "Plataforma"));
+        var app = await Gravar(empresa, Novo(empresa, "aplicacao", "APP-0001", "Motor", sis.Id));
+        await Gravar(empresa, Novo(empresa, "aplicacao", "APP-0002", "Portal", sis.Id));
+        await Gravar(empresa, Novo(empresa, "api", "API-0001", "API", app.Id));
+
+        await using var s = Abrir(empresa);
+        var filhos = await s.Ativos.BuscarAsync(new FiltroDoCatalogo(IdPai: sis.Id), 10);
+        Verificar.Igual("Motor,Portal", string.Join(",", filhos.Select(f => f.Nome).Order()), "o neto fica de fora");
+    }
+
     [Teste("destino descontinuado aparece como fora de vigência")]
     public async Task DestinoForaDeVigencia()
     {

@@ -30,6 +30,18 @@ public sealed class CartilhaTestes
         Verificar.Igual(Enum.GetValues<Acao>().Length, ConsultarCartilha.Matriz().Count, "toda ação aparece na matriz");
     }
 
+    [Teste("a matriz de mudança vem do painel, com as quatro respostas possíveis")]
+    public void MatrizDeMudancaVemDoPainel()
+    {
+        var linhas = Dominio.Governanca.MatrizDeMudanca.Linhas;
+        Verificar.Igual("texto,escopo,contrato,dependencia,descontinuacao", string.Join(",", linhas.Select(l => l.Mudanca)));
+        var contrato = linhas.Single(l => l.Mudanca == "contrato");
+        Verificar.Igual(("condicional", "obrigatoria", "obrigatoria"), (contrato.Negocial, contrato.Tecnica, contrato.Arquitetural));
+        Verificar.Igual("nao", linhas.Single(l => l.Mudanca == "texto").Arquitetural);
+        Verificar.Verdadeiro(linhas.SelectMany(l => new[] { l.Negocial, l.Tecnica, l.Arquitetural })
+            .All(v => v is "obrigatoria" or "condicional" or "opcional" or "nao"));
+    }
+
     [Teste("a segregação de função aparece: curador não decide validação")]
     public void CuradorNaoApareceDecidindoValidacao()
     {

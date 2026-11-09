@@ -37,6 +37,33 @@ public static class CatalogoDeRelacoes
         ("biblioteca", "Biblioteca compartilhada"),
     ];
 
+    /// <summary>
+    /// De onde veio a evidência da relação (<c>relacionamento_ativo.origem_evidencia</c>
+    /// do painel). Manual é a declarada por uma pessoa; as outras, lidas de uma fonte.
+    /// A pendência "dependência crítica sem evidência" conta só as manuais.
+    /// </summary>
+    public const string OrigemManual = "manual";
+
+    public static readonly IReadOnlyList<(string Chave, string Rotulo)> OrigensDeEvidencia =
+    [
+        (OrigemManual, "Declarada (manual)"),
+        ("git", "Repositório Git"),
+        ("openapi", "Contrato OpenAPI"),
+        ("cmdb", "CMDB"),
+        ("cicd", "Esteira de CI/CD"),
+    ];
+
+    /// <summary>A origem é opcional e vale manual; quando vem, tem de ser uma das conhecidas.</summary>
+    public static string ConferirOrigem(string? origem)
+    {
+        var chave = (origem ?? "").Trim().ToLowerInvariant();
+        if (chave.Length == 0) return OrigemManual;
+        if (OrigensDeEvidencia.All(o => o.Chave != chave))
+            throw new ErroDeDominio("ORIGEM_DE_EVIDENCIA_INVALIDA",
+                $"Origem da evidência inválida: {origem}. Use {string.Join(", ", OrigensDeEvidencia.Select(o => o.Chave))}.");
+        return chave;
+    }
+
     /// <summary>A chave do tipo, normalizada; tipo desconhecido é recusado.</summary>
     public static string ConferirTipo(string? tipo)
     {

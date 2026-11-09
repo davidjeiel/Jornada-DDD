@@ -2,6 +2,7 @@
 // envelhecer: as tabelas da página vêm da API, que as lê das regras aplicadas.
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MatrizDeMudanca } from './Politicas';
 import cartilhaMd from '../../../docs/CARTILHA.md?raw';
 import type { DadosDaCartilha } from '../api';
 import { PERFIS, PaginaDaCartilha, SECAO_DAS_TABELAS, dividirCartilhaEmSecoes } from './Cartilha';
@@ -19,6 +20,7 @@ const dados: DadosDaCartilha = {
   blocosPorPapel: { negocio: ['Estrutura DDD'], techlead: ['Ativos técnicos'], arquiteto: [], curador: [], admin: [], consulta: [] },
   ritos: [{ tipoItem: 'dominio', rotulo: 'Domínio', criticidade: '*', etapas: ['negocial', 'arquitetural'], evidenciaMinima: 1, scoreMinimo: 70, slaHoras: 72, revisarACadaDias: 365 },
     { tipoItem: 'api', rotulo: 'API', criticidade: 'critica', etapas: ['negocial', 'tecnica', 'arquitetural'], evidenciaMinima: 2, scoreMinimo: 80, slaHoras: 24, revisarACadaDias: 90 }],
+  matrizDeMudanca: [{ mudanca: 'contrato', rotulo: 'Contrato', negocial: 'condicional', tecnica: 'obrigatoria', arquitetural: 'obrigatoria' }],
 };
 
 const secoes = dividirCartilhaEmSecoes(cartilhaMd);
@@ -76,3 +78,15 @@ describe('cartilha', () => {
     expect(pagina(null)).toContain('Carregando as tabelas');
   });
 });
+
+describe('políticas', () => {
+  it('a matriz de mudança mostra cada etapa por extenso, com a obrigatória destacada', () => {
+    const html = renderToStaticMarkup(<MatrizDeMudanca linhas={[...dados.matrizDeMudanca,
+      { mudanca: 'texto', rotulo: 'Texto (nome, descrição)', negocial: 'opcional', tecnica: 'opcional', arquitetural: 'nao' }]} />);
+    expect(html).toContain('<th scope="row">Contrato</th>');
+    expect(html).toContain('<td class="exigencia-obrigatoria">obrigatória</td>');
+    expect(html).toContain('<td class="exigencia-condicional">condicional</td>');
+    expect(html).toContain('<td class="exigencia-nao">não se aplica</td>');
+  });
+});
+

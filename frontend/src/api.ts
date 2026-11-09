@@ -15,8 +15,10 @@ export type PreCheck = {
   dimensoes: Record<string, number>;
   bloqueios: { codigo: string; mensagem: string }[];
   alertas: string[];
-  politica: { scoreMinimo: number; evidenciaMinima: number; slaHoras: number; etapas: string[] };
+  politica: { scoreMinimo: number; evidenciaMinima: number; slaHoras: number; etapas: string[]; revisarACadaDias: number };
   caminho: { passo: string; rotulo: string; concluido: boolean; impedimentos: string[]; pendencias: string[] }[];
+  /** Última atualização mais a periodicidade da política (AAAA-MM-DD). */
+  proximaRevisao: string;
 };
 
 export type Validacao = {
@@ -51,6 +53,8 @@ export type RelacaoDoAtivo = {
   tipo: string;
   criticidade: string;
   mecanismo: string | null;
+  /** manual, git, openapi, cmdb ou cicd. */
+  origemDaEvidencia: string;
 };
 
 /** Um degrau da trilha hierárquica, da raiz até o pai direto. */
@@ -85,6 +89,8 @@ export type FichaDoAtivo = {
   evidencias: Evidencia[];
   responsaveis: Responsavel[];
   relacoes: RelacaoDoAtivo[];
+  /** Os filhos diretos na hierarquia, sem os arquivados. */
+  filhos: AtivoResumo[];
 };
 
 export type RevisaoRetratada = {
@@ -183,7 +189,11 @@ export type DadosDaCartilha = {
   etapasPorPapel: Record<string, string[]>;
   blocosPorPapel: Record<string, string[]>;
   ritos: Rito[];
+  matrizDeMudanca: Mudanca[];
 };
+
+/** Uma linha da matriz mínima de aprovação: cada etapa é obrigatoria, condicional, opcional ou nao. */
+export type Mudanca = { mudanca: string; rotulo: string; negocial: string; tecnica: string; arquitetural: string };
 
 /** Recusa da API no padrão CAIXA (ApiError), com o código para a tela decidir o que fazer. */
 export class ErroDaApi extends Error {
@@ -326,7 +336,10 @@ export function relacionarEmLote(id: string, destinos: string[], relacao: NovaRe
 }
 
 export type CampoDoTipo = { nome: string; rotulo: string; tipo: string; obrigatorio: boolean; opcoes: string[] };
-export type TipoDeAtivo = { chave: string; rotulo: string; bloco: string; pai: string | null; campos: CampoDoTipo[] };
+export type TipoDeAtivo = {
+  chave: string; rotulo: string; bloco: string; pai: string | null; campos: CampoDoTipo[];
+  exigeOwnerNegocial: boolean; exigeOwnerTecnico: boolean;
+};
 export type TipoDeRelacao = { chave: string; rotulo: string; destinosSugeridos: string[] };
 
 /** Tipos de ativo, tipos de relação e mecanismos da empresa (GET /v1/metamodelo). */

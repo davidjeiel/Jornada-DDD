@@ -88,6 +88,87 @@ export function TrilhaHierarquica({ trilha, atual }: { trilha: Ancestral[]; atua
   );
 }
 
+/** As cinco dimensões do score, cada uma com a barra (o cartão "Dimensões de qualidade" do painel). */
+export const DIMENSOES = [
+  { chave: 'completude', rotulo: 'Completude' },
+  { chave: 'consistencia', rotulo: 'Consistência' },
+  { chave: 'ownership', rotulo: 'Ownership' },
+  { chave: 'evidencia', rotulo: 'Evidência' },
+  { chave: 'temporalidade', rotulo: 'Temporalidade' },
+] as const;
+
+export function DimensoesDeQualidade({ preCheck }: { preCheck: PreCheck }) {
+  return (
+    <section className="detail-section" aria-labelledby="dimensoes-titulo">
+      <span className="panel-label" id="dimensoes-titulo">Dimensões de qualidade</span>
+      <ul className="lista-de-barras">
+        {DIMENSOES.map((d) => {
+          const valor = preCheck.dimensoes[d.chave] ?? 0;
+          return (
+            <li key={d.chave}>
+              <div className="linha-da-barra"><span>{d.rotulo}</span><span className="discreto">{valor}%</span></div>
+              <div className={valor < 70 ? 'barra baixa' : 'barra'} role="img" aria-label={`${d.rotulo}: ${valor}%`}><span style={{ width: `${valor}%` }} /></div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * O rito da política e os alertas do pré-check (o cartão "Rito e alertas" do
+ * painel). Em edição, os bloqueios já estão no caminho até a publicação e não
+ * se repetem; fora dela, aparecem aqui.
+ */
+export function RitoEAlertas({ preCheck, emEdicao }: { preCheck: PreCheck; emEdicao: boolean }) {
+  const p = preCheck.politica;
+  const bloqueios = emEdicao ? [] : preCheck.bloqueios;
+  return (
+    <section className="detail-section" aria-labelledby="rito-da-ficha">
+      <span className="panel-label" id="rito-da-ficha">{emEdicao ? 'Rito e alertas' : 'Pré-check de publicação'}</span>
+      <p className="discreto">Política: {p.etapas.join(' → ')} · evidência mínima {p.evidenciaMinima} · score mínimo {p.scoreMinimo}% · prazo {p.slaHoras}h por etapa · revisar a cada {p.revisarACadaDias} dias</p>
+      <ul className="lista-checagem">
+        {bloqueios.map((b) => <li key={b.codigo} className="bloqueio">{b.mensagem}</li>)}
+        {preCheck.alertas.map((a) => <li key={a} className="pendente">{a}</li>)}
+        {preCheck.aprovado && preCheck.alertas.length === 0 && <li className="ok">Tudo pronto para publicar</li>}
+        {preCheck.aprovado && preCheck.alertas.length > 0 && <li className="ok">Sem bloqueios: pode ser submetido</li>}
+        {emEdicao && !preCheck.aprovado && preCheck.alertas.length === 0 && <li className="discreto">Os impedimentos estão no caminho até a publicação, acima.</li>}
+      </ul>
+    </section>
+  );
+}
+
+/** De onde veio a evidência da relação, por extenso. */
+export const ORIGEM_DA_EVIDENCIA: Record<string, string> = {
+  manual: 'declarada', git: 'Git', openapi: 'OpenAPI', cmdb: 'CMDB', cicd: 'CI/CD',
+};
+
+/** Os filhos diretos na hierarquia (as linhas "filho · compõe" do mapa de relações do painel). */
+export function FilhosDoAtivo({ filhos, rotuloDoTipo }: { filhos: AtivoResumo[]; rotuloDoTipo: (chave: string) => string }) {
+  if (filhos.length === 0) return null;
+  return (
+    <section className="detail-section" aria-labelledby="filhos-titulo">
+      <span className="panel-label" id="filhos-titulo">Compõem este ativo ({filhos.length})</span>
+      <div className="ficha-list">
+        {filhos.map((f) => (
+          <div className="ficha-row" key={f.id}>
+            <div><strong><Link href={`/ativos/${f.id}`}>{f.codigo}</Link> {f.nome}</strong><small>{rotuloDoTipo(f.tipo)} · filho na hierarquia</small></div>
+            <Status status={f.status} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** O que o tipo exige de responsáveis para publicar (a nota da aba Pessoas do painel). */
+export function exigenciaDoTipo(tipo: { exigeOwnerNegocial: boolean; exigeOwnerTecnico: boolean } | undefined): string {
+  if (!tipo) return '';
+  const exigidos = [tipo.exigeOwnerNegocial && 'owner negocial', tipo.exigeOwnerTecnico && 'owner técnico'].filter(Boolean);
+  return exigidos.length ? `Este tipo exige ${exigidos.join(' e ')}.` : 'Este tipo não tem papel obrigatório.';
+}
+
 export function CaminhoAtePublicacao({ id, preCheck }: { id: string; preCheck: PreCheck }) {
   const metas: Record<string, string> = {
     descrever: 'descrição e campos obrigatórios do tipo',
@@ -201,7 +282,7 @@ export function FormularioDeRelacao({ id, ativos, metamodelo, ocupado, onRelacio
 
 export type Acoes = {
   editar: (dados: { nome: string; descricao: string; criticidade: string; atributos: Record<string, string>; idSquad: string | null }) => void;
-  submeter: () => void;
+  submeter: (motivo: string) => void;
   abrirRevisao: () => void;
   atribuir: (idPessoa: string, papel: string) => void;
   encerrar: (idPessoa: string, papel: string) => void;
@@ -349,15 +430,22 @@ function Resumo({ ficha, preCheck, podeEscrever, ocupado, acoes, metamodelo, squ
             <div className={preCheck.aprovado ? 'score-ring good' : 'score-ring'}>{preCheck.score}</div>
           </div>
         )}
+        {preCheck && <p className="proxima-revisao discreto">Próxima revisão <strong>{preCheck.proximaRevisao}</strong></p>}
         {preCheck && mostraCaminho(ficha.status) && <CaminhoAtePublicacao id={ficha.id} preCheck={preCheck} />}
+        {preCheck && <RitoEAlertas preCheck={preCheck} emEdicao={editavel(ficha.status)} />}
         {podeEscrever && ficha.status === 'publicado' && (
           <div className="detail-actions"><button className="primary-button" disabled={ocupado} onClick={acoes.abrirRevisao}>Abrir revisão</button></div>
         )}
         {podeEscrever && editavel(ficha.status) && (
-          <div className="detail-actions">
-            <button className="primary-button" disabled={ocupado || !preCheck?.aprovado} onClick={acoes.submeter}>Submeter para validação</button>
-          </div>
+          <form className="formulario-pagina submissao" aria-label="Enviar para validação"
+            onSubmit={(e) => { e.preventDefault(); acoes.submeter(new FormData(e.currentTarget).get('motivo')?.toString().trim() ?? ''); }}>
+            <label>Motivo da revisão<textarea name="motivo" rows={2} placeholder="O que mudou e por quê. Aparece no histórico e para quem valida." /></label>
+            <div className="detail-actions">
+              <button className="primary-button" disabled={ocupado || !preCheck?.aprovado}>Submeter para validação</button>
+            </div>
+          </form>
         )}
+        {preCheck && <DimensoesDeQualidade preCheck={preCheck} />}
       </aside>
     </div>
   );
@@ -375,7 +463,7 @@ function Relacoes({ ficha, ativos, metamodelo, podeEscrever, podeDescontinuar, i
               <Link2 size={15} aria-hidden="true" />
               <div>
                 <strong>{rel.direcao === 'saida' ? <>{rotuloDaRelacao(rel.tipo)} <Link href={`/ativos/${rel.ativoId}`}>{rel.codigo}</Link></> : <><Link href={`/ativos/${rel.ativoId}`}>{rel.codigo}</Link> {rotuloDaRelacao(rel.tipo)} este</>}</strong>
-                <small>{rel.nome}{rel.mecanismo && ` · ${rotuloDoMecanismo(rel.mecanismo)}`}</small>
+                <small>{rel.nome}{rel.mecanismo && ` · ${rotuloDoMecanismo(rel.mecanismo)}`} · evidência {ORIGEM_DA_EVIDENCIA[rel.origemDaEvidencia] ?? rel.origemDaEvidencia}</small>
               </div>
               <Criticidade valor={rel.criticidade} />
             </div>
@@ -383,6 +471,7 @@ function Relacoes({ ficha, ativos, metamodelo, podeEscrever, podeDescontinuar, i
       {podeEscrever && editavel(ficha.status) && (
         <FormularioDeRelacao id={ficha.id} ativos={ativos} metamodelo={metamodelo} ocupado={ocupado} onRelacionar={acoes.relacionar} onErro={onErro} />
       )}
+      <FilhosDoAtivo filhos={ficha.filhos ?? []} rotuloDoTipo={(c) => metamodelo?.tipos.find((t) => t.chave === c)?.rotulo ?? c} />
       <p><Link href={`/ativos/${ficha.id}/grafo`}>Ver o grafo de relações deste ativo</Link></p>
       {impacto && <QuemDepende impacto={impacto} />}
       {impacto && podeDescontinuar && podeSerDescontinuado(ficha.status) && (
@@ -393,7 +482,7 @@ function Relacoes({ ficha, ativos, metamodelo, podeEscrever, podeDescontinuar, i
   );
 }
 
-function Pessoas({ ficha, pessoas, podeEscrever, idPessoa, ocupado, acoes }: PropsDaVisao) {
+function Pessoas({ ficha, pessoas, podeEscrever, idPessoa, ocupado, acoes, metamodelo }: PropsDaVisao) {
   function atribuir(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const d = new FormData(evento.currentTarget);
@@ -414,6 +503,7 @@ function Pessoas({ ficha, pessoas, podeEscrever, idPessoa, ocupado, acoes }: Pro
               )}
             </div>
           ))}</div>}
+      <p className="discreto exigencia-do-tipo">{exigenciaDoTipo(metamodelo?.tipos.find((t) => t.chave === ficha.tipoItem))}</p>
       {podeEscrever && editavel(ficha.status) && (
         <form className="decisao-pleito" onSubmit={atribuir} aria-label="Definir responsável">
           <label>Pessoa
@@ -534,7 +624,7 @@ export function PaginaDoAtivo({
 
   const acoes: Acoes = {
     editar: (dados) => void agir(() => editarAtivo(id, dados), 'Não foi possível salvar as alterações.'),
-    submeter: () => void agir(() => submeterAtivo(id, 'Enviado pela ficha'), 'Não foi possível submeter.'),
+    submeter: (motivo) => void agir(() => submeterAtivo(id, motivo), 'Não foi possível submeter.'),
     abrirRevisao: () => void agir(() => abrirRevisao(id), 'Não foi possível abrir a revisão.'),
     atribuir: (quem, papel) => void agir(() => atribuirResponsavel(id, quem, papel), 'Não foi possível definir o responsável.'),
     encerrar: (quem, papel) => void agir(() => encerrarResponsavel(id, quem, papel), 'Não foi possível encerrar o responsável.'),

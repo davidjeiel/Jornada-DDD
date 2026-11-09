@@ -43,7 +43,8 @@ public sealed class ConsultarCartilha(IPoliticasDeGovernanca politicas, IMetamod
         IReadOnlyList<LinhaDaMatriz> Matriz,
         IReadOnlyDictionary<Papel, IReadOnlyList<EtapaValidacao>> EtapasPorPapel,
         IReadOnlyDictionary<Papel, IReadOnlyList<string>> BlocosPorPapel,
-        IReadOnlyList<Rito> Ritos);
+        IReadOnlyList<Rito> Ritos,
+        IReadOnlyList<MatrizDeMudanca.Linha> MatrizDeMudanca);
 
     /// <summary>Cada célula é <see cref="PoliticaDeAutorizacao.PapeisQuePodem"/>: mudou a regra, muda a página.</summary>
     public static IReadOnlyList<LinhaDaMatriz> Matriz() =>
@@ -65,6 +66,7 @@ public sealed class ConsultarCartilha(IPoliticasDeGovernanca politicas, IMetamod
 
         return new Saida(Matriz(), EtapasPorPapel(),
             OrdemDosPapeis.ToDictionary(p => p, PoliticaDeAutorizacao.BlocosDoPapel),
-            ritos);
+            ritos,
+            Dominio.Governanca.MatrizDeMudanca.Linhas);
     }
 }

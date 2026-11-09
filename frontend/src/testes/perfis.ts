@@ -40,10 +40,10 @@ export function pleito(dados: Partial<Pleito> = {}): Pleito {
 /** Um metamodelo com um tipo de cada bloco e uma hierarquia curta, para os testes do assistente. */
 export const metamodeloDeTeste: Metamodelo = {
   tipos: [
-    { chave: 'dominio', rotulo: 'Domínio', bloco: 'Estrutura DDD', pai: null, campos: [{ nome: 'visao', rotulo: 'Visão de negócio', tipo: 'area', obrigatorio: true, opcoes: [] }, { nome: 'forum', rotulo: 'Fórum', tipo: 'texto', obrigatorio: false, opcoes: [] }] },
-    { chave: 'subdominio', rotulo: 'Subdomínio', bloco: 'Estrutura DDD', pai: 'dominio', campos: [{ nome: 'classificacao', rotulo: 'Classificação', tipo: 'selecao', obrigatorio: true, opcoes: ['core', 'suporte', 'genérico'] }] },
-    { chave: 'sistema', rotulo: 'Sistema', bloco: 'Ativos técnicos', pai: null, campos: [] },
-    { chave: 'api', rotulo: 'API', bloco: 'Ativos técnicos', pai: null, campos: [] },
+    { chave: 'dominio', rotulo: 'Domínio', bloco: 'Estrutura DDD', pai: null, campos: [{ nome: 'visao', rotulo: 'Visão de negócio', tipo: 'area', obrigatorio: true, opcoes: [] }, { nome: 'forum', rotulo: 'Fórum', tipo: 'texto', obrigatorio: false, opcoes: [] }], exigeOwnerNegocial: false, exigeOwnerTecnico: false },
+    { chave: 'subdominio', rotulo: 'Subdomínio', bloco: 'Estrutura DDD', pai: 'dominio', campos: [{ nome: 'classificacao', rotulo: 'Classificação', tipo: 'selecao', obrigatorio: true, opcoes: ['core', 'suporte', 'genérico'] }], exigeOwnerNegocial: false, exigeOwnerTecnico: false },
+    { chave: 'sistema', rotulo: 'Sistema', bloco: 'Ativos técnicos', pai: null, campos: [], exigeOwnerNegocial: false, exigeOwnerTecnico: false },
+    { chave: 'api', rotulo: 'API', bloco: 'Ativos técnicos', pai: null, campos: [], exigeOwnerNegocial: false, exigeOwnerTecnico: false },
   ],
   relacoes: [],
   mecanismos: [],

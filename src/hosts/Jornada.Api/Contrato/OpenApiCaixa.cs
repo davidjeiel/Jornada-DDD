@@ -182,15 +182,17 @@ internal sealed class FiltroDeRespostas : ISchemaFilter
              "revisaoAtual":1,"trilha":[],"atributos":{"plataforma":"mainframe"},
              "evidencias":[{"id":"01a12128-8290-7d4e-a1f0-0b6a3c2d9e10","tipo":"openapi","titulo":"Contrato OpenAPI v2","url":"https://repositorio.exemplo/core-bancario/openapi.yaml"}],
              "responsaveis":[{"idPessoa":"{{IdPessoa}}","papel":"OwnerTecnico","inicioVigencia":"2026-10-09","fimVigencia":null,"vigente":true}],
-             "relacoes":[]}
+             "relacoes":[{"direcao":"saida","ativoId":"01a12128-82a1-7c3e-9d10-4f2b6a8c0e21","codigo":"BDD-0001","nome":"DB2 Contas","tipo":"persiste_em","criticidade":"alta","mecanismo":"sincrono","origemDaEvidencia":"manual"}],
+             "filhos":[{"id":"01a12128-82b4-7a51-8e22-3c9d0f6b1a32","codigo":"APP-0001","nome":"Motor de Lançamentos","tipo":"aplicacao","status":"publicado","criticidade":"alta"}]}
             """,
         [typeof(PreCheckResponse)] = """
             {"aprovado":false,"score":76,
              "dimensoes":{"completude":100,"consistencia":100,"ownership":0,"evidencia":80,"temporalidade":100},
              "bloqueios":[{"codigo":"OWNER_NAO_DEFINIDO","mensagem":"Owner técnico não definido"}],
              "alertas":["Definir owner tecnico"],
-             "politica":{"scoreMinimo":60,"evidenciaMinima":0,"slaHoras":72,"etapas":["tecnica"]},
-             "caminho":[{"passo":"responsaveis","rotulo":"Definir responsáveis","concluido":false,"impedimentos":["OWNER_NAO_DEFINIDO"],"pendencias":["Owner técnico não definido"]}]}
+             "politica":{"scoreMinimo":60,"evidenciaMinima":0,"slaHoras":72,"etapas":["tecnica"],"revisarACadaDias":180},
+             "caminho":[{"passo":"responsaveis","rotulo":"Definir responsáveis","concluido":false,"impedimentos":["OWNER_NAO_DEFINIDO"],"pendencias":["Owner técnico não definido"]}],
+             "proximaRevisao":"2027-04-07"}
             """,
         [typeof(SubmissaoResponse)] = """{"revisao":1,"score":97,"etapasAbertas":["tecnica"]}""",
         [typeof(ValidacaoResponse)] = $$"""

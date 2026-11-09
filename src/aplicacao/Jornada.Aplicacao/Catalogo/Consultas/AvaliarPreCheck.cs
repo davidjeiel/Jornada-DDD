@@ -23,7 +23,8 @@ public sealed class AvaliarPreCheck(
     public sealed record Saida(
         ResultadoPreCheck Checagem,
         ScoreDeQualidade Score,
-        IReadOnlyList<PassoDePublicacao> Caminho);
+        IReadOnlyList<PassoDePublicacao> Caminho,
+        DateOnly ProximaRevisao);
 
     public async Task<Resultado<Saida>> ExecutarAsync(IdDeAtivo id, CancellationToken ct = default)
     {
@@ -32,8 +33,16 @@ public sealed class AvaliarPreCheck(
             return Resultado<Saida>.Recusado("ATIVO_NAO_ENCONTRADO", "Ativo não encontrado.");
 
         var (checagem, score) = await AvaliarAsync(ativo, ct);
-        return Resultado<Saida>.Ok(new Saida(checagem, score, CaminhoDePublicacao.De(checagem)));
+        return Resultado<Saida>.Ok(new Saida(checagem, score, CaminhoDePublicacao.De(checagem),
+            ProximaRevisao(ativo, checagem.Politica)));
     }
+
+    /// <summary>
+    /// Quando o ativo deve ser revisto: a última atualização mais a
+    /// periodicidade da política (<c>qualidade.proxima_revisao</c>).
+    /// </summary>
+    public static DateOnly ProximaRevisao(Ativo ativo, PoliticaDeGovernanca politica) =>
+        DateOnly.FromDateTime(ativo.AtualizadoEm.UtcDateTime).AddDays(politica.PeriodicidadeRevisaoDias);
 
     /// <summary>Reutilizado por <c>SubmeterAtivo</c> — uma regra, dois chamadores.</summary>
     public async Task<(ResultadoPreCheck Checagem, ScoreDeQualidade Score)> AvaliarAsync(
