@@ -6994,6 +6994,7 @@ components:
         - origem
         - temResponsavel
         - atualizadoEm
+        - pai
       type: object
       properties:
         ativo:
@@ -7013,6 +7014,18 @@ components:
           type: string
           description: A última alteração.
           format: date-time
+        pai:
+          $ref: '#/components/schemas/AtivoResumoResponse'
+        score:
+          type: integer
+          description: 'O score de qualidade, de 0 a 100, com a mesma conta do pré-check.'
+          format: int32
+          nullable: true
+        criadoPor:
+          type: string
+          description: Quem cadastrou (ou importou) o ativo; nulo na carga.
+          format: uuid
+          nullable: true
       additionalProperties: false
       description: Um ativo na lista do catálogo.
     LeituraResponse:
@@ -7176,12 +7189,12 @@ components:
         meusRascunhos:
           type: array
           items:
-            $ref: '#/components/schemas/AtivoResumoResponse'
-          description: 'O que cadastrei e ainda está comigo: rascunho ou em revisão.'
+            $ref: '#/components/schemas/ItemDoCatalogoResponse'
+          description: 'O que cadastrei e ainda está comigo: rascunho ou em revisão, com qualidade e atualização.'
         aguardandoDecisao:
           type: array
           items:
-            $ref: '#/components/schemas/AtivoResumoResponse'
+            $ref: '#/components/schemas/ItemDoCatalogoResponse'
           description: O que cadastrei e está em validação.
       additionalProperties: false
       description: A minha mesa.

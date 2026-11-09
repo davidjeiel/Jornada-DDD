@@ -144,6 +144,7 @@ builder.Services.AddScoped<ConsultarVizinhanca>();
 builder.Services.AddScoped<MontarArvore>();
 builder.Services.AddScoped<MontarGrafoDoCatalogo>();
 builder.Services.AddScoped<Indicadores>();
+builder.Services.AddScoped<ItensDoCatalogo>();
 builder.Services.AddScoped<ImportarDescobertas>();
 builder.Services.AddScoped<TriarDescobertas>();
 builder.Services.AddScoped<Notificador>();
@@ -336,7 +337,7 @@ catalogo.MapGet("/ativos", async (IRepositorioDeAtivos repo, string? tipo, Cance
 // O catálogo com recorte, ordem e página (servicos.buscar_pagina). /ativos continua
 // sendo a lista simples, que os formulários usam para escolher pai e destino.
 catalogo.MapGet("/catalogo", async Task<Results<Ok<PaginaDoCatalogoResponse>, JsonHttpResult<ApiError>>> (
-    HttpContext http, BuscarNoCatalogo caso, IRelogio relogio, CancellationToken ct,
+    HttpContext http, BuscarNoCatalogo caso, ItensDoCatalogo itens, IRelogio relogio, CancellationToken ct,
     string? termo = null, string? tipo = null, string? status = null, Guid? squad = null, string? criticidade = null,
     bool semOwner = false, string? origem = null, string? ordenar = null, bool desc = false, int pagina = 1, int porPagina = 50) =>
 {
@@ -365,7 +366,7 @@ catalogo.MapGet("/catalogo", async Task<Results<Ok<PaginaDoCatalogoResponse>, Js
 
     var filtro = new FiltroDoCatalogo(termo, tipo, st, squad, crit, semOwner, org, relogio.Hoje);
     var r = await caso.ExecutarAsync(filtro, ordenar, desc, pagina, porPagina, ct);
-    return TypedResults.Ok(PaginaDoCatalogoResponse.De(r, relogio.Hoje));
+    return TypedResults.Ok(PaginaDoCatalogoResponse.De(r, await itens.DetalharAsync(r.Itens, ct), relogio.Hoje));
 })
     .WithName("buscarNoCatalogo")
     .WithSummary("Busca no catálogo, com filtros, ordem e página")
@@ -759,8 +760,11 @@ governanca.MapGet("/validacoes/{id:guid}/painel", async Task<Results<Ok<PainelDo
     .WithDescription("A etapa, a ficha do ativo (evidências, responsáveis, trilha), o pré-check e o que mudou desde a revisão anterior.")
     .ComErros(StatusCodes.Status404NotFound);
 
-governanca.MapGet("/mesa", async (MinhaMesa caso, CancellationToken ct) =>
-    TypedResults.Ok(MesaResponse.De(await caso.ExecutarAsync(ct))))
+governanca.MapGet("/mesa", async (MinhaMesa caso, ItensDoCatalogo itens, IRelogio relogio, CancellationToken ct) =>
+{
+    var mesa = await caso.ExecutarAsync(ct);
+    return TypedResults.Ok(MesaResponse.De(mesa, await itens.DetalharAsync([.. mesa.MeusRascunhos, .. mesa.AguardandoDecisao], ct), relogio.Hoje));
+})
     .WithName("consultarMesa")
     .WithSummary("Minha mesa: o que é meu")
     .WithDescription("As etapas que você assumiu, a fila livre, o que você cadastrou e ainda está com você (rascunho ou em revisão), e o que você cadastrou e aguarda decisão.");
@@ -856,10 +860,10 @@ acesso.MapGet("/cartilha", async (ConsultarCartilha caso, CancellationToken ct) 
 
 var descobertas = v1.MapGroup("/descobertas").WithTags(OpenApiCaixa.TagCatalogo);
 
-descobertas.MapGet("", async (TriarDescobertas caso, IRelogio relogio, CancellationToken ct) =>
+descobertas.MapGet("", async (TriarDescobertas caso, ItensDoCatalogo itens, IRelogio relogio, CancellationToken ct) =>
     TypedResults.Ok(new DescobertasResponse(
         FontesDeDescoberta.Todas.Select(f => new FonteDeDescobertaResponse(f.Chave, f.Rotulo, f.Ajuda, f.TipoDoPai)).ToArray(),
-        (await caso.BandejaAsync(ct)).Select(a => ItemDoCatalogoResponse.De(a, relogio.Hoje)).ToArray())))
+        (await itens.DetalharAsync(await caso.BandejaAsync(ct), ct)).Select(i => ItemDoCatalogoResponse.De(i, relogio.Hoje)).ToArray())))
     .WithName("consultarDescobertas")
     .WithSummary("As fontes de descoberta e a bandeja")
     .WithDescription("A bandeja é o que a importação trouxe e ninguém triou: origem automática, em rascunho, o mais recente primeiro (até 200).");

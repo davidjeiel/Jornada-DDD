@@ -5,6 +5,7 @@ import {
 } from '../api';
 import { Cabecalho } from '../componentes';
 import { Link } from '../roteador';
+import { nomeDaPessoa } from '../usuarios';
 
 const ROTULO_DA_ACAO: Record<string, string> = { criar: 'criar', manter: 'já existe', atualizar: 'atualizar' };
 const quando = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -115,17 +116,20 @@ export function BandejaDeDescobertas({ itens, selecionados, ocupado, onSeleciona
                   <tr>
                     <th scope="col"><input type="checkbox" aria-label="Selecionar todos" checked={todos}
                       onChange={(e) => onSelecionar(e.target.checked ? itens.map((i) => i.ativo.id) : [])} /></th>
-                    <th scope="col">Código</th><th scope="col">Nome</th><th scope="col">Tipo</th><th scope="col">Importado em</th>
+                    <th scope="col">Código</th><th scope="col">Nome</th><th scope="col">Tipo</th><th scope="col">Contexto/pai</th>
+                    <th scope="col">Trazido por</th><th scope="col">Importado em</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {itens.map(({ ativo, atualizadoEm }) => (
+                  {itens.map(({ ativo, atualizadoEm, pai, criadoPor }) => (
                     <tr key={ativo.id}>
                       <td><input type="checkbox" aria-label={`Selecionar ${ativo.nome}`} checked={selecionados.includes(ativo.id)}
                         onChange={(e) => onSelecionar(e.target.checked ? [...selecionados, ativo.id] : selecionados.filter((s) => s !== ativo.id))} /></td>
                       <td className="mono">{ativo.codigo}</td>
                       <td><Link href={`/ativos/${ativo.id}`}>{ativo.nome}</Link></td>
                       <td>{ativo.tipo}</td>
+                      <td>{pai ? <Link href={`/ativos/${pai.id}`}>{pai.nome}</Link> : '—'}</td>
+                      <td>{criadoPor ? nomeDaPessoa(criadoPor) : '—'}</td>
                       <td className="discreto">{quando.format(new Date(atualizadoEm))}</td>
                     </tr>
                   ))}

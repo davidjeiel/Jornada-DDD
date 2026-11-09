@@ -24,7 +24,11 @@ type PropsDosFiltros = { filtros: URLSearchParams; metamodelo: Metamodelo | null
 export function FormularioDeFiltros({ filtros, metamodelo, squads, onMudar }: PropsDosFiltros) {
   const valor = (chave: string) => filtros.get(chave) ?? '';
   return (
-    <form className="formulario-pagina filtros-do-catalogo" role="search" aria-label="Filtrar o catálogo" onSubmit={(e) => e.preventDefault()}>
+    <form className="formulario-pagina filtros-do-catalogo" role="search" aria-label="Filtrar o catálogo"
+      onSubmit={(e) => { e.preventDefault(); onMudar('termo', new FormData(e.currentTarget).get('termo')?.toString().trim() || null); }}>
+      <label className="busca-do-catalogo">Buscar
+        <input type="search" name="termo" key={valor('termo')} defaultValue={valor('termo')} placeholder="Nome, código ou descrição; Enter aplica" />
+      </label>
       <label>Tipo
         <select name="tipo" value={valor('tipo')} onChange={(e) => onMudar('tipo', e.target.value || null)}>
           <option value="">todos</option>
@@ -78,10 +82,15 @@ export function ChipsDosFiltros({ chips }: { chips: Chip[] }) {
   );
 }
 
-type PropsDaLista = { pagina: PaginaDoCatalogo; filtros: URLSearchParams; idSelecionado: string | null };
+type PropsDaLista = { pagina: PaginaDoCatalogo; filtros: URLSearchParams; idSelecionado: string | null; squads?: Squad[] };
+
+/** A faixa do score, como no painel: bom a partir de 80, médio a partir de 60. */
+export function classeDoScore(score: number): 'bom' | 'medio' | 'ruim' {
+  return score >= 80 ? 'bom' : score >= 60 ? 'medio' : 'ruim';
+}
 
 /** A página do recorte, com o total real e a navegação entre páginas (test_catalogo_mostra_total_e_paginacao). */
-export function ListaDoCatalogo({ pagina, filtros, idSelecionado }: PropsDaLista) {
+export function ListaDoCatalogo({ pagina, filtros, idSelecionado, squads = [] }: PropsDaLista) {
   const comAtivo = (id: string) => {
     const busca = new URLSearchParams(filtros);
     busca.set('pagina', String(pagina.pagina));
@@ -96,14 +105,19 @@ export function ListaDoCatalogo({ pagina, filtros, idSelecionado }: PropsDaLista
       </p>
       <div className="asset-list">
         {pagina.itens.length === 0 ? <div className="empty-state">Nenhum ativo neste recorte.</div>
-          : pagina.itens.map(({ ativo, origem, temResponsavel }) => (
+          : pagina.itens.map(({ ativo, origem, temResponsavel, pai, idSquad, score }) => (
             <Link className={idSelecionado === ativo.id ? 'asset-row selected' : 'asset-row'} key={ativo.id} href={comAtivo(ativo.id)}
               aria-current={idSelecionado === ativo.id ? 'true' : undefined}>
               <span className={`asset-icon type-${ativo.tipo.toLowerCase()}`} aria-hidden="true">{ativo.tipo.slice(0, 1).toUpperCase()}</span>
               <span className="asset-copy">
                 <strong>{ativo.nome}</strong>
                 <small>{ativo.codigo} <i>•</i> {ativo.tipo}{origem === 'automatica' && ' · descoberta automática'}{!temResponsavel && ' · sem responsável'}</small>
+                <small className="contexto-da-linha">{pai ? `em ${pai.nome}` : 'raiz'} · {squads.find((s) => s.id === idSquad)?.sigla ?? 'sem squad'}</small>
               </span>
+              {/* Sempre uma célula, mesmo sem score: a grade da linha não pode deslocar. */}
+              {score !== null
+                ? <span className={`score ${classeDoScore(score)}`} title="Qualidade (score do pré-check)">{score}%</span>
+                : <span className="score" title="Sem score: tipo fora do metamodelo">—</span>}
               <Status status={ativo.status} />
               <Criticidade valor={ativo.criticidade} />
               <ArrowUpRight size={17} className="row-arrow" aria-hidden="true" />
@@ -201,7 +215,7 @@ export function Catalogo({ busca, idSelecionado, metamodelo, squads, papeis, idP
       <div className="workspace-grid">
         <section className="panel catalog-panel" aria-labelledby="lista-titulo">
           <div className="panel-heading"><div><span className="panel-label">ATIVOS</span><h2 id="lista-titulo">O recorte</h2></div></div>
-          {pagina ? <ListaDoCatalogo pagina={pagina} filtros={filtros} idSelecionado={idSelecionado} /> : <div className="empty-state">Carregando catálogo...</div>}
+          {pagina ? <ListaDoCatalogo pagina={pagina} filtros={filtros} idSelecionado={idSelecionado} squads={squads} /> : <div className="empty-state">Carregando catálogo...</div>}
         </section>
 
         <aside className="panel detail-panel" aria-label="Ativo selecionado">

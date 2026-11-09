@@ -15,6 +15,21 @@ export type Formulario = {
 
 const CRITICIDADE: Record<string, string> = { baixa: 'baixa', media: 'média', alta: 'alta', critica: 'crítica' };
 
+/** O que o tipo exige para publicar (o "Exigências deste tipo" do assistente do painel). */
+export function ExigenciasDoTipo({ tipo, rotuloDoPai }: { tipo: TipoDeAtivo; rotuloDoPai: string }) {
+  return (
+    <>
+      <span className="panel-label">Exigências deste tipo</span>
+      <ul className="lista-checagem">
+        <li className={tipo.exigeOwnerNegocial ? 'pendente' : 'ok'}>Owner negocial {tipo.exigeOwnerNegocial ? 'obrigatório' : 'opcional'}</li>
+        <li className={tipo.exigeOwnerTecnico ? 'pendente' : 'ok'}>Owner técnico {tipo.exigeOwnerTecnico ? 'obrigatório' : 'opcional'}</li>
+        {tipo.pai && <li className="pendente">Vínculo com {rotuloDoPai}</li>}
+        {tipo.campos.filter((c) => c.obrigatorio).map((c) => <li key={c.nome} className="pendente">{c.rotulo} é obrigatório para publicar</li>)}
+      </ul>
+    </>
+  );
+}
+
 /** "negocial → tecnica → arquitetural", como o painel escreve o rito. */
 export function etapasDoRito(rito: Rito): string {
   return rito.etapas.join(' → ');
@@ -118,6 +133,15 @@ export function AssistenteDeCadastro({ oferecidos, metamodelo, ativos, squads, f
             <p className="discreto">O ativo nasce em rascunho. Responsáveis e evidências você completa na ficha, antes de submeter.</p>
           </>
         ) : <p className="vazio">Consultando o rito...</p>}
+        <ExigenciasDoTipo tipo={tipo} rotuloDoPai={metamodelo?.tipos.find((t) => t.chave === tipo.pai)?.rotulo ?? tipo.pai ?? ''} />
+        <span className="panel-label">O que vem depois</span>
+        <ol className="o-que-vem-depois">
+          <li>Salvar o rascunho com os campos do tipo</li>
+          <li>Definir os responsáveis, na aba Pessoas da ficha</li>
+          <li>Registrar as relações (implementa, expõe, depende de)</li>
+          <li>Anexar as evidências que a política exige</li>
+          <li>Enviar para validação: o pré-check roda antes</li>
+        </ol>
       </aside>
     </div>
   );

@@ -492,7 +492,7 @@ export function consultarPainel(id: string): Promise<PainelDoValidador> {
   return requisicao(`/v1/validacoes/${id}/painel`);
 }
 
-export type Mesa = { minhasValidacoes: ItemDaFila[]; filaLivre: ItemDaFila[]; meusRascunhos: AtivoResumo[]; aguardandoDecisao: AtivoResumo[] };
+export type Mesa = { minhasValidacoes: ItemDaFila[]; filaLivre: ItemDaFila[]; meusRascunhos: ItemDoCatalogo[]; aguardandoDecisao: ItemDoCatalogo[] };
 
 export function consultarMesa(): Promise<Mesa> {
   return requisicao('/v1/mesa');
@@ -500,7 +500,14 @@ export function consultarMesa(): Promise<Mesa> {
 
 // ── Catálogo com recorte, ordem e página (fase 5) ────────────────────────
 
-export type ItemDoCatalogo = { ativo: AtivoResumo; origem: string; idSquad: string | null; temResponsavel: boolean; atualizadoEm: string };
+export type ItemDoCatalogo = {
+  ativo: AtivoResumo; origem: string; idSquad: string | null; temResponsavel: boolean; atualizadoEm: string;
+  /** O pai na hierarquia; nulo num ativo raiz. */
+  pai: AtivoResumo | null;
+  /** O score de qualidade (0 a 100), a mesma conta do pré-check. */
+  score: number | null;
+  criadoPor: string | null;
+};
 
 export type PaginaDoCatalogo = {
   itens: ItemDoCatalogo[]; total: number; pagina: number; paginas: number; porPagina: number;

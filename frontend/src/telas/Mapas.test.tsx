@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { AtivoResumo, Impacto, NoDaArvore, Vizinhanca } from '../api';
 import { posicionar } from '../grafo';
 import { MENU } from '../navegacao';
-import { VisaoDoGrafo } from './Grafo';
+import { AtivosNoGrafo, VisaoDoGrafo } from './Grafo';
 import { QuemDepende } from './Impacto';
 import { ArvoreDoCatalogo, Mapas, filtrarArvore } from './Mapas';
 
@@ -73,5 +73,35 @@ describe('mapas', () => {
 
   it('ativo sem consumidor diz isso claramente (test_ativo_sem_consumidor_diz_isso_claramente)', () => {
     expect(renderToStaticMarkup(<QuemDepende impacto={semConsumidor} />)).toContain('Nenhum ativo em vigor depende deste.');
+  });
+});
+
+describe('detalhes do mapa e do grafo', () => {
+  it('a árvore vazia aponta por onde começar, em cada visão', () => {
+    const negocio = renderToStaticMarkup(<ArvoreDoCatalogo raizes={[]} filtro="" visao="negocio" />);
+    expect(negocio).toContain('href="/novo?tipo=dominio"');
+    const tecnica = renderToStaticMarkup(<ArvoreDoCatalogo raizes={[]} filtro="" visao="tecnica" />);
+    expect(tecnica).toContain('href="/novo?tipo=sistema"');
+    expect(tecnica).toContain('href="/descobertas"');
+  });
+
+  it('expandir e recolher tudo mandam em todos os ramos', () => {
+    const raizes = Array.from({ length: 4 }, (_, i) => no(ativo(`d-${i}`, `Domínio ${i}`, 'dominio'), [no(ativo(`s-${i}`, `Sub ${i}`, 'subdominio'))]));
+    const abertos = (html: string) => (html.match(/<details open=""/g) ?? []).length;
+    expect(abertos(renderToStaticMarkup(<ArvoreDoCatalogo raizes={raizes} filtro="" />))).toBe(0);   // mais de três raízes: fechada
+    expect(abertos(renderToStaticMarkup(<ArvoreDoCatalogo raizes={raizes} filtro="" tudoAberto />))).toBe(4);
+    expect(abertos(renderToStaticMarkup(<ArvoreDoCatalogo raizes={raizes.slice(0, 2)} filtro="" tudoAberto={false} />))).toBe(0);
+    const tela = renderToStaticMarkup(<Mapas visao="negocio" onErro={nada} />);
+    expect(tela).toContain('Expandir tudo');
+    expect(tela).toContain('Recolher tudo');
+  });
+
+  it('o grafo traz os mesmos ativos em tabela, com a distância', () => {
+    const html = renderToStaticMarkup(<AtivosNoGrafo dados={vizinhanca} />);
+    expect(html).toContain('Ativos no grafo (3)');
+    expect(html).toContain('<td>centro</td>');
+    expect((html.match(/<td>1<\/td>/g) ?? []).length).toBe(2);
+    expect(renderToStaticMarkup(<VisaoDoGrafo dados={vizinhanca} impacto={semConsumidor} metamodelo={null} tipos={[]} onSaltos={nada} onTipos={nada} />))
+      .toContain('Ativos no grafo');
   });
 });

@@ -114,6 +114,23 @@ public sealed class IndicadoresTestes
             "com owner negocial, a capacidade sai da pendência");
     }
 
+    [Teste("cada linha das listas traz o pai e o score, o mesmo do pré-check")]
+    public void ItensTrazemPaiEScoreDoPreCheck()
+    {
+        var m = new MundoDaFicha();
+        var (dom, sub, ctx, cap) = m.Capacidade();
+        m.Completar(cap);
+        var lista = new[] { dom, ctx, cap }.Select(id => m.Repo.ObterAsync(id).Result!).ToArray();
+
+        var itens = new ItensDoCatalogo(m.Repo, m.Repo, new MetamodeloPadrao(), new PoliticasPadrao(), Cenario.Relogio)
+            .DetalharAsync(lista).Result.ToDictionary(i => i.Ativo.Id);
+        Verificar.Igual(null, itens[dom].Pai, "raiz não tem pai");
+        Verificar.Igual(sub, itens[ctx].Pai!.Id, "o pai fora da lista é lido à parte");
+        Verificar.Igual(ctx, itens[cap].Pai!.Id);
+        foreach (var id in new[] { dom, ctx, cap })
+            Verificar.Igual<int?>(m.PreCheck(id).Score.Total, itens[id].Score, $"score de {m.Repo.ObterAsync(id).Result!.Nome}");
+    }
+
     private static Indicadores IndicadoresDe(MundoDaFicha m) =>
         new(m.Repo, m.Repo, m.Repo, new RepositorioDeIndicadoresEmMemoria(new ArmazemEmMemoria(), ContextoDeTenantFixo.Para(Cenario.EmpresaA)),
             new MetamodeloPadrao(), new PoliticasPadrao(), ContextoDeTenantFixo.Para(Cenario.EmpresaA), new AtorFixo(MundoDeAcesso.Admin), Cenario.Relogio);

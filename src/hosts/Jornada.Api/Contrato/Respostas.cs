@@ -334,15 +334,20 @@ public sealed record PainelDoValidadorResponse(
 /// <summary>A minha mesa.</summary>
 /// <param name="MinhasValidacoes">Etapas que eu assumi.</param>
 /// <param name="FilaLivre">Etapas que ninguém assumiu.</param>
-/// <param name="MeusRascunhos">O que cadastrei e ainda está comigo: rascunho ou em revisão.</param>
+/// <param name="MeusRascunhos">O que cadastrei e ainda está comigo: rascunho ou em revisão, com qualidade e atualização.</param>
 /// <param name="AguardandoDecisao">O que cadastrei e está em validação.</param>
 public sealed record MesaResponse(
     IReadOnlyList<ItemDaFilaResponse> MinhasValidacoes, IReadOnlyList<ItemDaFilaResponse> FilaLivre,
-    IReadOnlyList<AtivoResumoResponse> MeusRascunhos, IReadOnlyList<AtivoResumoResponse> AguardandoDecisao)
+    IReadOnlyList<ItemDoCatalogoResponse> MeusRascunhos, IReadOnlyList<ItemDoCatalogoResponse> AguardandoDecisao)
 {
-    public static MesaResponse De(MinhaMesa.Saida s) => new(
-        s.MinhasValidacoes.Select(ItemDaFilaResponse.De).ToArray(), s.FilaLivre.Select(ItemDaFilaResponse.De).ToArray(),
-        s.MeusRascunhos.Select(AtivoResumoResponse.De).ToArray(), s.AguardandoDecisao.Select(AtivoResumoResponse.De).ToArray());
+    public static MesaResponse De(MinhaMesa.Saida s, IReadOnlyList<ItensDoCatalogo.Item> itens, DateOnly hoje)
+    {
+        var porId = itens.ToDictionary(i => i.Ativo.Id);
+        ItemDoCatalogoResponse[] Itens(IEnumerable<Ativo> ativos) => ativos.Select(a => ItemDoCatalogoResponse.De(porId[a.Id], hoje)).ToArray();
+        return new(
+            s.MinhasValidacoes.Select(ItemDaFilaResponse.De).ToArray(), s.FilaLivre.Select(ItemDaFilaResponse.De).ToArray(),
+            Itens(s.MeusRascunhos), Itens(s.AguardandoDecisao));
+    }
 }
 
 /// <summary>Fila de validações da empresa.</summary>
@@ -560,11 +565,17 @@ public sealed record MudancaResponse(string Mudanca, string Rotulo, string Negoc
 /// <param name="IdSquad">O squad que cuida do ativo.</param>
 /// <param name="TemResponsavel">Há responsável vigente hoje.</param>
 /// <param name="AtualizadoEm">A última alteração.</param>
-public sealed record ItemDoCatalogoResponse(AtivoResumoResponse Ativo, string Origem, Guid? IdSquad, bool TemResponsavel, DateTimeOffset AtualizadoEm)
+/// <param name="Pai">O ativo pai na hierarquia; nulo num ativo raiz.</param>
+/// <param name="Score">O score de qualidade, de 0 a 100, com a mesma conta do pré-check.</param>
+/// <param name="CriadoPor">Quem cadastrou (ou importou) o ativo; nulo na carga.</param>
+public sealed record ItemDoCatalogoResponse(
+    AtivoResumoResponse Ativo, string Origem, Guid? IdSquad, bool TemResponsavel, DateTimeOffset AtualizadoEm,
+    AtivoResumoResponse? Pai, int? Score, Guid? CriadoPor)
 {
-    public static ItemDoCatalogoResponse De(Ativo a, DateOnly hoje) => new(
-        AtivoResumoResponse.De(a), a.Origem == OrigemDoAtivo.Automatica ? "automatica" : "manual", a.IdSquad,
-        a.Responsaveis.Any(r => r.Vigente(hoje)), a.AtualizadoEm);
+    public static ItemDoCatalogoResponse De(ItensDoCatalogo.Item i, DateOnly hoje) => new(
+        AtivoResumoResponse.De(i.Ativo), i.Ativo.Origem == OrigemDoAtivo.Automatica ? "automatica" : "manual", i.Ativo.IdSquad,
+        i.Ativo.Responsaveis.Any(r => r.Vigente(hoje)), i.Ativo.AtualizadoEm,
+        i.Pai is null ? null : AtivoResumoResponse.De(i.Pai), i.Score, i.Ativo.CriadoPor);
 }
 
 /// <summary>Uma página do catálogo, com o total real do recorte.</summary>
@@ -582,8 +593,8 @@ public sealed record PaginaDoCatalogoResponse(
     IReadOnlyList<ItemDoCatalogoResponse> Itens, int Total, int Pagina, int Paginas, int PorPagina, int Primeiro, int Ultimo,
     string Ordem, bool Descendente, bool Truncado)
 {
-    public static PaginaDoCatalogoResponse De(BuscarNoCatalogo.Saida s, DateOnly hoje) => new(
-        s.Itens.Select(a => ItemDoCatalogoResponse.De(a, hoje)).ToArray(), s.Total, s.Pagina, s.Paginas, s.PorPagina,
+    public static PaginaDoCatalogoResponse De(BuscarNoCatalogo.Saida s, IReadOnlyList<ItensDoCatalogo.Item> itens, DateOnly hoje) => new(
+        itens.Select(i => ItemDoCatalogoResponse.De(i, hoje)).ToArray(), s.Total, s.Pagina, s.Paginas, s.PorPagina,
         s.Primeiro, s.Ultimo, s.Ordem, s.Descendente, s.Truncado);
 }
 
