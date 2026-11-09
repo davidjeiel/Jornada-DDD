@@ -836,3 +836,17 @@ a.validation-row > :not(:first-child) { flex: none; width: auto; }
 .acao-do-plano { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); color: var(--muted); }
 .acao-do-plano.acao-criar { border-color: var(--success); background: var(--success-weak); color: var(--success); }
 .acao-do-plano.acao-atualizar { border-color: var(--warning); background: var(--warning-weak); color: var(--pending-ink); }
+
+/* Formulários dentro da ficha (responsável, relação, evidência) e da decisão de pleito:
+   o mesmo campo dos demais formulários, em grade. */
+.decisao-pleito label { display: block; color: var(--muted); font-size: 12.5px; }
+.decisao-pleito input, .decisao-pleito select, .decisao-pleito textarea { display: block; width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--field-border); border-radius: 7px; background: var(--field-bg); color: var(--ink); font: inherit; font-size: 14px; }
+.decisao-pleito input[type="checkbox"], .decisao-pleito input[type="radio"] { display: inline-block; width: auto; margin: 0 6px 0 0; }
+.decisao-pleito .ajuda { margin: 0; }
+.painel-aba .decisao-pleito { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+/* Por que a ficha está só para leitura. */
+.aviso-somente-leitura { margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-left: 3px solid var(--warning); border-radius: 8px; background: var(--warning-weak); color: var(--ink); font-size: 14px; }
+.aviso-somente-leitura a { margin-left: 6px; font-weight: 600; }
+.ficha-row .link-button { margin-left: 8px; }
+.abrir-ficha { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin: 4px 0 14px; text-decoration: none; }

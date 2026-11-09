@@ -121,6 +121,7 @@ builder.Services.AddSingleton<IPublicadorDeEventos, PublicadorEmMemoria>();
 builder.Services.AddScoped<CadastrarAtivo>();
 builder.Services.AddScoped<EditarAtivo>();
 builder.Services.AddScoped<AtribuirResponsavel>();
+builder.Services.AddScoped<EncerrarResponsavel>();
 builder.Services.AddScoped<AnexarEvidencia>();
 builder.Services.AddScoped<RelacionarAtivos>();
 builder.Services.AddScoped<RelacionarEmLote>();
@@ -492,7 +493,22 @@ catalogo.MapPost("/ativos/{id:guid}/responsaveis", async Task<Results<NoContent,
 })
     .WithName("atribuirResponsavel")
     .WithSummary("Define um responsável pelo ativo")
-    .WithDescription("Sem os owners que o tipo exige, o pré-check bloqueia a submissão. Só em rascunho ou com revisão aberta.")
+    .WithDescription("Um papel tem uma pessoa só: quem o ocupava é encerrado hoje, e a história fica. Sem os owners que o tipo exige, o pré-check bloqueia a submissão. Só em rascunho ou com revisão aberta.")
+    .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
+catalogo.MapPost("/ativos/{id:guid}/responsaveis/encerramentos", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (
+    HttpContext http, Guid id, EncerrarResponsavel caso, AtribuirResponsavelRequest corpo, CancellationToken ct) =>
+{
+    if (!Enum.TryParse<PapelDeOwnership>(corpo.Papel, ignoreCase: true, out var papel))
+        return Erro(http, "PAPEL_INVALIDO",
+            $"Papel '{corpo.Papel}' inválido. Use: {string.Join(", ", Enum.GetNames<PapelDeOwnership>())}.");
+
+    var r = await caso.ExecutarAsync(new ComandoEncerrarResponsavel(new IdDeAtivo(id), corpo.IdPessoa, papel), ct);
+    return r.Sucesso ? TypedResults.NoContent() : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("encerrarResponsavel")
+    .WithSummary("Encerra a responsabilidade de uma pessoa no ativo")
+    .WithDescription("O papel fica vago e a responsabilidade encerrada continua na história do ativo. Pessoa que não ocupa o papel: 404 RESPONSAVEL_NAO_ENCONTRADO. Só em rascunho ou com revisão aberta.")
     .ComErros(StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
 
 catalogo.MapPost("/ativos/{id:guid}/evidencias", async Task<Results<NoContent, JsonHttpResult<ApiError>>> (

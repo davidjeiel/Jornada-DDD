@@ -2517,8 +2517,120 @@ paths:
       tags:
         - Catálogo
       summary: Define um responsável pelo ativo
-      description: 'Sem os owners que o tipo exige, o pré-check bloqueia a submissão. Só em rascunho ou com revisão aberta.'
+      description: 'Um papel tem uma pessoa só: quem o ocupava é encerrado hoje, e a história fica. Sem os owners que o tipo exige, o pré-check bloqueia a submissão. Só em rascunho ou com revisão aberta.'
       operationId: atribuirResponsavel
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtribuirResponsavelRequest'
+        required: true
+      responses:
+        '204':
+          description: 'Operação concluída, sem conteúdo de resposta.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
+  '/v1/ativos/{id}/responsaveis/encerramentos':
+    post:
+      tags:
+        - Catálogo
+      summary: Encerra a responsabilidade de uma pessoa no ativo
+      description: 'O papel fica vago e a responsabilidade encerrada continua na história do ativo. Pessoa que não ocupa o papel: 404 RESPONSAVEL_NAO_ENCONTRADO. Só em rascunho ou com revisão aberta.'
+      operationId: encerrarResponsavel
       parameters:
         - name: id
           in: path

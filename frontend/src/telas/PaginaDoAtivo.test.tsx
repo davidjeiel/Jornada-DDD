@@ -5,13 +5,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { AtivoResumo, FichaDoAtivo, Metamodelo, PreCheck } from '../api';
 import { secaoDoCaminho } from '../navegacao';
 import {
-  VisaoDoAtivo, abaDaUrl, caminhoDaAba, candidatosAoDestino, destinoDigitado, problemaDaRelacao, type Acoes, type Aba,
+  VisaoDoAtivo, abaDaUrl, caminhoDaAba, candidatosAoDestino, destinoDigitado, motivoDeSoLeitura, problemaDaRelacao, type Acoes, type Aba,
 } from './PaginaDoAtivo';
 import { SelecaoDoLote } from './RelacoesEmLote';
 
 const nada = () => {};
 const assincrono = async () => {};
-const acoes: Acoes = { editar: nada, submeter: nada, abrirRevisao: nada, atribuir: nada, anexar: nada, relacionar: nada, comparar: nada, descontinuar: assincrono, arquivar: assincrono };
+const acoes: Acoes = { editar: nada, submeter: nada, abrirRevisao: nada, atribuir: nada, encerrar: nada, anexar: nada, relacionar: nada, comparar: nada, descontinuar: assincrono, arquivar: assincrono };
 
 const ID = '0199a1b2-0000-7000-8000-000000000004';
 const ativo = (id: string, codigo: string, nome: string, tipo: string): AtivoResumo => ({ id, codigo, nome, tipo, status: 'publicado', criticidade: 'media' });
@@ -164,5 +164,39 @@ describe('relações em lote', () => {
   it('volta para a aba de relações depois de enviar (test_post_do_lote_volta_para_a_aba_de_relacoes)', () => {
     expect(caminhoDaAba('a-0', 'relacoes')).toBe('/ativos/a-0?aba=relacoes');
     expect(lote()).toContain('href="/ativos/a-0?aba=relacoes"');
+  });
+});
+
+describe('responsáveis e só leitura', () => {
+  const comDono = (status: string, podeEscrever: boolean, motivo: string | null = null) => renderToStaticMarkup(
+    <VisaoDoAtivo ficha={{ ...ficha(status), responsaveis: [
+      { idPessoa: 'p-1', papel: 'OwnerNegocial', inicioVigencia: '2026-11-01', fimVigencia: null, vigente: true },
+      { idPessoa: 'p-2', papel: 'OwnerNegocial', inicioVigencia: '2026-10-01', fimVigencia: '2026-11-01', vigente: false },
+    ] }} preCheck={preCheck} aba="pessoas" ativos={ativos} pessoas={[]} metamodelo={metamodelo} squads={[]}
+      historico={null} comparacao={null} impacto={null} podeEscrever={podeEscrever} podeDescontinuar={false} idPessoa={null}
+      ocupado={false} acoes={acoes} onErro={nada} motivoDeSoLeitura={motivo} />);
+
+  it('o responsável vigente pode ser encerrado; o encerrado fica na lista, sem botão', () => {
+    const html = comDono('rascunho', true);
+    expect(html.match(/>Encerrar</g)).toHaveLength(1);
+    expect(html).toContain('encerrado');
+    expect(html).toContain('Definir responsável');
+    expect(html).toContain('Cada papel tem uma pessoa só');
+    expect(comDono('publicado', true)).not.toContain('>Encerrar<');
+    expect(comDono('rascunho', false)).not.toContain('>Encerrar<');
+  });
+
+  it('a ficha diz por que está só para leitura', () => {
+    const base = { identificado: true, modoLeitura: false, escreveNoTipo: true, status: 'rascunho', rotuloDoTipo: 'Sistema' };
+    expect(motivoDeSoLeitura(base)).toBeNull();
+    expect(motivoDeSoLeitura({ ...base, identificado: false })).toContain('escolha quem é você');
+    expect(motivoDeSoLeitura({ ...base, modoLeitura: true })).toContain('modo de leitura');
+    expect(motivoDeSoLeitura({ ...base, escreveNoTipo: false })).toContain('não edita ativos do tipo sistema');
+    expect(motivoDeSoLeitura({ ...base, status: 'em_validacao' })).toContain('até as etapas serem decididas');
+    expect(motivoDeSoLeitura({ ...base, status: 'publicado' })).toContain('Abrir revisão');
+    const html = comDono('rascunho', false, 'Você está só consultando. Para editar, escolha quem é você em Seu perfil.');
+    expect(html).toContain('class="aviso-somente-leitura"');
+    expect(html).toContain('href="/perfil"');
+    expect(html).not.toContain('só permite consulta');
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Check, Link2, Paperclip } from 'lucide-react';
 import {
-  abrirRevisao, analisarImpacto, anexarEvidencia, arquivarAtivo, atribuirResponsavel, avaliarPreCheck, compararRevisoes,
+  abrirRevisao, analisarImpacto, anexarEvidencia, arquivarAtivo, atribuirResponsavel, avaliarPreCheck, compararRevisoes, encerrarResponsavel,
   consultarHistorico, descontinuarAtivo, editarAtivo, obterAtivo, relacionarAtivos, submeterAtivo,
   type Ancestral, type AtivoResumo, type Comparacao, type FichaDoAtivo as Ficha, type Historico as DadosDoHistorico,
   type Impacto, type Metamodelo, type NovaRelacao, type Pessoa, type PreCheck, type Squad,
@@ -46,6 +46,25 @@ export function mostraCaminho(status: string): boolean {
 
 export function editavel(status: string): boolean {
   return status === 'rascunho' || status === 'em_revisao';
+}
+
+/**
+ * Por que a ficha está só para leitura, ou nulo se dá para editar. A ficha
+ * diz o motivo no topo, em vez de só esconder os formulários: quem não escolheu
+ * quem é, quem está em modo leitura, o papel que não edita aquele tipo, ou o
+ * estado do ativo.
+ */
+export function motivoDeSoLeitura(o: { identificado: boolean; modoLeitura: boolean; escreveNoTipo: boolean; status: string; rotuloDoTipo: string }): string | null {
+  if (!o.identificado) return 'Você está só consultando. Para editar, escolha quem é você em Seu perfil.';
+  if (o.modoLeitura) return 'Você está em modo de leitura. Para editar, troque o modo em Seu perfil.';
+  if (!o.escreveNoTipo) return `Seu papel não edita ativos do tipo ${o.rotuloDoTipo.toLowerCase()}. A ficha fica para consulta.`;
+  switch (o.status) {
+    case 'em_validacao': return 'Em validação: a ficha fica só para leitura até as etapas serem decididas. Acompanhe em Validações.';
+    case 'publicado': return 'Publicado: para mudar alguma coisa, abra uma revisão (botão "Abrir revisão" ao lado).';
+    case 'descontinuado': return 'Descontinuado: a ficha não se edita mais.';
+    case 'arquivado': return 'Arquivado: a ficha não se edita mais.';
+    default: return null;
+  }
 }
 
 const PAPEIS_DE_OWNERSHIP = [
@@ -185,6 +204,7 @@ export type Acoes = {
   submeter: () => void;
   abrirRevisao: () => void;
   atribuir: (idPessoa: string, papel: string) => void;
+  encerrar: (idPessoa: string, papel: string) => void;
   anexar: (evidencia: { tipo: string; titulo: string; url?: string }) => void;
   relacionar: (idDestino: string, relacao: NovaRelacao) => void;
   comparar: () => void;
@@ -209,6 +229,8 @@ type PropsDaVisao = {
   ocupado: boolean;
   acoes: Acoes;
   onErro: (mensagem: string) => void;
+  /** Por que a ficha está só para leitura; nulo quando dá para editar. */
+  motivoDeSoLeitura?: string | null;
 };
 
 /**
@@ -236,6 +258,12 @@ export function VisaoDoAtivo(props: PropsDaVisao) {
         </div>
         <div className="etiquetas"><Status status={ficha.status} /><Criticidade valor={ficha.criticidade} /></div>
       </header>
+      {props.motivoDeSoLeitura && (
+        <p className="aviso-somente-leitura" role="note">
+          {props.motivoDeSoLeitura}
+          {props.motivoDeSoLeitura.includes('Seu perfil') && <> <Link href="/perfil">Ir para Seu perfil</Link></>}
+        </p>
+      )}
 
       <div className="ficha-tabs" role="tablist" aria-label="Seções do ativo">
         {ABAS.map((a) => (
@@ -255,7 +283,7 @@ export function VisaoDoAtivo(props: PropsDaVisao) {
           ? <Historico historico={props.historico} comparacao={props.comparacao} onComparar={acoes.comparar} />
           : <p className="vazio">Carregando o histórico...</p>)}
       </div>
-      {!podeEscrever && <p className="readonly-note">Seu papel, ou o modo de leitura, só permite consulta.</p>}
+      {!podeEscrever && !props.motivoDeSoLeitura && <p className="readonly-note">Seu papel, ou o modo de leitura, só permite consulta.</p>}
       {preCheck === null && <p className="vazio">Avaliando o pré-check...</p>}
     </>
   );
@@ -380,6 +408,10 @@ function Pessoas({ ficha, pessoas, podeEscrever, idPessoa, ocupado, acoes }: Pro
             <div className="ficha-row" key={`${r.idPessoa}-${r.papel}-${i}`}>
               <div><strong>{nomeDaPessoa(r.idPessoa)}</strong><small>{PAPEIS_DE_OWNERSHIP.find((p) => p.chave === r.papel)?.rotulo ?? r.papel} · desde {r.inicioVigencia}{r.fimVigencia ? ` até ${r.fimVigencia}` : ''}</small></div>
               <span className={r.vigente ? 'status status-good' : 'status'}>{r.vigente ? 'vigente' : 'encerrado'}</span>
+              {r.vigente && podeEscrever && editavel(ficha.status) && (
+                <button type="button" className="link-button" disabled={ocupado} onClick={() => acoes.encerrar(r.idPessoa, r.papel)}
+                  aria-label={`Encerrar ${nomeDaPessoa(r.idPessoa)} como ${PAPEIS_DE_OWNERSHIP.find((p) => p.chave === r.papel)?.rotulo ?? r.papel}`}>Encerrar</button>
+              )}
             </div>
           ))}</div>}
       {podeEscrever && editavel(ficha.status) && (
@@ -393,6 +425,7 @@ function Pessoas({ ficha, pessoas, podeEscrever, idPessoa, ocupado, acoes }: Pro
           <label>Papel no ativo
             <select name="papel" defaultValue="OwnerTecnico">{PAPEIS_DE_OWNERSHIP.map((p) => <option key={p.chave} value={p.chave}>{p.rotulo}</option>)}</select>
           </label>
+          <p className="ajuda largo">Cada papel tem uma pessoa só: definir outra encerra quem estava, e a troca fica no histórico.</p>
           <div className="modal-actions"><button className="primary-button" disabled={ocupado}>Definir responsável</button></div>
         </form>
       )}
@@ -446,11 +479,18 @@ type Props = {
   podeEscrever: boolean;
   podeDescontinuar: boolean;
   idPessoa: string | null;
+  /** Os blocos de tipos em que o papel da pessoa escreve (perfil.blocosQueEscreve). */
+  blocos?: string[];
+  identificado?: boolean;
+  modoLeitura?: boolean;
   onAlterado: () => Promise<void>;
   onErro: (mensagem: string) => void;
 };
 
-export function PaginaDoAtivo({ id, aba, ativos, pessoas, metamodelo, squads, podeEscrever, podeDescontinuar, idPessoa, onAlterado, onErro }: Props) {
+export function PaginaDoAtivo({
+  id, aba, ativos, pessoas, metamodelo, squads, podeEscrever, podeDescontinuar, idPessoa,
+  blocos = [], identificado = true, modoLeitura = false, onAlterado, onErro,
+}: Props) {
   const [ficha, setFicha] = useState<Ficha | null>(null);
   const [preCheck, setPreCheck] = useState<PreCheck | null>(null);
   const [impacto, setImpacto] = useState<Impacto | null>(null);
@@ -497,6 +537,7 @@ export function PaginaDoAtivo({ id, aba, ativos, pessoas, metamodelo, squads, po
     submeter: () => void agir(() => submeterAtivo(id, 'Enviado pela ficha'), 'Não foi possível submeter.'),
     abrirRevisao: () => void agir(() => abrirRevisao(id), 'Não foi possível abrir a revisão.'),
     atribuir: (quem, papel) => void agir(() => atribuirResponsavel(id, quem, papel), 'Não foi possível definir o responsável.'),
+    encerrar: (quem, papel) => void agir(() => encerrarResponsavel(id, quem, papel), 'Não foi possível encerrar o responsável.'),
     anexar: (ev) => void agir(() => anexarEvidencia(id, ev), 'Não foi possível anexar a evidência.'),
     relacionar: (destino, relacao) => void agir(async () => {
       const { criada } = await relacionarAtivos(id, destino, relacao);
@@ -507,9 +548,17 @@ export function PaginaDoAtivo({ id, aba, ativos, pessoas, metamodelo, squads, po
     arquivar: () => agir(() => arquivarAtivo(id), 'Não foi possível arquivar o ativo.'),
   };
 
+  // O papel escreve em blocos de tipos: quem edita sistemas não edita domínios, e vice-versa.
+  const tipo = metamodelo?.tipos.find((t) => t.chave === ficha.tipoItem);
+  const escreveNoTipo = podeEscrever && (!tipo || blocos.length === 0 || blocos.includes(tipo.bloco));
+  const motivo = motivoDeSoLeitura({
+    identificado, modoLeitura, escreveNoTipo: identificado && !modoLeitura ? escreveNoTipo : true,
+    status: ficha.status, rotuloDoTipo: tipo?.rotulo ?? ficha.tipoItem,
+  });
+
   return (
     <VisaoDoAtivo ficha={ficha} preCheck={preCheck} aba={aba} ativos={ativos} pessoas={pessoas} metamodelo={metamodelo} squads={squads}
-      historico={historico} comparacao={comparacao} impacto={impacto} podeEscrever={podeEscrever} podeDescontinuar={podeDescontinuar}
-      idPessoa={idPessoa} ocupado={ocupado} acoes={acoes} onErro={onErro} />
+      historico={historico} comparacao={comparacao} impacto={impacto} podeEscrever={escreveNoTipo} podeDescontinuar={podeDescontinuar}
+      idPessoa={idPessoa} ocupado={ocupado} acoes={acoes} onErro={onErro} motivoDeSoLeitura={motivo} />
   );
 }

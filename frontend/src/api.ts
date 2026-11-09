@@ -291,6 +291,10 @@ export function editarAtivo(id: string, payload: {
   return requisicao(`/v1/ativos/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
+export function encerrarResponsavel(id: string, idPessoa: string, papel: string): Promise<void> {
+  return requisicao(`/v1/ativos/${id}/responsaveis/encerramentos`, { method: 'POST', body: JSON.stringify({ idPessoa, papel }) });
+}
+
 export function atribuirResponsavel(id: string, idPessoa: string, papel: string = 'OwnerTecnico'): Promise<void> {
   return requisicao(`/v1/ativos/${id}/responsaveis`, {
     method: 'POST',

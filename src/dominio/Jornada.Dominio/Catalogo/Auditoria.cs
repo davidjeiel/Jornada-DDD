@@ -31,6 +31,7 @@ public static class AcoesAuditadas
     public const string Criar = "criar";
     public const string Alterar = "alterar";
     public const string DefinirResponsavel = "definir_responsavel";
+    public const string EncerrarResponsavel = "encerrar_responsavel";
     public const string Relacionar = "relacionar";
     public const string AnexarEvidencia = "anexar_evidencia";
     public const string Submeter = "submeter";
