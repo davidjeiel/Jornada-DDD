@@ -225,7 +225,8 @@ public sealed class Indicadores(
             new("repositorio_sem_mantenedor", "Repositório sem mantenedor",
                 vivos.Count(a => a.TipoItem == "repositorio" && !a.Responsaveis.Any(r => r.Vigente(hoje))), TipoItem: "repositorio", SemResponsavel: true),
             new("sla_vencido", "Validação com SLA vencido", Vencidas(b), Tela: "validacoes"),
-            new("dependencia_critica_sem_evidencia", "Dependência crítica sem evidência", b.DependenciasCriticas.Count()),
+            new("dependencia_critica_sem_evidencia", "Dependência crítica sem evidência",
+                b.DependenciasCriticas.Count(r => r.OrigemDaEvidencia == CatalogoDeRelacoes.OrigemManual)),
         ];
     }
 }

@@ -880,3 +880,20 @@ a.validation-row > :not(:first-child) { flex: none; width: auto; }
 .tabela td.numero { text-align: right; }
 .linha-da-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .linha-da-fila a { flex: 1 1 auto; }
+
+/* Ficha, validação e políticas: dimensões, rito e alertas, submissão com motivo, matriz de mudança. */
+.lista-checagem { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.lista-checagem li { padding-left: 20px; position: relative; }
+.lista-checagem li::before { position: absolute; left: 0; font-weight: 700; }
+.lista-checagem li.bloqueio { color: var(--danger); }
+.lista-checagem li.bloqueio::before { content: "✕"; }
+.lista-checagem li.pendente { color: var(--warning); }
+.lista-checagem li.pendente::before { content: "!"; }
+.lista-checagem li.ok { color: var(--success); }
+.lista-checagem li.ok::before { content: "✓"; }
+.submissao { margin-top: 12px; }
+.exigencia-do-tipo { margin-top: 8px; }
+.matriz-de-mudanca th[scope="row"] { color: var(--ink); font-size: 14px; font-weight: 600; text-align: left; text-transform: none; letter-spacing: normal; }
+.matriz-de-mudanca td.exigencia-obrigatoria { color: var(--danger); font-weight: 600; }
+.matriz-de-mudanca td.exigencia-condicional { color: var(--warning); }
+.matriz-de-mudanca td.exigencia-nao { color: var(--muted); }

@@ -49,7 +49,8 @@ public sealed record ResponsavelResponse(
 /// <param name="Tipo">Tipo da relação.</param>
 /// <param name="Criticidade">Quanto a origem depende do destino: baixa, media, alta ou critica.</param>
 /// <param name="Mecanismo">Como a relação acontece (sincrono, assincrono, batch, arquivo, biblioteca); nulo se não informado.</param>
-public sealed record RelacaoResponse(string Direcao, Guid AtivoId, string Codigo, string Nome, string Tipo, string Criticidade, string? Mecanismo);
+/// <param name="OrigemDaEvidencia">De onde veio a evidência: manual, git, openapi, cmdb ou cicd.</param>
+public sealed record RelacaoResponse(string Direcao, Guid AtivoId, string Codigo, string Nome, string Tipo, string Criticidade, string? Mecanismo, string OrigemDaEvidencia);
 
 /// <summary>Um degrau da trilha hierárquica.</summary>
 public sealed record AncestralResponse(Guid Id, string Codigo, string Nome, string TipoItem);
@@ -69,6 +70,7 @@ public sealed record AncestralResponse(Guid Id, string Codigo, string Nome, stri
 /// <param name="Evidencias">Evidências anexadas.</param>
 /// <param name="Responsaveis">Responsáveis, vigentes e encerrados.</param>
 /// <param name="Relacoes">Relações nos dois sentidos.</param>
+/// <param name="Filhos">Os filhos diretos na hierarquia, sem os arquivados.</param>
 public sealed record FichaDoAtivoResponse(
     Guid Id,
     string Codigo,
@@ -83,7 +85,8 @@ public sealed record FichaDoAtivoResponse(
     IReadOnlyDictionary<string, string> Atributos,
     IReadOnlyList<EvidenciaResponse> Evidencias,
     IReadOnlyList<ResponsavelResponse> Responsaveis,
-    IReadOnlyList<RelacaoResponse> Relacoes)
+    IReadOnlyList<RelacaoResponse> Relacoes,
+    IReadOnlyList<AtivoResumoResponse> Filhos)
 {
     public static FichaDoAtivoResponse De(ObterVisaoDoAtivo.Saida s) => new(
         s.Id.Valor, s.Codigo, s.Nome, s.TipoItem, s.Status, s.Criticidade, s.Descricao,
@@ -92,7 +95,8 @@ public sealed record FichaDoAtivoResponse(
         s.Responsaveis.Select(r => new ResponsavelResponse(
             r.IdPessoa, r.Papel, r.InicioVigencia, r.FimVigencia, r.Vigente)).ToArray(),
         s.Relacoes.Select(r => new RelacaoResponse(
-            r.Direcao, Guid.Parse(r.AtivoId), r.Codigo, r.Nome, r.Tipo, r.Criticidade, r.Mecanismo)).ToArray());
+            r.Direcao, Guid.Parse(r.AtivoId), r.Codigo, r.Nome, r.Tipo, r.Criticidade, r.Mecanismo, r.OrigemDaEvidencia)).ToArray(),
+        s.Filhos.Select(AtivoResumoResponse.De).ToArray());
 }
 
 /// <summary>Ativo que aponta para o analisado e ainda vale como referência (publicado ou em revisão).</summary>
@@ -188,7 +192,12 @@ public sealed record DimensoesDoScoreResponse(
 public sealed record BloqueioResponse(string Codigo, string Mensagem);
 
 /// <summary>Política de governança que vale para este ativo (tipo × criticidade).</summary>
-public sealed record PoliticaResponse(int ScoreMinimo, int EvidenciaMinima, int SlaHoras, IReadOnlyList<string> Etapas);
+/// <param name="ScoreMinimo">Score de qualidade mínimo para publicar.</param>
+/// <param name="EvidenciaMinima">Quantas evidências o rito exige.</param>
+/// <param name="SlaHoras">Prazo de cada etapa de validação, em horas.</param>
+/// <param name="Etapas">As etapas do rito, na ordem.</param>
+/// <param name="RevisarACadaDias">De quantos em quantos dias o ativo deve ser revisto.</param>
+public sealed record PoliticaResponse(int ScoreMinimo, int EvidenciaMinima, int SlaHoras, IReadOnlyList<string> Etapas, int RevisarACadaDias);
 
 /// <summary>Passo do caminho até a publicação.</summary>
 /// <param name="Passo">descrever, responsaveis, conectar, evidenciar ou qualidade.</param>
@@ -212,7 +221,10 @@ public sealed record CampoDoTipoResponse(string Nome, string Rotulo, string Tipo
 /// <param name="Bloco">Estrutura DDD ou Ativos técnicos.</param>
 /// <param name="Pai">A chave do tipo pai, quando o tipo exige hierarquia.</param>
 /// <param name="Campos">Os campos específicos do tipo.</param>
-public sealed record TipoDeAtivoResponse(string Chave, string Rotulo, string Bloco, string? Pai, IReadOnlyList<CampoDoTipoResponse> Campos);
+/// <param name="ExigeOwnerNegocial">Publicar exige owner negocial vigente.</param>
+/// <param name="ExigeOwnerTecnico">Publicar exige owner técnico vigente.</param>
+public sealed record TipoDeAtivoResponse(string Chave, string Rotulo, string Bloco, string? Pai, IReadOnlyList<CampoDoTipoResponse> Campos,
+    bool ExigeOwnerNegocial, bool ExigeOwnerTecnico);
 
 /// <summary>Um tipo de relação e os tipos de destino que fazem sentido para ele.</summary>
 public sealed record TipoDeRelacaoResponse(string Chave, string Rotulo, IReadOnlyList<string> DestinosSugeridos);
@@ -244,7 +256,8 @@ public sealed record PreCheckResponse(
     IReadOnlyList<BloqueioResponse> Bloqueios,
     IReadOnlyList<string> Alertas,
     PoliticaResponse Politica,
-    IReadOnlyList<PassoResponse> Caminho)
+    IReadOnlyList<PassoResponse> Caminho,
+    DateOnly ProximaRevisao)
 {
     public static PreCheckResponse De(AvaliarPreCheck.Saida s) => new(
         s.Checagem.Aprovado,
@@ -255,10 +268,12 @@ public sealed record PreCheckResponse(
         s.Checagem.Alertas,
         new PoliticaResponse(s.Checagem.Politica.ScoreMinimo, s.Checagem.Politica.EvidenciaMinima,
             s.Checagem.Politica.SlaHoras,
-            s.Checagem.Politica.Etapas.Select(e => e.ToString().ToLowerInvariant()).ToArray()),
+            s.Checagem.Politica.Etapas.Select(e => e.ToString().ToLowerInvariant()).ToArray(),
+            s.Checagem.Politica.PeriodicidadeRevisaoDias),
         s.Caminho.Select(p => new PassoResponse(p.Chave, p.Rotulo, p.Concluido,
             p.Impedimentos.Select(b => b.Codigo.Chave()).ToArray(),
-            p.Impedimentos.Select(b => b.Mensagem).ToArray())).ToArray());
+            p.Impedimentos.Select(b => b.Mensagem).ToArray())).ToArray(),
+        s.ProximaRevisao);
 }
 
 /// <summary>Submissão aceita: a revisão foi aberta e as etapas exigidas pela política aguardam decisão.</summary>
@@ -510,11 +525,13 @@ public sealed record RitoResponse(
 /// <param name="EtapasPorPapel">Papel → etapas de validação que ele decide.</param>
 /// <param name="BlocosPorPapel">Papel → blocos de tipos em que escreve.</param>
 /// <param name="Ritos">O rito de cada tipo de ativo.</param>
+/// <param name="MatrizDeMudanca">Por tipo de mudança, se cada etapa é obrigatoria, condicional, opcional ou nao.</param>
 public sealed record CartilhaResponse(
     IReadOnlyList<string> Papeis, IReadOnlyList<LinhaDaMatrizResponse> Matriz,
     IReadOnlyDictionary<string, IReadOnlyList<string>> EtapasPorPapel,
     IReadOnlyDictionary<string, IReadOnlyList<string>> BlocosPorPapel,
-    IReadOnlyList<RitoResponse> Ritos)
+    IReadOnlyList<RitoResponse> Ritos,
+    IReadOnlyList<MudancaResponse> MatrizDeMudanca)
 {
     public static CartilhaResponse De(ConsultarCartilha.Saida s) => new(
         ConsultarCartilha.OrdemDosPapeis.Select(p => p.Chave()).ToArray(),
@@ -525,8 +542,17 @@ public sealed record CartilhaResponse(
         s.BlocosPorPapel.ToDictionary(kv => kv.Key.Chave(), kv => kv.Value),
         s.Ritos.Select(r => new RitoResponse(r.TipoItem, r.Rotulo, r.Politica.Criticidade,
             r.Politica.Etapas.Select(e => e.ToString().ToLowerInvariant()).ToArray(),
-            r.Politica.EvidenciaMinima, r.Politica.ScoreMinimo, r.Politica.SlaHoras, r.Politica.PeriodicidadeRevisaoDias)).ToArray());
+            r.Politica.EvidenciaMinima, r.Politica.ScoreMinimo, r.Politica.SlaHoras, r.Politica.PeriodicidadeRevisaoDias)).ToArray(),
+        s.MatrizDeMudanca.Select(l => new MudancaResponse(l.Mudanca, l.Rotulo, l.Negocial, l.Tecnica, l.Arquitetural)).ToArray());
 }
+
+/// <summary>Uma linha da matriz mínima de aprovação por tipo de mudança.</summary>
+/// <param name="Mudanca">texto, escopo, contrato, dependencia ou descontinuacao.</param>
+/// <param name="Rotulo">A mudança, por extenso.</param>
+/// <param name="Negocial">obrigatoria, condicional, opcional ou nao.</param>
+/// <param name="Tecnica">obrigatoria, condicional, opcional ou nao.</param>
+/// <param name="Arquitetural">obrigatoria, condicional, opcional ou nao.</param>
+public sealed record MudancaResponse(string Mudanca, string Rotulo, string Negocial, string Tecnica, string Arquitetural);
 
 /// <summary>Um ativo na lista do catálogo.</summary>
 /// <param name="Ativo">Código, nome, tipo, status e criticidade.</param>

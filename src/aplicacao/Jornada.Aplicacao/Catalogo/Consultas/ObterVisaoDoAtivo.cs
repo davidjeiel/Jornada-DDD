@@ -17,7 +17,8 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
         Guid IdPessoa, string Papel, DateOnly InicioVigencia, DateOnly? FimVigencia, bool Vigente);
 
     public sealed record RelacaoResumo(
-        string Direcao, string AtivoId, string Codigo, string Nome, string Tipo, string Criticidade, string? Mecanismo);
+        string Direcao, string AtivoId, string Codigo, string Nome, string Tipo, string Criticidade, string? Mecanismo,
+        string OrigemDaEvidencia = CatalogoDeRelacoes.OrigemManual);
 
     /// <summary>Um degrau da trilha hierárquica, da raiz até o pai direto.</summary>
     public sealed record Ancestral(IdDeAtivo Id, string Codigo, string Nome, string TipoItem);
@@ -36,7 +37,8 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
         IReadOnlyDictionary<string, string> Atributos,
         IReadOnlyList<EvidenciaResumo> Evidencias,
         IReadOnlyList<ResponsavelResumo> Responsaveis,
-        IReadOnlyList<RelacaoResumo> Relacoes);
+        IReadOnlyList<RelacaoResumo> Relacoes,
+        IReadOnlyList<Ativo> Filhos);
 
     public async Task<Resultado<Saida>> ExecutarAsync(IdDeAtivo id, CancellationToken ct = default)
     {
@@ -58,8 +60,14 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
 
             relacoesResolvidas.Add(new RelacaoResumo(
                 direcao, outroAtivo.Id.Valor.ToString(), outroAtivo.Codigo.Valor, outroAtivo.Nome, aresta.Tipo,
-                aresta.Criticidade.Chave(), aresta.Mecanismo));
+                aresta.Criticidade.Chave(), aresta.Mecanismo, aresta.OrigemDaEvidencia));
         }
+
+        // Os filhos diretos na hierarquia (a parte "filho / compõe" do mapa de relações da visão 360°).
+        var filhos = (await ativos.BuscarAsync(new FiltroDoCatalogo(IdPai: id), BuscarNoCatalogo.Teto, ct))
+            .Where(a => a.Status != StatusCicloVida.Arquivado)
+            .OrderBy(a => a.Nome, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
 
         return Resultado<Saida>.Ok(new Saida(
             ativo.Id,
@@ -77,6 +85,7 @@ public sealed class ObterVisaoDoAtivo(IRepositorioDeAtivos ativos, IRepositorioD
             ativo.Evidencias.Select(e => new EvidenciaResumo(e.Id, e.Tipo, e.Titulo, e.Url)).ToArray(),
             ativo.Responsaveis.Select(r => new ResponsavelResumo(
                 r.IdPessoa, r.Papel.ToString(), r.InicioVigencia, r.FimVigencia, r.Vigente(hoje))).ToArray(),
-            relacoesResolvidas));
+            relacoesResolvidas,
+            filhos));
     }
 }

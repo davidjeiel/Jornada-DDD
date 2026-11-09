@@ -83,6 +83,47 @@ public sealed class FichaTestes
         Verificar.Igual("assincrono", m.Ficha(app).Relacoes.Single().Mecanismo);
     }
 
+    [Teste("a origem da evidência chega ao banco e à ficha; sem ela, é manual")]
+    public void OrigemDaEvidenciaChegaAFicha()
+    {
+        var m = new MundoDaFicha();
+        var (_, _, ctx, cap) = m.Capacidade();
+        var app = m.Aplicacao();
+        m.Exigir(m.Relacionar(app, ctx, "consome", origemDaEvidencia: "OpenAPI"));
+        m.Exigir(m.Relacionar(app, cap, "implementa"));
+
+        var porTipo = m.Ficha(app).Relacoes.ToDictionary(r => r.Tipo, r => r.OrigemDaEvidencia);
+        Verificar.Igual(("openapi", "manual"), (porTipo["consome"], porTipo["implementa"]));
+        Verificar.Igual("ORIGEM_DE_EVIDENCIA_INVALIDA", m.Relacionar(app, ctx, "depende_de", origemDaEvidencia: "boato").Codigo);
+    }
+
+    [Teste("a ficha lista os filhos diretos, sem os arquivados")]
+    public void FichaListaOsFilhos()
+    {
+        var m = new MundoDaFicha();
+        var (dom, sub, ctx, _) = m.Capacidade();
+        var outro = m.Cadastrar("subdominio", "Formalização", dom, new() { ["classificacao"] = "suporte" });
+        var arquivado = m.Cadastrar("subdominio", "Antigo", dom, new() { ["classificacao"] = "generico" });
+        var ativo = m.Repo.ObterAsync(arquivado).Result!;
+        ativo.Arquivar(Cenario.Relogio);
+        m.Repo.ConfirmarAsync().Wait();
+
+        Verificar.Igual("Formalização,Originação", string.Join(",", m.Ficha(dom).Filhos.Select(f => f.Nome)), "só os diretos, por nome");
+        Verificar.Igual(ctx, m.Ficha(sub).Filhos.Single().Id);
+        Verificar.Vazio(m.Ficha(outro).Filhos);
+    }
+
+    [Teste("a próxima revisão é a última atualização mais a periodicidade da política")]
+    public void ProximaRevisaoSegueAPolitica()
+    {
+        var m = new MundoDaFicha();
+        var (dom, _, _, cap) = m.Capacidade();
+        var preCheck = m.PreCheck(cap);
+        var atualizado = DateOnly.FromDateTime(m.Repo.ObterAsync(cap).Result!.AtualizadoEm.UtcDateTime);
+        Verificar.Igual(atualizado.AddDays(180), preCheck.ProximaRevisao, "capacidade de criticidade média: 180 dias");
+        Verificar.Igual(atualizado.AddDays(365), m.PreCheck(dom).ProximaRevisao, "domínio: 365 dias");
+    }
+
     [Teste("tipo de relação e mecanismo desconhecidos são recusados")]
     public void TipoEMecanismoSaoConferidos()
     {
@@ -223,8 +264,8 @@ internal sealed class MundoDaFicha
         new(Repo, Repo, _meta, _tenant, quem is null ? _curador : new AtorFixo(quem), Repo, Repo, Cenario.Relogio);
 
     public Resultado<bool> Relacionar(IdDeAtivo origem, IdDeAtivo destino, string tipo,
-                                      Criticidade criticidade = Criticidade.Media, string? mecanismo = null) =>
-        Relacionador().ExecutarAsync(new ComandoRelacionarAtivos(origem, destino, tipo, criticidade, mecanismo)).Result;
+                                      Criticidade criticidade = Criticidade.Media, string? mecanismo = null, string? origemDaEvidencia = null) =>
+        Relacionador().ExecutarAsync(new ComandoRelacionarAtivos(origem, destino, tipo, criticidade, mecanismo, origemDaEvidencia)).Result;
 
     public Resultado<RelacionarEmLote.Saida> Lote(IdDeAtivo origem, IdDeAtivo[] destinos, string tipo,
                                                   string? mecanismo = null, Ator? quem = null) =>
