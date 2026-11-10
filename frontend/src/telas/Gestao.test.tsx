@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Cadastro, Squad } from '../api';
-import { PainelDoCadastro, TabelaDeCadastros } from './GestaoDeAcessos';
+import { FormularioDeCadastroDireto, PainelDoCadastro, TabelaDeCadastros } from './GestaoDeAcessos';
 import { ListaDeSquads } from './Squads';
 
 const nada = () => {};
@@ -71,3 +71,19 @@ describe('squads', () => {
     expect(html.match(/>Editar</g)).toHaveLength(2);
   });
 });
+
+describe('cadastro direto', () => {
+  it('o admin cadastra quem vai ser responsável, sem pleito, com os campos do cadastro', () => {
+    const times: Squad[] = [
+      { id: 'sq-1', sigla: 'CRED', titulo: 'Squad Crédito', descricao: 'x', ativa: true },
+      { id: 'sq-2', sigla: 'OLD', titulo: 'Squad Antiga', descricao: 'x', ativa: false },
+    ];
+    const html = renderToStaticMarkup(<FormularioDeCadastroDireto squads={times} ocupado={false} onCadastrar={() => {}} />);
+    expect(html).toContain('<summary>Cadastrar pessoa</summary>');
+    for (const campo of ['matricula', 'unidade', 'nome', 'email', 'idSquad']) expect(html).toContain(`name="${campo}"`);
+    expect(html).toContain('CRED · Squad Crédito');
+    expect(html).not.toContain('OLD');                       // squad inativa não recebe gente nova
+    expect(html).toContain('já pode ser escolhida como responsável');
+  });
+});
+

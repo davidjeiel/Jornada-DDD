@@ -911,3 +911,8 @@ a.validation-row > :not(:first-child) { flex: none; width: auto; }
 .rito .tabela { margin: 6px 0 8px; }
 .ativos-no-grafo { margin-top: 12px; }
 .grade-da-mesa .mesa-larga { grid-column: 1 / -1; }
+
+/* Gestão de acessos: o cadastro direto, recolhido até alguém precisar. */
+.cadastro-direto > summary { cursor: pointer; font-weight: 600; color: var(--brand); }
+.cadastro-direto[open] > summary { margin-bottom: 8px; }
+.cadastro-direto .formulario-pagina { max-width: 640px; }

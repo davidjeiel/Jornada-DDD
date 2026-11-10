@@ -157,11 +157,47 @@ public sealed class GestaoTestes
         var cadastro = m.Exigir(gestao.ConcederAsync(davi.Id, "arquiteto", "empresa", null).Result);
         Verificar.Igual("Arquiteto", cadastro.Papeis.Single().Atribuicao.Papel.Rotulo());
         Verificar.Igual<Guid?>(ana.Id, cadastro.Papeis.Single().Atribuicao.ConcedidoPor);
-        Verificar.Verdadeiro(PoliticaDeAutorizacao.Pode(m.Como(davi), Acao.Descontinuar, AlvoDaAcao.NaEmpresa(Cenario.EmpresaA), Cenario.Relogio.Hoje));
+        Verificar.Verdadeiro(PoliticaDeAutorizacao.Pode(m.Como(davi), Acao.Decidir, AlvoDaAcao.NaEmpresa(Cenario.EmpresaA), Cenario.Relogio.Hoje),
+            "o papel concedido vale na hora");
 
         Verificar.Igual("PAPEL_JA_CONCEDIDO", gestao.ConcederAsync(davi.Id, "arquiteto", "empresa", null).Result.Codigo);
         Verificar.Igual("SEGREGACAO_DE_FUNCAO", gestao.ConcederAsync(ana.Id, "curador", "empresa", null).Result.Codigo);
         Verificar.Igual("ESCOPO_SEM_ALVO", gestao.ConcederAsync(davi.Id, "negocio", "dominio", null).Result.Codigo);
+    }
+
+    [Teste("o admin cadastra uma pessoa direto, sem papel, e ela pode responder por ativos")]
+    public void CadastroDiretoPeloAdmin()
+    {
+        var m = new MundoDeGestao();
+        var gestao = m.Gestao(MundoDeAcesso.Admin);
+
+        var cadastro = m.Exigir(gestao.CadastrarAsync("c654321", "Helena Duarte Prado", "helena.prado@empresa.com", "0427", null).Result);
+        Verificar.Igual("C654321", cadastro.Pessoa.Matricula.Valor, "matrícula normalizada");
+        Verificar.Verdadeiro(cadastro.Pessoa.Ativa);
+        Verificar.Vazio(cadastro.Papeis, "nasce sem papel: consulta o catálogo");
+        Verificar.Igual(cadastro.Pessoa.Id, ((IRepositorioDePessoas)m.Acesso).ObterPorMatriculaAsync(Matricula.De("C654321")).Result!.Id);
+
+        m.Responsavel(cadastro.Pessoa.Id);   // já pode ser owner de um ativo
+        Verificar.Igual("responsabilidades em ativos", m.Exigir(gestao.VinculosAsync(cadastro.Pessoa.Id).Result).Single());
+    }
+
+    [Teste("o cadastro direto confere os dados, a matrícula repetida, o squad e quem cadastra")]
+    public void CadastroDiretoConfere()
+    {
+        var m = new MundoDeGestao();
+        m.Pessoa("C123456", "Davi Souza", "0427");
+        var gestao = m.Gestao(MundoDeAcesso.Admin);
+
+        Verificar.Igual("MATRICULA_JA_CADASTRADA", gestao.CadastrarAsync("C123456", "Outro Nome", "outro@empresa.com", "0427", null).Result.Codigo);
+        Verificar.Igual("MATRICULA_INVALIDA", gestao.CadastrarAsync("123", "Helena Prado", "h@empresa.com", "0427", null).Result.Codigo);
+        Verificar.Igual("NOME_INCOMPLETO", gestao.CadastrarAsync("C654321", "Helena", "h@empresa.com", "0427", null).Result.Codigo);
+        Verificar.Igual("SQUAD_NAO_ENCONTRADA", gestao.CadastrarAsync("C654321", "Helena Prado", "h@empresa.com", "0427", Guid.NewGuid()).Result.Codigo);
+        Verificar.Igual("SEM_PERMISSAO", m.Gestao(MundoDeAcesso.Curador).CadastrarAsync("C654321", "Helena Prado", "h@empresa.com", "0427", null).Result.Codigo,
+            "cadastrar direto é do administrador");
+
+        var squad = m.Exigir(m.Squads(MundoDeAcesso.Admin).CriarAsync("CRED", "Squad Crédito", "Crédito imobiliário.").Result);
+        var comSquad = m.Exigir(gestao.CadastrarAsync("C654321", "Helena Prado", "h@empresa.com", "0427", squad.Id).Result);
+        Verificar.Igual<Guid?>(squad.Id, comSquad.Pessoa.IdSquad);
     }
 
     [Teste("revogar tira o papel hoje, não amanhã")]

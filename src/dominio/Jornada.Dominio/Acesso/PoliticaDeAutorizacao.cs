@@ -35,15 +35,20 @@ public sealed record AlvoDaAcao(
 /// </summary>
 public static class PoliticaDeAutorizacao
 {
-    /// <summary>Ação → papéis que a permitem. Portado de <c>acesso.PERMISSOES</c>.</summary>
+    /// <summary>
+    /// Ação → papéis que a permitem. Portado de <c>acesso.PERMISSOES</c>, com
+    /// uma mudança de regra pedida depois da paridade: o arquiteto só valida.
+    /// No painel ele também cadastrava, editava, relacionava, submetia, abria
+    /// revisão e descontinuava; aqui fica só com a decisão da etapa arquitetural.
+    /// </summary>
     private static readonly Dictionary<Acao, Papel[]> Permissoes = new()
     {
-        [Acao.Cadastrar]     = [Papel.Admin, Papel.Curador, Papel.Arquiteto, Papel.TechLead, Papel.Negocio],
-        [Acao.Editar]        = [Papel.Admin, Papel.Curador, Papel.Arquiteto, Papel.TechLead, Papel.Negocio],
-        [Acao.Relacionar]    = [Papel.Admin, Papel.Curador, Papel.Arquiteto, Papel.TechLead],
-        [Acao.Submeter]      = [Papel.Admin, Papel.Curador, Papel.Arquiteto, Papel.TechLead, Papel.Negocio],
-        [Acao.Revisar]       = [Papel.Admin, Papel.Curador, Papel.Arquiteto, Papel.TechLead, Papel.Negocio],
-        [Acao.Descontinuar]  = [Papel.Admin, Papel.Curador, Papel.Arquiteto],
+        [Acao.Cadastrar]     = [Papel.Admin, Papel.Curador, Papel.TechLead, Papel.Negocio],
+        [Acao.Editar]        = [Papel.Admin, Papel.Curador, Papel.TechLead, Papel.Negocio],
+        [Acao.Relacionar]    = [Papel.Admin, Papel.Curador, Papel.TechLead],
+        [Acao.Submeter]      = [Papel.Admin, Papel.Curador, Papel.TechLead, Papel.Negocio],
+        [Acao.Revisar]       = [Papel.Admin, Papel.Curador, Papel.TechLead, Papel.Negocio],
+        [Acao.Descontinuar]  = [Papel.Admin, Papel.Curador],
         [Acao.Importar]      = [Papel.Admin, Papel.Curador, Papel.TechLead],
         [Acao.Triar]         = [Papel.Admin, Papel.Curador, Papel.TechLead],
         [Acao.Decidir]       = [Papel.Admin, Papel.Arquiteto, Papel.TechLead, Papel.Negocio],
@@ -57,15 +62,16 @@ public static class PoliticaDeAutorizacao
     ///
     /// Sem isto, o papel autoriza a AÇÃO mas não o OBJETO: quem responde pelo
     /// negócio conseguiria cadastrar uma API, e quem responde pela técnica
-    /// conseguiria redesenhar a hierarquia de domínios. Arquiteto, curador e
-    /// admin atravessam os dois blocos por ofício.
+    /// conseguiria redesenhar a hierarquia de domínios. Curador e admin
+    /// atravessam os dois blocos por ofício; o arquiteto, que só valida, não
+    /// escreve em nenhum.
     /// </summary>
     private static readonly Dictionary<Papel, string[]?> BlocosPorPapel = new()
     {
         [Papel.Negocio]   = [CatalogoDeTipos.BlocoEstruturaDdd],
         [Papel.TechLead]  = [CatalogoDeTipos.BlocoAtivosTecnicos],
-        [Papel.Arquiteto] = null,   // null = todos os blocos
-        [Papel.Curador]   = null,
+        [Papel.Arquiteto] = [],     // só valida: nenhum bloco de escrita
+        [Papel.Curador]   = null,   // null = todos os blocos
         [Papel.Admin]     = null,
         [Papel.Consulta]  = [],     // vazio = nenhum bloco de escrita
     };

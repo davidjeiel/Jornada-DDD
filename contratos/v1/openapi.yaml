@@ -992,6 +992,115 @@ paths:
         - Bearer: [ ]
         - X-Empresa: [ ]
           X-Pessoa: [ ]
+    post:
+      tags:
+        - Acesso
+      summary: 'Cadastra uma pessoa direto, sem pleito'
+      description: 'Só admin. Para quem vai responder por ativos sem ter pedido acesso. A pessoa nasce ativa e sem papel (consulta o catálogo); papéis se concedem em POST /gestao/pessoas/{id}/papeis. Matrícula já cadastrada: 409 MATRICULA_JA_CADASTRADA.'
+      operationId: cadastrarPessoa
+      parameters:
+        - name: x-correlation-id
+          in: header
+          description: 'Identificador de rastreabilidade. Se ausente ou inválido, a API gera um e o devolve no cabeçalho de mesmo nome.'
+          schema:
+            type: string
+            format: uuid
+          example: 1cf88bdf-48c6-4421-a40b-79fb835a6c4d
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CadastrarPessoaRequest'
+        required: true
+      responses:
+        '201':
+          description: Recurso criado.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CadastroResponse'
+        '400':
+          description: 'Requisição inválida: corpo malformado, campo obrigatório ausente ou valor fora do domínio.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: 'O papel da pessoa não permite esta ação neste ativo, ou ela está em modo de leitura (MODO_LEITURA).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Recurso não encontrado nesta empresa.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflito com o estado atual do recurso.
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: 'Empresa não identificada (token ou, em desenvolvimento, cabeçalho X-Empresa).'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: 'Erro interno não esperado. O detalhe fica no log, sob o x-correlation-id.'
+          headers:
+            x-correlation-id:
+              description: O identificador de rastreabilidade desta requisição.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      security:
+        - Bearer: [ ]
+        - X-Empresa: [ ]
+          X-Pessoa: [ ]
   '/v1/gestao/pessoas/{id}/vinculos':
     get:
       tags:
@@ -6068,6 +6177,34 @@ components:
           nullable: true
       additionalProperties: false
       description: Cadastro de um ativo novo. Ele nasce em rascunho.
+    CadastrarPessoaRequest:
+      required:
+        - email
+        - matricula
+        - nome
+        - unidade
+      type: object
+      properties:
+        matricula:
+          type: string
+          description: Uma letra e seis números. Única na empresa.
+          example: C654321
+        nome:
+          type: string
+          example: Helena Duarte Prado
+        email:
+          type: string
+          example: helena.prado@empresa.com
+        unidade:
+          type: string
+          example: '0427'
+        idSquad:
+          type: string
+          description: 'O squad da pessoa; opcional, e tem de estar ativo.'
+          format: uuid
+          nullable: true
+      additionalProperties: false
+      description: Correção do cadastro pela gestão de acessos. A matrícula não muda.
     CadastroResponse:
       required:
         - pessoa
@@ -6313,7 +6450,6 @@ components:
           description: 'false inativa o cadastro e encerra todos os papéis; true reativa, sem devolver papel.'
           example: true
       additionalProperties: false
-      description: Correção do cadastro pela gestão de acessos. A matrícula não muda.
     DecidirPleitoRequest:
       required:
         - aprovar

@@ -123,16 +123,16 @@ public sealed class MesaTestes
     public void MinhaMesaSeparaOQueEMeu()
     {
         var m = new MundoDeGovernanca();
-        var arquiteta = Cenario.Ator(Papel.Arquiteto);
-        var submetido = m.SistemaCompleto("Simular Financiamento", quem: arquiteta);
+        var techLead = Cenario.Ator(Papel.TechLead);   // cadastra sistemas e decide a etapa técnica
+        var submetido = m.SistemaCompleto("Simular Financiamento", quem: techLead);
         m.Submeter(submetido);
-        var rascunho = m.SistemaCompleto("Rascunho da arquiteta", quem: arquiteta);
+        var rascunho = m.SistemaCompleto("Rascunho do tech lead", quem: techLead);
         m.SistemaCompleto("Garantias");                    // de outra pessoa
         var alheio = m.SistemaCompleto("Alheio");
         m.Submeter(alheio);
-        Exigir(Atribuicao(m, arquiteta).AssumirAsync(m.UnicaAberta(alheio)).Result);
+        Exigir(Atribuicao(m, techLead).AssumirAsync(m.UnicaAberta(alheio)).Result);
 
-        var mesa = new MinhaMesa(Fila(m, arquiteta), m.Repo, new AtorFixo(arquiteta)).ExecutarAsync().Result;
+        var mesa = new MinhaMesa(Fila(m, techLead), m.Repo, new AtorFixo(techLead)).ExecutarAsync().Result;
         Verificar.Igual(m.UnicaAberta(alheio), mesa.MinhasValidacoes.Single().Validacao.Id);
         Verificar.Igual("Simular Financiamento", mesa.FilaLivre.Single().Ativo.Nome, "a que eu assumi não está na fila livre");
         Verificar.Igual(rascunho, mesa.MeusRascunhos.Single().Id, "Garantias é de outra pessoa");

@@ -197,6 +197,26 @@ public sealed record DecidirPleitoRequest
 }
 
 /// <summary>Correção do cadastro pela gestão de acessos. A matrícula não muda.</summary>
+/// <summary>Cadastro direto de uma pessoa pelo administrador, sem pleito.</summary>
+public sealed record CadastrarPessoaRequest
+{
+    /// <summary>Uma letra e seis números. Única na empresa.</summary>
+    /// <example>C654321</example>
+    public required string Matricula { get; init; }
+
+    /// <example>Helena Duarte Prado</example>
+    public required string Nome { get; init; }
+
+    /// <example>helena.prado@empresa.com</example>
+    public required string Email { get; init; }
+
+    /// <example>0427</example>
+    public required string Unidade { get; init; }
+
+    /// <summary>O squad da pessoa; opcional, e tem de estar ativo.</summary>
+    public Guid? IdSquad { get; init; }
+}
+
 public sealed record CorrigirCadastroRequest
 {
     /// <example>Davi Souza Lima</example>

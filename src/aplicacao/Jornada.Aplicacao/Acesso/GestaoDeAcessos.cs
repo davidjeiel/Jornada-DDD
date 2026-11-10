@@ -62,6 +62,39 @@ public sealed class GestaoDeAcessos(
 
     // ──────────────────────────────────────────────────────────── escrita
 
+    /// <summary>
+    /// Cadastra uma pessoa direto, sem pleito, para ela poder ser responsável
+    /// por ativos. Nasce ativa e sem papel nenhum: consulta o catálogo, e os
+    /// papéis se concedem à parte. A matrícula é única na empresa.
+    /// </summary>
+    public async Task<Resultado<CadastroLegivel>> CadastrarAsync(
+        string? matricula, string? nome, string? email, string? unidade, Guid? idSquad, CancellationToken ct = default)
+    {
+        if (await RecusaAsync<CadastroLegivel>(ct) is { } recusa) return recusa;
+
+        DadosDeCadastro dados;
+        try { dados = DadosDeCadastro.Conferir(matricula, nome, email, unidade); }
+        catch (ErroDeDominio e) { return Resultado<CadastroLegivel>.Recusado(e.Codigo, e.Message); }
+
+        if (await pessoas.ObterPorMatriculaAsync(dados.Matricula, ct) is { } existente)
+            return Resultado<CadastroLegivel>.Recusado("MATRICULA_JA_CADASTRADA",
+                $"A matrícula {dados.Matricula} já está cadastrada ({existente.Nome}). Corrija esse cadastro em vez de criar outro.");
+
+        Squad? squad = null;
+        if (idSquad is { } s)
+        {
+            squad = await squads.ObterAsync(s, ct);
+            if (squad is null) return Resultado<CadastroLegivel>.Recusado("SQUAD_NAO_ENCONTRADA", "Squad não encontrada.");
+            if (!squad.Ativa) return Resultado<CadastroLegivel>.Recusado("SQUAD_INATIVA", "A squad está inativa.");
+        }
+
+        var pessoa = Pessoa.Cadastrar(tenant.Atual.Empresa, dados, relogio);
+        if (squad is not null) pessoa.Corrigir(dados.Nome, dados.Email, dados.Unidade.Valor, squad.Id);
+        await pessoas.AdicionarAsync(pessoa, ct);
+        await uow.ConfirmarAsync(ct);
+        return Resultado<CadastroLegivel>.Ok(await LegivelAsync(pessoa, squad, ct));
+    }
+
     /// <summary>Corrige nome, e-mail, unidade e squad; <paramref name="ativa"/> falso inativa e encerra os papéis.</summary>
     public Task<Resultado<CadastroLegivel>> CorrigirAsync(
         Guid idPessoa, string? nome, string? email, string? unidade, Guid? idSquad, bool ativa, CancellationToken ct = default) =>

@@ -155,6 +155,8 @@ type Props = {
   blocos: string[];
   identificado: boolean;
   modoLeitura: boolean;
+  /** Os papéis concedidos: o arquiteto, que só valida, recebe outro aviso. */
+  papeis?: string[];
   /** O que veio na URL (?tipo=api&criticidade=critica), como o assistente do painel aceita. */
   tipoInicial?: string;
   criticidadeInicial?: string;
@@ -162,7 +164,7 @@ type Props = {
   onErro: (mensagem: string) => void;
 };
 
-export function NovoAtivo({ ativos, metamodelo, squads, blocos, identificado, modoLeitura, tipoInicial, criticidadeInicial, onCadastrado, onErro }: Props) {
+export function NovoAtivo({ ativos, metamodelo, squads, blocos, identificado, modoLeitura, papeis = [], tipoInicial, criticidadeInicial, onCadastrado, onErro }: Props) {
   const oferecidos = tiposOferecidos(metamodelo, blocos);
   const [formulario, setFormulario] = useState<Formulario>({
     tipo: tipoInicial ?? '', nome: '', descricao: '', criticidade: criticidadeInicial ?? 'media', paiId: '', idSquad: '', atributos: {},
@@ -210,7 +212,9 @@ export function NovoAtivo({ ativos, metamodelo, squads, blocos, identificado, mo
             ? <p>Você está em modo de leitura. Para cadastrar, troque para edição no <Link href="/perfil">seu perfil</Link>.</p>
             : !identificado
               ? <p>Diga quem você é no <Link href="/perfil">seu perfil</Link> antes de cadastrar. Ainda sem cadastro? <Link href="/acesso/solicitar">Cadastre-se e peça um papel</Link>.</p>
-              : <p>O seu papel só permite consulta. Para cadastrar, <Link href="/acesso/solicitar">peça um papel de escrita</Link>; veja o que cada papel faz na <Link href="/cartilha">cartilha</Link>.</p>}
+              : papeis.includes('arquiteto')
+                ? <p>O arquiteto valida, não cadastra: quem descreve o negócio e a técnica são o negócio e o time técnico. As etapas arquiteturais esperam por você em <Link href="/validacoes?etapa=arquitetural">Validações</Link>.</p>
+                : <p>O seu papel só permite consulta. Para cadastrar, <Link href="/acesso/solicitar">peça um papel de escrita</Link>; veja o que cada papel faz na <Link href="/cartilha">cartilha</Link>.</p>}
         </div>
       </>
     );

@@ -185,6 +185,7 @@ describe('responsáveis e só leitura', () => {
     expect(html).toContain('encerrado');
     expect(html).toContain('Definir responsável');
     expect(html).toContain('Cada papel tem uma pessoa só');
+    expect(html).toContain('href="/gestao-acessos"');   // quem não está na lista, o admin cadastra
     expect(comDono('publicado', true)).not.toContain('>Encerrar<');
     expect(comDono('rascunho', false)).not.toContain('>Encerrar<');
   });

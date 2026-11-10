@@ -5,7 +5,7 @@ import { ROTULO_DO_PAPEL, type ChaveDePapel } from '../papeis';
 const BLOCOS: Record<ChaveDePapel, string[]> = {
   admin: ['Ativos técnicos', 'Estrutura DDD'],
   curador: ['Ativos técnicos', 'Estrutura DDD'],
-  arquiteto: ['Ativos técnicos', 'Estrutura DDD'],
+  arquiteto: [],
   techlead: ['Ativos técnicos'],
   negocio: ['Estrutura DDD'],
   consulta: [],

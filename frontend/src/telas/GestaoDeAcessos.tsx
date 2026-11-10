@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
-  concederPapel, consultarVinculos, corrigirCadastro, excluirCadastro, inativarEmLote, listarCadastros, listarSquads, revogarPapel,
+  cadastrarPessoa, concederPapel, consultarVinculos, corrigirCadastro, excluirCadastro, inativarEmLote, listarCadastros, listarSquads, revogarPapel,
   type AtivoResumo, type Cadastro, type PapelNoEscopo, type Squad,
 } from '../api';
 import { Cabecalho } from '../componentes';
@@ -174,12 +174,54 @@ export function PainelDoCadastro({ cadastro, squads, dominios, vinculos, ehVoce,
   );
 }
 
-type Props = { ativos: AtivoResumo[]; idDoAdmin: string | null; onErro: (mensagem: string) => void };
+export type NovoCadastro = { matricula: string; nome: string; email: string; unidade: string; idSquad: string | null };
+
+/**
+ * Cadastro direto, sem pleito: para pôr como responsável quem não pediu acesso.
+ * A pessoa nasce ativa e sem papel; o papel, se precisar, concede-se depois.
+ */
+export function FormularioDeCadastroDireto({ squads, ocupado, onCadastrar }: { squads: Squad[]; ocupado: boolean; onCadastrar: (dados: NovoCadastro) => void }) {
+  function enviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const d = new FormData(evento.currentTarget);
+    const texto = (k: string) => d.get(k)?.toString().trim() ?? '';
+    onCadastrar({ matricula: texto('matricula'), nome: texto('nome'), email: texto('email'), unidade: texto('unidade'), idSquad: texto('idSquad') || null });
+  }
+  return (
+    <details className="panel screen-panel cadastro-direto">
+      <summary>Cadastrar pessoa</summary>
+      <p className="discreto">Para quem vai responder por ativos sem ter pedido acesso. A pessoa entra ativa e sem papel: consulta o catálogo e já pode ser escolhida como responsável na ficha. Se precisar de papel, conceda abaixo, no cadastro dela.</p>
+      <form className="formulario-pagina" onSubmit={enviar} aria-label="Cadastrar pessoa">
+        <div className="form-grid">
+          <label>Matrícula<input name="matricula" required placeholder="C123456" autoComplete="off" /></label>
+          <label>Unidade<input name="unidade" required placeholder="0427" inputMode="numeric" /></label>
+        </div>
+        <label>Nome completo<input name="nome" required /></label>
+        <label>E-mail<input name="email" type="email" required /></label>
+        <label>Squad
+          <select name="idSquad" defaultValue="">
+            <option value="">sem squad</option>
+            {squads.filter((s) => s.ativa).map((s) => <option key={s.id} value={s.id}>{s.sigla} · {s.titulo}</option>)}
+          </select>
+        </label>
+        <div className="modal-actions"><button className="primary-button" disabled={ocupado}>Cadastrar</button></div>
+      </form>
+    </details>
+  );
+}
+
+type Props = {
+  ativos: AtivoResumo[];
+  idDoAdmin: string | null;
+  /** Avisa o App: a lista de pessoas (os responsáveis possíveis) mudou. */
+  onPessoasAlteradas?: () => void;
+  onErro: (mensagem: string) => void;
+};
 
 // A gestão de acessos do painel (/gestao-acessos), só para o admin: a API recusa
 // para qualquer outro papel. Salvar o cadastro não mexe nos papéis: cada papel
 // se concede e se revoga (ADR-0018, consequências).
-export function GestaoDeAcessos({ ativos, idDoAdmin, onErro }: Props) {
+export function GestaoDeAcessos({ ativos, idDoAdmin, onPessoasAlteradas, onErro }: Props) {
   const [cadastros, setCadastros] = useState<Cadastro[]>([]);
   const [squads, setSquads] = useState<Squad[]>([]);
   const [busca, setBusca] = useState('');
@@ -232,7 +274,9 @@ export function GestaoDeAcessos({ ativos, idDoAdmin, onErro }: Props) {
   return (
     <>
       <Cabecalho rotulo="ADMINISTRAÇÃO" titulo="Gestão de acessos"
-        texto="Todos os cadastros da empresa, inclusive os inativos. Corrija dados, conceda ou revogue papéis, inative quem saiu." />
+        texto="Todos os cadastros da empresa, inclusive os inativos. Cadastre quem vai responder por ativos, corrija dados, conceda ou revogue papéis, inative quem saiu." />
+      <FormularioDeCadastroDireto key={cadastros.length} squads={squads} ocupado={ocupado}
+        onCadastrar={(dados) => void agir(async () => { const novo = await cadastrarPessoa(dados); setAberto(novo.pessoa.id); onPessoasAlteradas?.(); })} />
       <section className="panel screen-panel">
         <form className="barra-de-busca" role="search" onSubmit={buscar}>
           <input name="busca" type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome, matrícula, e-mail, unidade ou squad" aria-label="Buscar cadastros" />

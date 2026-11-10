@@ -176,7 +176,7 @@ function App() {
         break;
       case 'novo':
         tela = <NovoAtivo key={`${blocos.join('|')}-${metamodelo ? 'm' : ''}`} ativos={ativos} metamodelo={metamodelo} squads={squads} blocos={blocos}
-          identificado={!!perfil?.identificado} modoLeitura={!!perfil?.modoLeitura}
+          identificado={!!perfil?.identificado} modoLeitura={!!perfil?.modoLeitura} papeis={papeis}
           tipoInicial={local.busca.get('tipo') ?? undefined} criticidadeInicial={local.busca.get('criticidade') ?? undefined}
           onCadastrado={carregar} onErro={setErro} />;
         break;
@@ -230,7 +230,7 @@ function App() {
         tela = <Pleitos ativos={ativos} onErro={setErro} onDecidido={() => void carregarPerfil()} />;
         break;
       case 'gestao-acessos':
-        tela = <GestaoDeAcessos ativos={ativos} idDoAdmin={perfil?.pessoa?.id ?? null} onErro={setErro} />;
+        tela = <GestaoDeAcessos ativos={ativos} idDoAdmin={perfil?.pessoa?.id ?? null} onPessoasAlteradas={() => void carregarPerfil()} onErro={setErro} />;
         break;
       case 'squads':
         tela = <Squads onErro={setErro} />;

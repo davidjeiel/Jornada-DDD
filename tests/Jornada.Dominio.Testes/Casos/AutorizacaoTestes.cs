@@ -131,6 +131,21 @@ public sealed class AutorizacaoTestes
             $"o motivo deve dizer o porquê; veio: {decisao.Motivo}");
     }
 
+    [Teste("o arquiteto só valida: não cria domínio nem escreve em bloco nenhum, mas decide a etapa arquitetural")]
+    public void ArquitetoSoValida()
+    {
+        var arquiteto = Cenario.Ator(Papel.Arquiteto);
+        foreach (var tipo in new[] { "dominio", "subdominio", "capacidade", "sistema", "api" })
+            foreach (var acao in new[] { Acao.Cadastrar, Acao.Editar, Acao.Relacionar, Acao.Submeter, Acao.Revisar, Acao.Descontinuar })
+                Verificar.Falso(PoliticaDeAutorizacao.Pode(arquiteto, acao, Cenario.Alvo(tipo), Hoje), $"{acao} em {tipo}");
+        Verificar.Vazio(PoliticaDeAutorizacao.BlocosQueEscreve(arquiteto, Hoje), "o assistente não oferece tipo nenhum");
+
+        var arquitetural = PoliticaDeAutorizacao.PodeDecidir(
+            arquiteto, EtapaValidacao.Arquitetural, Guid.NewGuid(), Cenario.AtivoCompleto(), Cenario.Alvo("dominio"), Hoje);
+        Verificar.Verdadeiro(arquitetural.Permitido, arquitetural.Motivo);
+        Verificar.Verdadeiro(PoliticaDeAutorizacao.Pode(arquiteto, Acao.Decidir, Cenario.Alvo("dominio"), Hoje));
+    }
+
     [Teste("etapa técnica exige tech_lead")]
     public void EtapaTecnicaExigeTechLead()
     {
