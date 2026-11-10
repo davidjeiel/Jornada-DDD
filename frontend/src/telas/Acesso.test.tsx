@@ -12,10 +12,10 @@ import { OQueCadaPapelExerce, SolicitarAcesso } from './SolicitarAcesso';
 const nada = () => {};
 const assincrono = async () => {};
 
-function novoAtivo(blocos: string[], opcoes: { identificado?: boolean; modoLeitura?: boolean } = {}) {
+function novoAtivo(blocos: string[], opcoes: { identificado?: boolean; modoLeitura?: boolean; papeis?: string[] } = {}) {
   return renderToStaticMarkup(
     <NovoAtivo ativos={[]} metamodelo={metamodeloDeTeste} squads={[]} blocos={blocos} identificado={opcoes.identificado ?? true} modoLeitura={opcoes.modoLeitura ?? false}
-      onCadastrado={assincrono} onErro={nada} />,
+      papeis={opcoes.papeis} onCadastrado={assincrono} onErro={nada} />,
   );
 }
 
@@ -82,6 +82,14 @@ describe('novo ativo', () => {
   it('sem papel, manda pleitear (test_sem_papel_o_wizard_manda_pleitear)', () => {
     expect(novoAtivo([])).toContain('href="/acesso/solicitar"');
     expect(novoAtivo([])).not.toMatch(/<form\b/);
+  });
+
+  it('o arquiteto, que só valida, é mandado às validações, não a pedir papel', () => {
+    const html = novoAtivo([], { papeis: ['arquiteto'] });
+    expect(html).toContain('O arquiteto valida, não cadastra');
+    expect(html).toContain('href="/validacoes?etapa=arquitetural"');
+    expect(html).not.toContain('href="/acesso/solicitar"');
+    expect(html).not.toMatch(/<form\b/);
   });
 
   it('em modo leitura, não há formulário e o caminho é o perfil (test_modo_leitura_esconde_os_formularios)', () => {

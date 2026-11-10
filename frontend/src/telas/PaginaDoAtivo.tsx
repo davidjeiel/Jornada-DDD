@@ -515,7 +515,8 @@ function Pessoas({ ficha, pessoas, podeEscrever, idPessoa, ocupado, acoes, metam
           <label>Papel no ativo
             <select name="papel" defaultValue="OwnerTecnico">{PAPEIS_DE_OWNERSHIP.map((p) => <option key={p.chave} value={p.chave}>{p.rotulo}</option>)}</select>
           </label>
-          <p className="ajuda largo">Cada papel tem uma pessoa só: definir outra encerra quem estava, e a troca fica no histórico.</p>
+          <p className="ajuda largo">Cada papel tem uma pessoa só: definir outra encerra quem estava, e a troca fica no histórico.
+            Não achou quem procura? Um administrador cadastra a pessoa em <Link href="/gestao-acessos">Gestão de acessos</Link>, sem ela precisar pedir acesso.</p>
           <div className="modal-actions"><button className="primary-button" disabled={ocupado}>Definir responsável</button></div>
         </form>
       )}

@@ -1007,6 +1007,19 @@ gestao.MapGet("/pessoas", async Task<Results<Ok<ListaDeCadastrosResponse>, JsonH
     .WithDescription("Só admin. Ativos primeiro, por nome. O parâmetro busca filtra por nome, matrícula, e-mail, unidade ou squad.")
     .ComErros(StatusCodes.Status403Forbidden);
 
+gestao.MapPost("/pessoas", async Task<Results<Created<CadastroResponse>, JsonHttpResult<ApiError>>> (
+    HttpContext http, CadastrarPessoaRequest corpo, GestaoDeAcessos caso, IRelogio relogio, CancellationToken ct) =>
+{
+    var r = await caso.CadastrarAsync(corpo.Matricula, corpo.Nome, corpo.Email, corpo.Unidade, corpo.IdSquad, ct);
+    return r.Sucesso
+        ? TypedResults.Created($"{metadados.PrefixoDasRotas}/gestao/pessoas/{r.Valor!.Pessoa.Id}", CadastroResponse.De(r.Valor!, relogio.Hoje))
+        : Erro(http, r.Codigo!, r.Mensagem!);
+})
+    .WithName("cadastrarPessoa")
+    .WithSummary("Cadastra uma pessoa direto, sem pleito")
+    .WithDescription("Só admin. Para quem vai responder por ativos sem ter pedido acesso. A pessoa nasce ativa e sem papel (consulta o catálogo); papéis se concedem em POST /gestao/pessoas/{id}/papeis. Matrícula já cadastrada: 409 MATRICULA_JA_CADASTRADA.")
+    .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict);
+
 gestao.MapGet("/pessoas/{id:guid}/vinculos", async Task<Results<Ok<VinculosResponse>, JsonHttpResult<ApiError>>> (
     HttpContext http, Guid id, GestaoDeAcessos caso, CancellationToken ct) =>
 {

@@ -132,8 +132,9 @@ ou em modo de leitura, os formulários somem e ficam só os dados.
 **O papel autoriza a ação e o objeto.** Quem responde pelo negócio escreve na Estrutura
 DDD — domínio, subdomínio, contextos delimitados, capacidade. Quem responde pela técnica
 escreve nos ativos técnicos — sistema, aplicação, repositório, API, endpoint, base de
-dados, objeto de dado, evento. Arquiteto, curador e admin atravessam os dois blocos. Fora
-do seu bloco, a rota recusa mesmo que você monte a chamada à API na mão.
+dados, objeto de dado, evento. Curador e admin atravessam os dois blocos; o arquiteto não
+escreve em nenhum, só valida. Fora do seu bloco, a rota recusa mesmo que você monte a
+chamada à API na mão.
 
 **Quem submete não decide.** Se você enviou uma revisão para validação, a ferramenta não
 deixa você mesmo decidir sobre ela — nem se o seu papel permitir aquela etapa. É
@@ -230,17 +231,21 @@ alguém" em uma resposta.
 Você responde pela **coerência do todo**: se os limites entre contextos fazem sentido, se
 um contrato novo não cria um acoplamento que ninguém vai conseguir desfazer.
 
+Você **valida, não cadastra**. Quem descreve o negócio e a técnica são o negócio e o
+time técnico; o seu trabalho é dizer se o que eles descreveram fica de pé.
+
 **O que você faz**
 
-- Cadastrar e editar qualquer tipo de ativo, nos dois blocos
-- Registrar relações entre ativos
 - Decidir a etapa **arquitetural** — a última barreira antes de publicar contratos e
   contextos delimitados
+- Consultar o catálogo inteiro, os mapas e o grafo de relações de cada ativo
+- Responder como **arquiteto** de um ativo, quando alguém o põe como responsável na aba
+  Pessoas: aí você decide a etapa arquitetural daquele ativo
 
 **O que a ferramenta recusa**
 
-- Decidir sobre uma revisão que você mesmo submeteu — segregação de função não tem
-  exceção de papel
+- Cadastrar, editar, relacionar, submeter, abrir revisão ou descontinuar ativos, de
+  qualquer tipo, domínio incluído
 
 **Sua rotina: decidir com o histórico à vista**
 

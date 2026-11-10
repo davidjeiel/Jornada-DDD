@@ -61,6 +61,16 @@ original no título, para facilitar a busca.
   de mandar `forcar`. No Jornada é um mecanismo só, na API: com consumidor
   crítico, a confirmação é o código do ativo. Assim um cliente da API não
   contorna a confirmação. O motivo é obrigatório.
+- **O arquiteto só valida.** Regra pedida depois da paridade: no painel o
+  arquiteto cadastrava, editava, relacionava, submetia, abria revisão e
+  descontinuava ativos dos dois blocos. No Jornada ele não escreve em bloco
+  nenhum e fica com a decisão da etapa arquitetural (e, como responsável
+  formal de um ativo, a etapa arquitetural daquele ativo). `ArquitetoSoValida`.
+- **Cadastro direto pelo administrador.** No painel uma pessoa só entra pelo
+  pedido de acesso. No Jornada o administrador também a cadastra direto
+  (`POST /v1/gestao/pessoas`), ativa e sem papel, para pô-la como responsável
+  por ativos sem ela ter pedido acesso. `CadastroDiretoPeloAdmin` e
+  `CadastroDiretoConfere`.
 - **Grafo do catálogo.** O painel desenha todos os ativos na visão
   executiva. No Jornada há um teto de 300 nós (até 1.000 pela API), e passar
   dele marca `truncado` e a tela avisa, a mesma regra da vizinhança. Arquivados
@@ -256,7 +266,7 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 | `test_curador_que_tenta_conceder_admin_pela_rota_e_recusado` | 2 | ✅ | `CuradorQueTentaConcederAdminERecusado` (403) |
 | `test_negocio_nao_cadastra_ativo_tecnico` — O papel autoriza a ação e também o objeto: era o furo antigo. | 2 | ✅ | `NegocioNaoCadastraAtivoTecnico` |
 | `test_tech_lead_nao_redesenha_a_hierarquia_de_negocio` | 2 | ✅ | `TechLeadNaoMexeEmDominio` |
-| `test_arquiteto_e_curador_atravessam_os_dois_blocos` | 2 | ✅ | `CuradorCadastraEmQualquerBloco`, `BlocosQueEscreve` |
+| `test_arquiteto_e_curador_atravessam_os_dois_blocos` | 2 | ✅ | `CuradorCadastraEmQualquerBloco`, `BlocosQueEscreve`; o arquiteto, por regra nova, não escreve em bloco nenhum (`ArquitetoSoValida`, ver diferenças) |
 | `test_edicao_de_ativo_existente_respeita_o_bloco` | 2 | ✅ | `EdicaoDeAtivoExistenteRespeitaOBloco` |
 | `test_rota_de_cadastro_recusa_tipo_fora_do_papel` | 2 | ✅ | `CadastrarAtivo` recusa com SEM_PERMISSAO (403) |
 | `test_wizard_so_oferece_os_blocos_do_papel` | 2 | ✅ | `telas/Acesso.test.tsx`: o Novo ativo agrupa os tipos por bloco e mostra só os do papel |

@@ -8,7 +8,7 @@ import { Criticidade } from '../componentes';
 
 // Espelho de PERMISSOES[descontinuar] (PoliticaDeAutorizacao). A API decide;
 // isto só evita oferecer um botão que vai ser recusado.
-const PAPEIS_QUE_DESCONTINUAM = ['admin', 'curador', 'arquiteto'];
+const PAPEIS_QUE_DESCONTINUAM = ['admin', 'curador'];
 
 /** Algum dos papéis concedidos descontinua? */
 export function podeDescontinuar(papeis: string[]): boolean {

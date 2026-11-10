@@ -13,9 +13,7 @@ const STATUS = ['rascunho', 'em_validacao', 'publicado', 'em_revisao', 'desconti
 // Papel concedido → papel de OWNERSHIP mais provável para quem assume o
 // ativo. É só uma sugestão de UX; o servidor decide de verdade (ADR-0007).
 function papelDeOwnershipSugerido(papeis: string[]): string {
-  if (papeis.includes('negocio')) return 'OwnerNegocial';
-  if (papeis.includes('arquiteto')) return 'Arquiteto';
-  return 'OwnerTecnico';
+  return papeis.includes('negocio') ? 'OwnerNegocial' : 'OwnerTecnico';
 }
 
 type PropsDosFiltros = { filtros: URLSearchParams; metamodelo: Metamodelo | null; squads: Squad[]; onMudar: (chave: string, valor: string | null) => void };

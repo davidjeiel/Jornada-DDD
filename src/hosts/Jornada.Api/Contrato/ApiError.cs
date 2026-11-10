@@ -93,6 +93,7 @@ public static class CodigosDeErro
         ["CONFLITO_DE_EDICAO"] = StatusCodes.Status409Conflict,
         ["PLEITO_JA_DECIDIDO"] = StatusCodes.Status409Conflict,
         ["PLEITO_PENDENTE"] = StatusCodes.Status409Conflict,
+        ["MATRICULA_JA_CADASTRADA"] = StatusCodes.Status409Conflict,
         ["CADASTRO_COM_VINCULOS"] = StatusCodes.Status409Conflict,
         ["CADASTRO_INATIVO"] = StatusCodes.Status409Conflict,
         ["PAPEL_JA_CONCEDIDO"] = StatusCodes.Status409Conflict,

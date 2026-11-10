@@ -408,6 +408,11 @@ export function listarCadastros(busca = ''): Promise<{ total: number; cadastros:
   return requisicao(`/v1/gestao/pessoas${busca ? `?busca=${encodeURIComponent(busca)}` : ''}`);
 }
 
+/** Cadastro direto pelo admin, sem pleito: a pessoa nasce ativa e sem papel, pronta para ser responsável. */
+export function cadastrarPessoa(payload: { matricula: string; nome: string; email: string; unidade: string; idSquad: string | null }): Promise<Cadastro> {
+  return requisicao('/v1/gestao/pessoas', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export function consultarVinculos(id: string): Promise<{ podeExcluir: boolean; vinculos: string[] }> {
   return requisicao(`/v1/gestao/pessoas/${id}/vinculos`);
 }
