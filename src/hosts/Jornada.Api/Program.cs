@@ -50,24 +50,22 @@ builder.Services.AddSingleton(new RegrasDeAcesso(
 // Adaptador de persistência escolhido em RUNTIME, por configuração — nunca por
 // rebuild de imagem (Grupo 1 do plano de containers: um container só é
 // reconfigurável de verdade se isso for verdade). Zero-config continua sendo
-// "memoria" (appsettings.json); container/pod liga o Cosmos DB via variável de
-// ambiente Persistencia__Provedor (ver local/compose.yaml). O Postgres saiu do
-// produto (ADR-0016): um valor desconhecido derruba a partida, em vez de cair
-// em silêncio na memória e perder os dados a cada reinício.
-var provedorDePersistencia = builder.Configuration.GetValue("Persistencia:Provedor", "memoria")!;
-var usaCosmos = string.Equals(provedorDePersistencia, "cosmos", StringComparison.OrdinalIgnoreCase);
-if (!usaCosmos && !string.Equals(provedorDePersistencia, "memoria", StringComparison.OrdinalIgnoreCase))
-    throw new InvalidOperationException(
-        $"Persistencia:Provedor='{provedorDePersistencia}' não existe. Use 'cosmos' ou 'memoria'.");
+// "memoria"; o ambiente corporativo liga o Cosmos DB só com a variável
+// COSMOS_CONNECTION_STRING, e o compose local, com Persistencia__Provedor e
+// ConnectionStrings__Cosmos. Um provedor desconhecido derruba a partida
+// (regra em EscolhaDaPersistencia).
+var persistencia = EscolhaDaPersistencia.De(
+    builder.Configuration["Persistencia:Provedor"],
+    builder.Configuration[EscolhaDaPersistencia.VariavelDoAmbiente],
+    builder.Configuration.GetConnectionString("Cosmos"));
+var usaCosmos = persistencia.UsaCosmos;
 
 if (usaCosmos)
 {
     // Cosmos DB, API NoSQL (ADR-0016). O banco (cliente + containers) é
     // singleton; o repositório é scoped porque carrega o contexto de tenant,
     // pelo mesmo motivo de dependência cativa do adaptador em memória.
-    var stringDoCosmos = builder.Configuration.GetConnectionString("Cosmos")
-        ?? throw new InvalidOperationException(
-            "ConnectionStrings:Cosmos é obrigatória quando Persistencia:Provedor=cosmos.");
+    var stringDoCosmos = persistencia.StringDeConexao!;
 
     builder.Services.AddSingleton(_ => BancoDoCatalogo.Conectar(
         stringDoCosmos,
@@ -272,7 +270,7 @@ app.MapGet("/", () => Results.Ok(new
 {
     produto = "Jornada DDD",
     versao = metadados.Versao,
-    provedor = provedorDePersistencia,
+    provedor = usaCosmos ? "cosmos" : "memoria",
     contrato = $"/swagger/{OpenApiCaixa.NomeDoDocumento}/swagger.json",
     dica = $"toda rota {metadados.PrefixoDasRotas} exige o cabeçalho X-Empresa. Veja /demo para um exemplo pronto.",
 })).ExcludeFromDescription();
