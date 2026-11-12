@@ -234,8 +234,9 @@ por fase. Fora da paridade, falta ainda:
 ## Rodar com Cosmos DB
 
 O adaptador Cosmos DB ([ADR-0016](docs/adr/0016-cosmos-db-como-sistema-de-registro.md))
-é o sistema de registro, escolhido por `Persistencia:Provedor=cosmos`; sem essa
-configuração a API roda em memória. Para subir API e front sobre o emulador:
+é o sistema de registro, escolhido por `Persistencia:Provedor=cosmos` ou, sem provedor declarado, pela
+simples presença de `COSMOS_CONNECTION_STRING`; sem nenhum dos dois a API roda
+em memória. Para subir API e front sobre o emulador:
 
 ```bash
 cd local && docker compose --profile full up -d --build cosmos api frontend
@@ -278,6 +279,19 @@ Sem RLS, o isolamento entre empresas é imposto pelo `AcessoDoTenant`, o ponto
 único de acesso ao SDK; uma guarda em `tests/Jornada.Arquitetura.Testes` falha o
 build se outro tipo do adaptador usar o SDK direto. `./local/dev.sh
 testar-isolamento` roda a suíte contra o emulador local.
+
+### Variáveis num ambiente publicado
+
+| Variável | Onde | Para quê |
+|---|---|---|
+| `COSMOS_CONNECTION_STRING` | API | Conexão da conta Cosmos. Sozinha, já liga o Cosmos; vence `ConnectionStrings__Cosmos`. |
+| `Persistencia__Provedor` | API | `cosmos` ou `memoria`. Declarado, vence a regra acima. |
+| `Cosmos__Banco` | API | Nome do database (padrão `jornada`). Criado na partida, com os containers. |
+| `Acesso__AdministradoresIniciais__0` | API | Matrícula do primeiro administrador. |
+| `Demonstracao__Carregar` | API | `true` carrega o cenário piloto nas empresas de teste vazias. |
+| `ENDERECO_DA_API` | front | Para onde o nginx repassa `/api/` (padrão `http://api:8080`). |
+
+A API escuta na porta 8080 e responde a prontidão em `/saude/pronto`; o front, na porta 80.
 
 ---
 
