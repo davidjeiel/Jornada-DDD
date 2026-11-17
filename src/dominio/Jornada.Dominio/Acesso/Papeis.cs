@@ -40,7 +40,7 @@ public enum TipoDeEscopo { Empresa, Unidade, Dominio, Squad }
 public enum Acao
 {
     Cadastrar, Editar, Relacionar, Submeter, Revisar,
-    Descontinuar, Importar, Triar, Decidir, Conceder, Administrar,
+    Descontinuar, Importar, Triar, Decidir, Conceder, EditarCadastro, Administrar,
 }
 
 /// <summary>

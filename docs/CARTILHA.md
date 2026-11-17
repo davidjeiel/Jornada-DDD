@@ -280,11 +280,17 @@ alguém resolver.
   diferente do pedido, exige resposta
 - Cadastrar e manter os **Squads**: título, sigla (única, até 20 letras) e descrição.
   Inativar um squad não apaga os vínculos que ele já tem
+- Na **Gestão de acessos**, corrigir o cadastro das pessoas: buscar qualquer cadastro,
+  inclusive os inativos, e acertar nome, e-mail, unidade e squad. Só você e o
+  administrador editam cadastro; ninguém corrige os próprios dados, nem pedindo acesso de
+  novo com a mesma matrícula
 
 **O que a ferramenta recusa**
 
 - Decidir validações — por desenho: quem cuida do cadastro não é quem o aprova. Você
   prepara, outra pessoa valida
+- Na Gestão de acessos, o que é do administrador: cadastrar pessoa direto, conceder ou
+  revogar papel fora de pleito, inativar, reativar e excluir cadastro
 
 **O que o `painel-ddd` já dava ao curador, e esta versão ainda não tem**
 

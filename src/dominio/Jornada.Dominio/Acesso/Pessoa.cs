@@ -76,16 +76,16 @@ public sealed class Pessoa
         new(id ?? Guid.CreateVersion7(), empresa, dados, ativa: true, relogio.Agora, []);
 
     /// <summary>
-    /// Quem se cadastra de novo com a mesma matrícula atualiza o cadastro, sem
-    /// duplicar a pessoa, e volta a ficar ativo. A matrícula não muda.
+    /// Quem se cadastra de novo com a mesma matrícula volta a ficar ativo, sem
+    /// duplicar a pessoa. Os dados NÃO mudam: no painel, o recadastro os
+    /// sobrescrevia; aqui, corrigir um cadastro é do curador ou do admin
+    /// (<see cref="Acao.EditarCadastro"/>), e quem digita a matrícula de outra
+    /// pessoa não troca o nome nem o e-mail dela.
     /// </summary>
     public void Recadastrar(DadosDeCadastro dados)
     {
         if (dados.Matricula != Matricula)
             throw new ErroDeDominio("MATRICULA_DIVERGENTE", "O recadastro é da mesma matrícula.");
-        Nome = dados.Nome;
-        Email = dados.Email;
-        Unidade = dados.Unidade;
         Ativa = true;
     }
 

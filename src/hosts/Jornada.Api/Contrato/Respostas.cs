@@ -454,11 +454,12 @@ public sealed record PleitoAbertoResponse(Guid IdPessoa, Guid IdPleito, string S
 /// <param name="BlocosQueEscreve">Blocos de tipos em que a pessoa cadastra agora. Vazio: só consulta.</param>
 /// <param name="PodeConceder">Despacha pleitos (curador ou admin).</param>
 /// <param name="PodeConcederAdmin">Concede o papel de admin (só admin).</param>
+/// <param name="PodeEditarCadastros">Busca e corrige cadastros de pessoas na gestão de acessos (curador ou admin).</param>
 /// <param name="PodeAdministrar">Administra a ferramenta (admin).</param>
 public sealed record PerfilResponse(
     bool Identificado, bool ModoLeitura, bool ModoDemonstracao, PessoaResponse? Pessoa,
     IReadOnlyList<PapelResponse> Papeis, IReadOnlyList<PleitoResponse> Pleitos, IReadOnlyList<string> BlocosQueEscreve,
-    bool PodeConceder, bool PodeConcederAdmin, bool PodeAdministrar)
+    bool PodeConceder, bool PodeConcederAdmin, bool PodeEditarCadastros, bool PodeAdministrar)
 {
     public static PerfilResponse De(ConsultarPerfil.Saida s, bool modoDemonstracao, DateOnly hoje) => new(
         s.Ator.Identificado, s.Ator.ModoLeitura, modoDemonstracao,
@@ -466,7 +467,7 @@ public sealed record PerfilResponse(
         s.Papeis.Select(PapelResponse.De).ToArray(),
         s.Pleitos.Select(l => PleitoResponse.De(l, hoje)).ToArray(),
         s.BlocosQueEscreve.Order().ToArray(),
-        s.PodeConceder, s.PodeConcederAdmin, s.PodeAdministrar);
+        s.PodeConceder, s.PodeConcederAdmin, s.PodeEditarCadastros, s.PodeAdministrar);
 }
 
 /// <summary>Um squad.</summary>

@@ -106,7 +106,7 @@ public sealed class AcessoTestes
         Verificar.Igual("PLEITO_PENDENTE", m.Solicitar(papel: "negocio").Codigo);
     }
 
-    [Teste("recadastro atualiza a pessoa, sem duplicar")]
+    [Teste("recadastro reaproveita a pessoa sem duplicar e sem trocar os dados")]
     public void RecadastroAtualizaAPessoaSemDuplicar()
     {
         var m = new MundoDeAcesso();
@@ -116,8 +116,8 @@ public sealed class AcessoTestes
         var de_novo = m.Exigir(m.Solicitar("c123456", "Davi Souza Lima", "davi.lima@empresa.com", "0500", "arquiteto"));
         Verificar.Igual(primeiro.Pessoa.Id, de_novo.Pessoa.Id);
         var pessoa = m.Pessoa(primeiro.Pessoa.Id);
-        Verificar.Igual("Davi Souza Lima", pessoa.Nome);
-        Verificar.Igual("0500", pessoa.Unidade.Valor);
+        Verificar.Igual("Davi Souza", pessoa.Nome, "corrigir o cadastro é do curador ou do admin");
+        Verificar.Igual("0427", pessoa.Unidade.Valor);
         Verificar.Igual(1, m.Pessoas.ListarAsync().Result.Count(p => p.Matricula.Valor == "C123456"));
     }
 

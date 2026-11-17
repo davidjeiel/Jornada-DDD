@@ -12,6 +12,8 @@ type PropsDaTabela = {
   cadastros: Cadastro[];
   pagina: number;
   idDoAdmin: string | null;
+  /** Só o admin seleciona para inativar em lote; o curador só abre e corrige. */
+  administra?: boolean;
   selecionados: string[];
   aberto: string | null;
   onSelecionar: (id: string, marcado: boolean) => void;
@@ -20,7 +22,7 @@ type PropsDaTabela = {
 };
 
 /** A lista paginada, ativos primeiro (POR_PAGINA_GESTAO do painel). O próprio admin não entra na seleção. */
-export function TabelaDeCadastros({ cadastros, pagina, idDoAdmin, selecionados, aberto, onSelecionar, onAbrir, onPagina }: PropsDaTabela) {
+export function TabelaDeCadastros({ cadastros, pagina, idDoAdmin, administra = true, selecionados, aberto, onSelecionar, onAbrir, onPagina }: PropsDaTabela) {
   const paginas = Math.max(1, Math.ceil(cadastros.length / POR_PAGINA));
   const atual = Math.min(Math.max(1, pagina), paginas);
   const visiveis = cadastros.slice((atual - 1) * POR_PAGINA, atual * POR_PAGINA);
@@ -37,7 +39,7 @@ export function TabelaDeCadastros({ cadastros, pagina, idDoAdmin, selecionados, 
             {visiveis.map(({ pessoa, squad, papeis }) => (
               <tr key={pessoa.id} className={pessoa.id === aberto ? 'selecionada' : undefined}>
                 <td>
-                  {pessoa.id !== idDoAdmin && pessoa.ativa && (
+                  {administra && pessoa.id !== idDoAdmin && pessoa.ativa && (
                     <input type="checkbox" aria-label={`Selecionar ${pessoa.nome}`} checked={selecionados.includes(pessoa.id)}
                       onChange={(e) => onSelecionar(pessoa.id, e.target.checked)} />
                   )}
@@ -71,6 +73,8 @@ type PropsDoPainel = {
   dominios: AtivoResumo[];
   vinculos: string[] | null;
   ehVoce: boolean;
+  /** Admin: papéis, inativação e exclusão. Curador: só os dados do cadastro. */
+  administra?: boolean;
   ocupado: boolean;
   onCorrigir: (dados: { nome: string; email: string; unidade: string; idSquad: string | null; ativa: boolean }) => void;
   onConceder: (papel: PapelNoEscopo) => void;
@@ -78,8 +82,12 @@ type PropsDoPainel = {
   onExcluir: () => void;
 };
 
-/** O detalhe de um cadastro: correção, papéis (conceder e revogar) e exclusão, quando não há vínculo. */
-export function PainelDoCadastro({ cadastro, squads, dominios, vinculos, ehVoce, ocupado, onCorrigir, onConceder, onRevogar, onExcluir }: PropsDoPainel) {
+/**
+ * O detalhe de um cadastro: correção, papéis (conceder e revogar) e exclusão,
+ * quando não há vínculo. O curador vê só a correção dos dados e os papéis, sem
+ * mexer neles: conceder é pelos pleitos, e o resto é do admin.
+ */
+export function PainelDoCadastro({ cadastro, squads, dominios, vinculos, ehVoce, administra = true, ocupado, onCorrigir, onConceder, onRevogar, onExcluir }: PropsDoPainel) {
   const { pessoa, papeis } = cadastro;
 
   function corrigir(evento: FormEvent<HTMLFormElement>) {
@@ -119,10 +127,17 @@ export function PainelDoCadastro({ cadastro, squads, dominios, vinculos, ehVoce,
             </select>
           </label>
         </div>
-        <label className="caixa-de-marcar">
-          <input name="ativa" type="checkbox" defaultChecked={pessoa.ativa} disabled={ehVoce} /> Cadastro ativo
-          <small className="ajuda">Inativar encerra todos os papéis. Reativar não devolve nenhum.{ehVoce && ' Você não pode inativar o próprio cadastro.'}</small>
-        </label>
+        {administra ? (
+          <label className="caixa-de-marcar">
+            <input name="ativa" type="checkbox" defaultChecked={pessoa.ativa} disabled={ehVoce} /> Cadastro ativo
+            <small className="ajuda">Inativar encerra todos os papéis. Reativar não devolve nenhum.{ehVoce && ' Você não pode inativar o próprio cadastro.'}</small>
+          </label>
+        ) : (
+          <>
+            {pessoa.ativa && <input type="hidden" name="ativa" value="on" />}
+            <p className="discreto">Cadastro {pessoa.ativa ? 'ativo' : 'inativo'}. Inativar ou reativar é com o administrador.</p>
+          </>
+        )}
         <div className="modal-actions"><button className="primary-button" disabled={ocupado}>Salvar cadastro</button></div>
       </form>
 
@@ -132,7 +147,7 @@ export function PainelDoCadastro({ cadastro, squads, dominios, vinculos, ehVoce,
           {papeis.map((p) => (
             <li key={`${p.papel}-${p.escopoTipo}-${p.escopoId ?? ''}`}>
               <span><strong>{p.rotulo}</strong> · {p.escopoRotulo}</span>
-              {!ehVoce && (
+              {administra && !ehVoce && (
                 <button type="button" className="text-button" disabled={ocupado}
                   onClick={() => onRevogar({ papel: p.papel, escopoTipo: p.escopoTipo, escopoId: p.escopoId })}>Revogar</button>
               )}
@@ -141,7 +156,7 @@ export function PainelDoCadastro({ cadastro, squads, dominios, vinculos, ehVoce,
         </ul>
       )}
 
-      {!ehVoce && pessoa.ativa && (
+      {administra && !ehVoce && pessoa.ativa && (
         <form className="decisao-pleito" onSubmit={conceder}>
           <label>Conceder papel
             <select name="papel" defaultValue="negocio">{PAPEIS.map((p) => <option key={p} value={p}>{ROTULO_DO_PAPEL[p]}</option>)}</select>
@@ -159,8 +174,8 @@ export function PainelDoCadastro({ cadastro, squads, dominios, vinculos, ehVoce,
         </form>
       )}
 
-      <h3>Excluir o cadastro</h3>
-      {vinculos === null ? <p className="vazio">Verificando vínculos...</p>
+      {administra && <h3>Excluir o cadastro</h3>}
+      {!administra ? null : vinculos === null ? <p className="vazio">Verificando vínculos...</p>
         : vinculos.length > 0
           ? <p className="discreto">Não pode ser excluído: {vinculos.join(', ')}. Inative o cadastro em vez de excluir.</p>
           : ehVoce
@@ -213,15 +228,18 @@ export function FormularioDeCadastroDireto({ squads, ocupado, onCadastrar }: { s
 type Props = {
   ativos: AtivoResumo[];
   idDoAdmin: string | null;
+  /** Admin gere tudo; o curador (sem isto) busca e corrige os dados dos cadastros. */
+  administra: boolean;
   /** Avisa o App: a lista de pessoas (os responsáveis possíveis) mudou. */
   onPessoasAlteradas?: () => void;
   onErro: (mensagem: string) => void;
 };
 
-// A gestão de acessos do painel (/gestao-acessos), só para o admin: a API recusa
-// para qualquer outro papel. Salvar o cadastro não mexe nos papéis: cada papel
-// se concede e se revoga (ADR-0018, consequências).
-export function GestaoDeAcessos({ ativos, idDoAdmin, onPessoasAlteradas, onErro }: Props) {
+// A gestão de acessos do painel (/gestao-acessos). Admin e curador buscam e
+// corrigem cadastros; o resto (cadastro direto, papéis, inativação, exclusão) é
+// só do admin, e a API recusa para os demais. Salvar o cadastro não mexe nos
+// papéis: cada papel se concede e se revoga (ADR-0018, consequências).
+export function GestaoDeAcessos({ ativos, idDoAdmin, administra, onPessoasAlteradas, onErro }: Props) {
   const [cadastros, setCadastros] = useState<Cadastro[]>([]);
   const [squads, setSquads] = useState<Squad[]>([]);
   const [busca, setBusca] = useState('');
@@ -249,8 +267,8 @@ export function GestaoDeAcessos({ ativos, idDoAdmin, onPessoasAlteradas, onErro 
 
   useEffect(() => {
     setVinculos(null);
-    if (aberto) consultarVinculos(aberto).then((v) => setVinculos(v.vinculos)).catch(() => setVinculos([]));
-  }, [aberto, cadastros]);
+    if (aberto && administra) consultarVinculos(aberto).then((v) => setVinculos(v.vinculos)).catch(() => setVinculos([]));
+  }, [aberto, cadastros, administra]);
 
   async function agir(acao: () => Promise<unknown>) {
     setOcupado(true);
@@ -274,26 +292,30 @@ export function GestaoDeAcessos({ ativos, idDoAdmin, onPessoasAlteradas, onErro 
   return (
     <>
       <Cabecalho rotulo="ADMINISTRAÇÃO" titulo="Gestão de acessos"
-        texto="Todos os cadastros da empresa, inclusive os inativos. Cadastre quem vai responder por ativos, corrija dados, conceda ou revogue papéis, inative quem saiu." />
-      <FormularioDeCadastroDireto key={cadastros.length} squads={squads} ocupado={ocupado}
-        onCadastrar={(dados) => void agir(async () => { const novo = await cadastrarPessoa(dados); setAberto(novo.pessoa.id); onPessoasAlteradas?.(); })} />
+        texto={administra
+          ? 'Todos os cadastros da empresa, inclusive os inativos. Cadastre quem vai responder por ativos, corrija dados, conceda ou revogue papéis, inative quem saiu.'
+          : 'Todos os cadastros da empresa, inclusive os inativos. Corrija nome, e-mail, unidade e squad. Papéis se concedem pelos pleitos; inativar e excluir é com o administrador.'} />
+      {administra && <FormularioDeCadastroDireto key={cadastros.length} squads={squads} ocupado={ocupado}
+        onCadastrar={(dados) => void agir(async () => { const novo = await cadastrarPessoa(dados); setAberto(novo.pessoa.id); onPessoasAlteradas?.(); })} />}
       <section className="panel screen-panel">
         <form className="barra-de-busca" role="search" onSubmit={buscar}>
           <input name="busca" type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome, matrícula, e-mail, unidade ou squad" aria-label="Buscar cadastros" />
           <button className="outline-button">Buscar</button>
-          <button type="button" className="danger-button" disabled={selecionados.length === 0 || ocupado}
-            onClick={() => void agir(async () => { await inativarEmLote(selecionados); setSelecionados([]); })}>
-            Inativar selecionados ({selecionados.length})
-          </button>
+          {administra && (
+            <button type="button" className="danger-button" disabled={selecionados.length === 0 || ocupado}
+              onClick={() => void agir(async () => { await inativarEmLote(selecionados); setSelecionados([]); })}>
+              Inativar selecionados ({selecionados.length})
+            </button>
+          )}
         </form>
-        <TabelaDeCadastros cadastros={cadastros} pagina={pagina} idDoAdmin={idDoAdmin} selecionados={selecionados} aberto={aberto}
+        <TabelaDeCadastros cadastros={cadastros} pagina={pagina} idDoAdmin={idDoAdmin} administra={administra} selecionados={selecionados} aberto={aberto}
           onSelecionar={(id, marcado) => setSelecionados((atual) => marcado ? [...atual, id] : atual.filter((x) => x !== id))}
           onAbrir={setAberto} onPagina={setPagina} />
       </section>
       {cadastro && (
         <PainelDoCadastro cadastro={cadastro} squads={squads} dominios={dominios} vinculos={vinculos}
-          ehVoce={cadastro.pessoa.id === idDoAdmin} ocupado={ocupado}
-          onCorrigir={(dados) => void agir(() => corrigirCadastro(cadastro.pessoa.id, dados))}
+          ehVoce={cadastro.pessoa.id === idDoAdmin} administra={administra} ocupado={ocupado}
+          onCorrigir={(dados) => void agir(async () => { await corrigirCadastro(cadastro.pessoa.id, dados); onPessoasAlteradas?.(); })}
           onConceder={(papel) => void agir(() => concederPapel(cadastro.pessoa.id, papel))}
           onRevogar={(papel) => void agir(() => revogarPapel(cadastro.pessoa.id, papel))}
           onExcluir={() => void agir(async () => { await excluirCadastro(cadastro.pessoa.id); setAberto(null); })} />

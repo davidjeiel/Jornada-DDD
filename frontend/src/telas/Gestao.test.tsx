@@ -20,12 +20,28 @@ const tabela = (cadastros: Cadastro[], idDoAdmin: string | null = null) => rende
     onSelecionar={nada} onAbrir={nada} onPagina={nada} />,
 );
 
-const painel = (vinculos: string[] | null, ehVoce = false) => renderToStaticMarkup(
-  <PainelDoCadastro cadastro={cadastro('p-1')} squads={[]} dominios={[]} vinculos={vinculos} ehVoce={ehVoce} ocupado={false}
+const painel = (vinculos: string[] | null, ehVoce = false, administra = true) => renderToStaticMarkup(
+  <PainelDoCadastro cadastro={cadastro('p-1')} squads={[]} dominios={[]} vinculos={vinculos} ehVoce={ehVoce} administra={administra} ocupado={false}
     onCorrigir={nada} onConceder={nada} onRevogar={nada} onExcluir={nada} />,
 );
 
 describe('gestão de acessos', () => {
+  it('o curador corrige os dados, mas não mexe em papel, situação nem exclusão', () => {
+    const html = painel(null, false, false);
+    expect(html).toContain('name="nome"');
+    expect(html).toContain('Salvar cadastro');
+    expect(html).toContain('<input type="hidden" name="ativa" value="on"/>');
+    expect(html).toContain('Inativar ou reativar é com o administrador.');
+    expect(html).toContain('Negócio');
+    expect(html).not.toContain('Revogar');
+    expect(html).not.toContain('Conceder papel');
+    expect(html).not.toContain('Excluir o cadastro');
+    const lista = renderToStaticMarkup(
+      <TabelaDeCadastros cadastros={[cadastro('p-1', 'Bia')]} pagina={1} idDoAdmin={null} administra={false} selecionados={[]} aberto={null}
+        onSelecionar={nada} onAbrir={nada} onPagina={nada} />);
+    expect(lista).not.toContain('Selecionar Bia');
+  });
+
   it('pagina de 20 em 20', () => {
     const muitos = Array.from({ length: 25 }, (_, i) => cadastro(`p-${i}`));
     const html = tabela(muitos);

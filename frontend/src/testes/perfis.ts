@@ -24,6 +24,7 @@ export function perfilDe(papel: ChaveDePapel | null, pleitos: Pleito[] = []): Pe
     blocosQueEscreve: papel ? BLOCOS[papel] : [],
     podeConceder: papel === 'admin' || papel === 'curador',
     podeConcederAdmin: papel === 'admin',
+    podeEditarCadastros: papel === 'admin' || papel === 'curador',
     podeAdministrar: papel === 'admin',
   };
 }

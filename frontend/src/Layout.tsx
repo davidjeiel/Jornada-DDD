@@ -25,7 +25,7 @@ type Props = {
 };
 
 export function Layout({ secao, perfil, nomeDaEmpresa, tema, onAlternarTema, menuCompacto, onAlternarMenu, termo, onBuscar, naoLidas, children }: Props) {
-  const itens = itensVisiveis(perfil ?? { podeConceder: false, podeAdministrar: false });
+  const itens = itensVisiveis(perfil ?? { podeConceder: false, podeEditarCadastros: false, podeAdministrar: false });
   const nome = perfil?.pessoa?.nome ?? 'Quem é você?';
   const papel = perfil?.papeis.map((p) => p.rotulo).join(', ') || (perfil?.identificado ? 'Sem papel: só consulta' : 'Não identificado');
   const estadoTema = estadoDoTema(tema);

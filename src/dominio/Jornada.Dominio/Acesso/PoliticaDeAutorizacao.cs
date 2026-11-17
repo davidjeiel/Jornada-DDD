@@ -53,6 +53,7 @@ public static class PoliticaDeAutorizacao
         [Acao.Triar]         = [Papel.Admin, Papel.Curador, Papel.TechLead],
         [Acao.Decidir]       = [Papel.Admin, Papel.Arquiteto, Papel.TechLead, Papel.Negocio],
         [Acao.Conceder]      = [Papel.Admin, Papel.Curador],
+        [Acao.EditarCadastro] = [Papel.Admin, Papel.Curador],
         [Acao.Administrar]   = [Papel.Admin],
     };
 

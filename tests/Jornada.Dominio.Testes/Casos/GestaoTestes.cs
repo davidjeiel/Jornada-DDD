@@ -88,11 +88,44 @@ public sealed class CartilhaTestes
 [Suite("Gestão de acessos e squads")]
 public sealed class GestaoTestes
 {
-    [Teste("só o administrador entra na gestão de acessos")]
-    public void SoAdminGerencia()
+    [Teste("o curador busca e corrige cadastros; o resto da gestão é só do administrador")]
+    public void CuradorCorrigeCadastro()
     {
         var m = new MundoDeGestao();
-        Verificar.Igual("SEM_PERMISSAO", m.Gestao(MundoDeAcesso.Curador).ListarAsync().Result.Codigo);
+        var davi = m.Pessoa("C123456", "Davi Souza", "0427", Papel.TechLead);
+        var curador = m.Gestao(MundoDeAcesso.Curador);
+
+        Verificar.Verdadeiro(curador.ListarAsync().Result.Sucesso);
+        m.Exigir(curador.CorrigirAsync(davi.Id, "Davi Souza Lima", "davi.lima@empresa.com", "0500", null, ativa: true).Result);
+        Verificar.Igual("Davi Souza Lima", davi.Nome);
+        Verificar.Igual("0500", davi.Unidade.Valor);
+
+        var inativar = curador.CorrigirAsync(davi.Id, "Davi Souza Lima", "davi.lima@empresa.com", "0500", null, ativa: false).Result;
+        Verificar.Igual("SEM_PERMISSAO", inativar.Codigo, "inativar é do admin");
+        Verificar.Verdadeiro(davi.Ativa);
+
+        Verificar.Igual("SEM_PERMISSAO", curador.VinculosAsync(davi.Id).Result.Codigo);
+        Verificar.Igual("SEM_PERMISSAO", curador.CadastrarAsync("E654321", "Eva Lima", "eva@empresa.com", "0310", null).Result.Codigo);
+        Verificar.Igual("SEM_PERMISSAO", curador.ConcederAsync(davi.Id, "negocio", "empresa", null).Result.Codigo);
+        Verificar.Igual("SEM_PERMISSAO", curador.ExcluirAsync(davi.Id).Result.Codigo);
+        Verificar.Igual("SEM_PERMISSAO", curador.InativarEmLoteAsync([davi.Id]).Result.Codigo);
+    }
+
+    [Teste("fora admin e curador, ninguém lista nem corrige cadastro, nem o próprio")]
+    public void SoAdminECuradorCorrigem()
+    {
+        var m = new MundoDeGestao();
+        var davi = m.Pessoa("C123456", "Davi Souza", "0427", Papel.TechLead);
+        foreach (var papel in new[] { Papel.TechLead, Papel.Negocio, Papel.Arquiteto, Papel.Consulta })
+        {
+            var gestao = m.Gestao(Cenario.Ator(papel));
+            Verificar.Igual("SEM_PERMISSAO", gestao.ListarAsync().Result.Codigo, papel.ToString());
+            Verificar.Igual("SEM_PERMISSAO",
+                gestao.CorrigirAsync(davi.Id, "Outro Nome", "outro@empresa.com", "0001", null, ativa: true).Result.Codigo, papel.ToString());
+        }
+        var proprio = m.Gestao(m.Como(davi)).CorrigirAsync(davi.Id, "Outro Nome", "outro@empresa.com", "0001", null, ativa: true).Result;
+        Verificar.Igual("SEM_PERMISSAO", proprio.Codigo, "nem o próprio cadastro");
+        Verificar.Igual("Davi Souza", davi.Nome);
         Verificar.Verdadeiro(m.Gestao(MundoDeAcesso.Admin).ListarAsync().Result.Sucesso);
     }
 

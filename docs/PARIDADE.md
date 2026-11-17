@@ -71,6 +71,13 @@ original no título, para facilitar a busca.
   (`POST /v1/gestao/pessoas`), ativa e sem papel, para pô-la como responsável
   por ativos sem ela ter pedido acesso. `CadastroDiretoPeloAdmin` e
   `CadastroDiretoConfere`.
+- **Edição de cadastro só por curador e admin.** No painel a gestão de acessos
+  era só do admin, e quem pedia acesso de novo com a mesma matrícula
+  sobrescrevia nome, e-mail e unidade do cadastro, sem ser ninguém. No Jornada
+  admin e curador buscam e corrigem cadastros (`Acao.EditarCadastro`); o resto
+  da gestão segue do admin, e o curador não muda a situação (ativo/inativo).
+  O recadastro reaproveita a pessoa sem trocar os dados.
+  `CuradorCorrigeCadastro`, `SoAdminECuradorCorrigem`.
 - **Grafo do catálogo.** O painel desenha todos os ativos na visão
   executiva. No Jornada há um teto de 300 nós (até 1.000 pela API), e passar
   dele marca `truncado` e a tela avisa, a mesma regra da vizinhança. Arquivados
@@ -253,7 +260,7 @@ cadastrados antes dela não têm autor e não entram em "Meus rascunhos".
 | `test_quem_se_cadastra_consulta_o_catalogo` — Sem papel, tudo é leitura — e leitura tem de funcionar. | 2 | ✅ | `QuemSeCadastraConsultaOCatalogo` |
 | `test_pleito_nasce_pendente_com_os_dados_informados` | 2 | ✅ | `PleitoNascePendenteComOsDadosInformados` |
 | `test_segundo_pleito_pendente_e_recusado` | 2 | ✅ | `SegundoPleitoPendenteERecusado` (409 `PLEITO_PENDENTE`) |
-| `test_recadastro_atualiza_a_pessoa_sem_duplicar` | 2 | ✅ | `RecadastroAtualizaAPessoaSemDuplicar`; no Cosmos, a reserva da matrícula impede a duplicata (contrato de persistência) |
+| `test_recadastro_atualiza_a_pessoa_sem_duplicar` | 2 | ✅ | `RecadastroAtualizaAPessoaSemDuplicar`: não duplica, mas por regra nova não troca os dados (ver diferenças); no Cosmos, a reserva da matrícula impede a duplicata (contrato de persistência) |
 | `test_quem_concede_e_avisado_do_pleito` | 8 | ✅ | `QuemConcedeEAvisadoDoPleito`: `PodeConceder` por pessoa; admin só por admin; a resposta vai a quem pediu |
 | `test_aprovacao_concede_o_papel_e_responde` | 2 | ✅ | `AprovacaoConcedeOPapelEResponde`: o papel vale, a resposta fica no pleito e no perfil, e o aviso vai à caixa (fase 8). |
 | `test_negativa_exige_motivo_e_nao_concede_nada` | 2 | ✅ | `NegativaExigeMotivoENaoConcedeNada`, com o aviso de negativa na caixa (fase 8). |

@@ -8,9 +8,10 @@ namespace Jornada.Aplicacao.Acesso;
 public sealed record CadastroLegivel(Pessoa Pessoa, IReadOnlyList<PapelLegivel> Papeis, Squad? Squad);
 
 /// <summary>
-/// A gestão de acessos do painel-ddd (<c>/gestao-acessos</c>), só para quem
-/// administra: busca de cadastros, correção, concessão e revogação direta,
-/// inativação e exclusão de cadastro sem vínculo.
+/// A gestão de acessos do painel-ddd (<c>/gestao-acessos</c>): busca de
+/// cadastros, correção, concessão e revogação direta, inativação e exclusão de
+/// cadastro sem vínculo. Buscar e corrigir os dados de um cadastro é de admin e
+/// curador (<see cref="Acao.EditarCadastro"/>); o resto, só de quem administra.
 ///
 /// Uma diferença de propósito: no painel, salvar o cadastro troca TODOS os
 /// papéis por um papel na empresa inteira (<c>atualizar_pessoa</c>), e um papel
@@ -35,7 +36,7 @@ public sealed class GestaoDeAcessos(
     /// <summary>Todos os cadastros, ativos primeiro, filtrados por qualquer dado visível (<c>acesso.pessoas</c>).</summary>
     public async Task<Resultado<IReadOnlyList<CadastroLegivel>>> ListarAsync(string? busca = null, CancellationToken ct = default)
     {
-        if (await RecusaAsync<IReadOnlyList<CadastroLegivel>>(ct) is { } recusa) return recusa;
+        if (await RecusaAsync<IReadOnlyList<CadastroLegivel>>(ct, Acao.EditarCadastro) is { } recusa) return recusa;
 
         var todosOsSquads = (await squads.ListarAsync(ct)).ToDictionary(s => s.Id);
         var termo = (busca ?? "").Trim();
@@ -95,11 +96,17 @@ public sealed class GestaoDeAcessos(
         return Resultado<CadastroLegivel>.Ok(await LegivelAsync(pessoa, squad, ct));
     }
 
-    /// <summary>Corrige nome, e-mail, unidade e squad; <paramref name="ativa"/> falso inativa e encerra os papéis.</summary>
+    /// <summary>
+    /// Corrige nome, e-mail, unidade e squad (admin ou curador);
+    /// <paramref name="ativa"/> falso inativa e encerra os papéis, e inativar ou
+    /// reativar continua só do admin.
+    /// </summary>
     public Task<Resultado<CadastroLegivel>> CorrigirAsync(
         Guid idPessoa, string? nome, string? email, string? unidade, Guid? idSquad, bool ativa, CancellationToken ct = default) =>
-        AlterarAsync(idPessoa, ct, async (pessoa, ator) =>
+        AlterarAsync(idPessoa, ct, Acao.EditarCadastro, async (pessoa, ator) =>
         {
+            if (ativa != pessoa.Ativa && !PoliticaDeAutorizacao.Pode(ator, Acao.Administrar, AlvoDaAcao.NaEmpresa(tenant.Atual.Empresa), relogio.Hoje))
+                throw new SemPermissao("Inativar ou reativar um cadastro é atribuição do administrador.");
             if (!ativa && pessoa.Id == ator.IdPessoa)
                 throw new ErroDeDominio(ProprioCadastro, "O administrador conectado não pode inativar o próprio cadastro.");
             if (idSquad is { } s && await squads.ObterAsync(s, ct) is null)
@@ -113,7 +120,7 @@ public sealed class GestaoDeAcessos(
     /// <summary>Concede um papel direto, fora de pleito. Ninguém concede a si mesmo, nem o admin.</summary>
     public Task<Resultado<CadastroLegivel>> ConcederAsync(
         Guid idPessoa, string? papel, string? escopoTipo, Guid? escopoId, CancellationToken ct = default) =>
-        AlterarAsync(idPessoa, ct, async (pessoa, ator) =>
+        AlterarAsync(idPessoa, ct, Acao.Administrar, async (pessoa, ator) =>
         {
             var (p, escopo) = await ConferirPapelAsync(papel, escopoTipo, escopoId, ct);
             if (pessoa.Id == ator.IdPessoa)
@@ -129,7 +136,7 @@ public sealed class GestaoDeAcessos(
     /// <summary>Encerra uma atribuição vigente. O próprio administrador não revoga os próprios papéis.</summary>
     public Task<Resultado<CadastroLegivel>> RevogarAsync(
         Guid idPessoa, string? papel, string? escopoTipo, Guid? escopoId, CancellationToken ct = default) =>
-        AlterarAsync(idPessoa, ct, async (pessoa, ator) =>
+        AlterarAsync(idPessoa, ct, Acao.Administrar, async (pessoa, ator) =>
         {
             var (p, escopo) = await ConferirPapelAsync(papel, escopoTipo, escopoId, ct, conferirDominio: false);
             if (pessoa.Id == ator.IdPessoa)
@@ -180,9 +187,9 @@ public sealed class GestaoDeAcessos(
     // ──────────────────────────────────────────────────────────── apoio
 
     private async Task<Resultado<CadastroLegivel>> AlterarAsync(
-        Guid idPessoa, CancellationToken ct, Func<Pessoa, Ator, Task> alteracao)
+        Guid idPessoa, CancellationToken ct, Acao acao, Func<Pessoa, Ator, Task> alteracao)
     {
-        if (await RecusaAsync<CadastroLegivel>(ct) is { } recusa) return recusa;
+        if (await RecusaAsync<CadastroLegivel>(ct, acao) is { } recusa) return recusa;
         var pessoa = await pessoas.ObterAsync(idPessoa, ct);
         if (pessoa is null)
             return Resultado<CadastroLegivel>.Recusado("PESSOA_NAO_ENCONTRADA", "Cadastro não encontrado.");
@@ -195,13 +202,15 @@ public sealed class GestaoDeAcessos(
         return Resultado<CadastroLegivel>.Ok(await LegivelAsync(pessoa, squad, ct));
     }
 
-    /// <summary>Gestão de acessos é do administrador (<c>@exige("administrar")</c>).</summary>
-    private async Task<Resultado<T>?> RecusaAsync<T>(CancellationToken ct)
+    /// <summary>Gestão de acessos é do administrador (<c>@exige("administrar")</c>); buscar e corrigir cadastro, também do curador.</summary>
+    private async Task<Resultado<T>?> RecusaAsync<T>(CancellationToken ct, Acao acao = Acao.Administrar)
     {
         var ator = await atorAtual.ObterAsync(ct);
-        return PoliticaDeAutorizacao.Pode(ator, Acao.Administrar, AlvoDaAcao.NaEmpresa(tenant.Atual.Empresa), relogio.Hoje)
+        return PoliticaDeAutorizacao.Pode(ator, acao, AlvoDaAcao.NaEmpresa(tenant.Atual.Empresa), relogio.Hoje)
             ? null
-            : Recusa.Para<T>(ator, "A gestão de acessos é atribuição do administrador.");
+            : Recusa.Para<T>(ator, acao == Acao.EditarCadastro
+                ? "Corrigir cadastro de pessoa é atribuição do curador ou do administrador."
+                : "A gestão de acessos é atribuição do administrador.");
     }
 
     private async Task<(Papel, TipoDeEscopo)> ConferirPapelAsync(
