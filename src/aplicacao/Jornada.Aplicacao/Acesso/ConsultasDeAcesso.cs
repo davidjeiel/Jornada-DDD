@@ -57,6 +57,7 @@ public sealed class ConsultarPerfil(
         IReadOnlySet<string> BlocosQueEscreve,
         bool PodeConceder,
         bool PodeConcederAdmin,
+        bool PodeEditarCadastros,
         bool PodeAdministrar);
 
     public async Task<Saida> ExecutarAsync(CancellationToken ct = default)
@@ -81,6 +82,7 @@ public sealed class ConsultarPerfil(
             PoliticaDeAutorizacao.BlocosQueEscreve(ator, hoje),
             PoliticaDeAutorizacao.PodeConceder(ator, null, hoje).Permitido,
             PoliticaDeAutorizacao.PodeConceder(ator, Papel.Admin, hoje).Permitido,
+            PoliticaDeAutorizacao.Pode(ator, Acao.EditarCadastro, AlvoDaAcao.NaEmpresa(ator.Empresa), hoje),
             ator.Identificado && ator.Atribuicoes.Any(a => a.Vigente(hoje) && a.Papel == Papel.Admin));
     }
 }

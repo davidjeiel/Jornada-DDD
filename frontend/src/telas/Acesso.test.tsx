@@ -125,6 +125,7 @@ describe('ao lado do pedido de acesso', () => {
     const html = renderToStaticMarkup(<SolicitarAcesso onCadastrado={() => {}} onErro={() => {}} />);
     expect(html).toContain('O que cada papel exerce');
     expect(html).toContain('O que acontece depois');
-    expect(html).toContain('não cria um segundo pedido');
+    expect(html).toContain('não se abre um segundo pedido');
+    expect(html).toContain('fale com um curador ou administrador');
   });
 });

@@ -230,7 +230,7 @@ function App() {
         tela = <Pleitos ativos={ativos} onErro={setErro} onDecidido={() => void carregarPerfil()} />;
         break;
       case 'gestao-acessos':
-        tela = <GestaoDeAcessos ativos={ativos} idDoAdmin={perfil?.pessoa?.id ?? null} onPessoasAlteradas={() => void carregarPerfil()} onErro={setErro} />;
+        tela = <GestaoDeAcessos ativos={ativos} idDoAdmin={perfil?.pessoa?.id ?? null} administra={perfil?.podeAdministrar ?? false} onPessoasAlteradas={() => void carregarPerfil()} onErro={setErro} />;
         break;
       case 'squads':
         tela = <Squads onErro={setErro} />;

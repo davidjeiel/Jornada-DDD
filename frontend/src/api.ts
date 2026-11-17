@@ -165,6 +165,8 @@ export type Perfil = {
   blocosQueEscreve: string[];
   podeConceder: boolean;
   podeConcederAdmin: boolean;
+  /** Busca e corrige cadastros de pessoas (curador ou admin). */
+  podeEditarCadastros: boolean;
   podeAdministrar: boolean;
 };
 

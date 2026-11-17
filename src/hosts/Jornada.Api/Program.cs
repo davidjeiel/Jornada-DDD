@@ -809,7 +809,7 @@ acesso.MapPost("/pleitos", async Task<Results<Created<PleitoAbertoResponse>, Jso
 })
     .WithName("solicitarAcesso")
     .WithSummary("Cadastra a pessoa e pede um papel")
-    .WithDescription("Aberta a quem ainda não tem papel: não exige X-Pessoa. O cadastro não concede nada; a pessoa consulta o catálogo até um curador ou admin decidir. Matrícula já cadastrada atualiza o cadastro, sem duplicar; com pleito pendente, devolve 409 PLEITO_PENDENTE.")
+    .WithDescription("Aberta a quem ainda não tem papel: não exige X-Pessoa. O cadastro não concede nada; a pessoa consulta o catálogo até um curador ou admin decidir. Matrícula já cadastrada reaproveita o cadastro como está, sem duplicar nem trocar os dados (corrigir é do curador ou admin); com pleito pendente, devolve 409 PLEITO_PENDENTE.")
     .ComErros(StatusCodes.Status409Conflict, StatusCodes.Status422UnprocessableEntity);
 
 acesso.MapGet("/pleitos", async Task<Results<Ok<FilaDePleitosResponse>, JsonHttpResult<ApiError>>> (
@@ -1002,7 +1002,7 @@ gestao.MapGet("/pessoas", async Task<Results<Ok<ListaDeCadastrosResponse>, JsonH
 })
     .WithName("listarCadastros")
     .WithSummary("Lista todos os cadastros, inclusive os inativos")
-    .WithDescription("Só admin. Ativos primeiro, por nome. O parâmetro busca filtra por nome, matrícula, e-mail, unidade ou squad.")
+    .WithDescription("Curador ou admin. Ativos primeiro, por nome. O parâmetro busca filtra por nome, matrícula, e-mail, unidade ou squad.")
     .ComErros(StatusCodes.Status403Forbidden);
 
 gestao.MapPost("/pessoas", async Task<Results<Created<CadastroResponse>, JsonHttpResult<ApiError>>> (
@@ -1037,7 +1037,7 @@ gestao.MapPut("/pessoas/{id:guid}", async Task<Results<Ok<CadastroResponse>, Jso
 })
     .WithName("corrigirCadastro")
     .WithSummary("Corrige o cadastro e o situa como ativo ou inativo")
-    .WithDescription("Só admin. Nome, e-mail, unidade e squad; a matrícula não muda. ativa=false encerra todos os papéis; o administrador conectado não se inativa (403 PROPRIO_CADASTRO).")
+    .WithDescription("Curador ou admin corrigem nome, e-mail, unidade e squad; a matrícula não muda. Mudar ativa é só do admin (403 para o curador): ativa=false encerra todos os papéis; o administrador conectado não se inativa (403 PROPRIO_CADASTRO).")
     .ComErros(StatusCodes.Status400BadRequest, StatusCodes.Status403Forbidden, StatusCodes.Status404NotFound);
 
 gestao.MapPost("/pessoas/{id:guid}/papeis", async Task<Results<Ok<CadastroResponse>, JsonHttpResult<ApiError>>> (

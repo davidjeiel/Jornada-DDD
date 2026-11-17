@@ -21,11 +21,12 @@ describe('menu', () => {
 
   it('só mostra a fila de pleitos e os squads para quem concede (test_menu_so_mostra_a_fila_para_quem_concede)', () => {
     // As alçadas vêm da API (GET /v1/perfil), já com os papéis concedidos e o modo leitura.
-    const secoes = (podeConceder: boolean, podeAdministrar: boolean) =>
-      itensVisiveis({ podeConceder, podeAdministrar }).map((item) => item.secao);
+    const secoes = (podeConceder: boolean, podeAdministrar: boolean, podeEditarCadastros = podeAdministrar) =>
+      itensVisiveis({ podeConceder, podeEditarCadastros, podeAdministrar }).map((item) => item.secao);
     expect(secoes(true, false)).toContain('pleitos');
     expect(secoes(true, false)).toContain('squads');
     expect(secoes(true, false)).not.toContain('gestao-acessos');
+    expect(secoes(true, false, true)).toContain('gestao-acessos');
     expect(secoes(true, true)).toContain('gestao-acessos');
     for (const secao of ['pleitos', 'squads', 'gestao-acessos']) expect(secoes(false, false)).not.toContain(secao);
     expect(secoes(false, false)).toContain('politicas');

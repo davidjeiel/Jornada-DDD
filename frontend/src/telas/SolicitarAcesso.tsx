@@ -39,7 +39,7 @@ export function OQueAconteceDepois() {
         <li>O pedido vai para a fila de um curador ou administrador, que pode <strong>conceder o papel pedido, conceder outro ou negar</strong>, sempre com uma resposta escrita.</li>
         <li>A resposta chega no sino e fica em <strong>Seu perfil</strong>. Concedido o papel, as ações dele aparecem na tela.</li>
       </ol>
-      <p className="discreto">Com um pedido pendente, um novo cadastro com a mesma matrícula atualiza seus dados, mas não cria um segundo pedido.</p>
+      <p className="discreto">Já tem cadastro? O pedido usa os dados que já estão nele, e não se abre um segundo pedido enquanto houver um pendente. Para corrigir nome, e-mail ou unidade, fale com um curador ou administrador.</p>
     </>
   );
 }

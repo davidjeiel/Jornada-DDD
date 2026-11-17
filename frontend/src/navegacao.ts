@@ -18,8 +18,8 @@ export type ItemDeMenu = {
   /** O que aparece no menu recolhido, como no painel ("VE", "CA"...). */
   inicial: string;
   grupo?: Grupo;
-  /** Quem vê o item: só papéis que concedem acesso, ou só o admin. */
-  exige?: 'conceder' | 'administrar';
+  /** Quem vê o item: só papéis que concedem acesso, que corrigem cadastros, ou só o admin. */
+  exige?: 'conceder' | 'editarCadastros' | 'administrar';
   /** Fase do plano de paridade que entrega a tela; ausente = já entregue. */
   fase?: number;
   descricao: string;
@@ -40,7 +40,7 @@ export const MENU: ItemDeMenu[] = [
 
   { secao: 'pleitos', caminho: '/pleitos', rotulo: 'Pleitos de acesso', inicial: 'PA', grupo: 'Administração', exige: 'conceder', descricao: 'Fila de pedidos de papel para quem concede acesso.' },
   { secao: 'squads', caminho: '/squads', rotulo: 'Squads', inicial: 'SQ', grupo: 'Administração', exige: 'conceder', descricao: 'Os times da empresa.' },
-  { secao: 'gestao-acessos', caminho: '/gestao-acessos', rotulo: 'Gestão de acessos', inicial: 'GA', grupo: 'Administração', exige: 'administrar', descricao: 'Cadastros, concessões e revogações de papel em toda a empresa.' },
+  { secao: 'gestao-acessos', caminho: '/gestao-acessos', rotulo: 'Gestão de acessos', inicial: 'GA', grupo: 'Administração', exige: 'editarCadastros', descricao: 'Cadastros, concessões e revogações de papel em toda a empresa.' },
   { secao: 'politicas', caminho: '/politicas', rotulo: 'Políticas', inicial: 'PO', grupo: 'Administração', descricao: 'Rito de validação por tipo e criticidade: etapas, evidência, score e SLA.' },
 ];
 
@@ -54,13 +54,14 @@ export const SOLICITAR_ACESSO: ItemDeMenu = {
 };
 
 /** O que a API diz que a pessoa pode (GET /v1/perfil). */
-export type Alcadas = { podeConceder: boolean; podeAdministrar: boolean };
+export type Alcadas = { podeConceder: boolean; podeEditarCadastros: boolean; podeAdministrar: boolean };
 
 // A decisão é do servidor (acesso.PERMISSOES, com os papéis concedidos e o
 // modo de leitura): esconder o item é conforto, não autorização.
 export function itensVisiveis(alcadas: Alcadas): ItemDeMenu[] {
   return MENU.filter((item) =>
     item.exige === 'conceder' ? alcadas.podeConceder
+      : item.exige === 'editarCadastros' ? alcadas.podeEditarCadastros
       : item.exige === 'administrar' ? alcadas.podeAdministrar
         : true);
 }

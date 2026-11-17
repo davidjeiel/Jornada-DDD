@@ -153,7 +153,7 @@ paths:
       tags:
         - Acesso
       summary: Cadastra a pessoa e pede um papel
-      description: 'Aberta a quem ainda não tem papel: não exige X-Pessoa. O cadastro não concede nada; a pessoa consulta o catálogo até um curador ou admin decidir. Matrícula já cadastrada atualiza o cadastro, sem duplicar; com pleito pendente, devolve 409 PLEITO_PENDENTE.'
+      description: 'Aberta a quem ainda não tem papel: não exige X-Pessoa. O cadastro não concede nada; a pessoa consulta o catálogo até um curador ou admin decidir. Matrícula já cadastrada reaproveita o cadastro como está, sem duplicar nem trocar os dados (corrigir é do curador ou admin); com pleito pendente, devolve 409 PLEITO_PENDENTE.'
       operationId: solicitarAcesso
       parameters:
         - name: x-correlation-id
@@ -913,7 +913,7 @@ paths:
       tags:
         - Acesso
       summary: 'Lista todos os cadastros, inclusive os inativos'
-      description: 'Só admin. Ativos primeiro, por nome. O parâmetro busca filtra por nome, matrícula, e-mail, unidade ou squad.'
+      description: 'Curador ou admin. Ativos primeiro, por nome. O parâmetro busca filtra por nome, matrícula, e-mail, unidade ou squad.'
       operationId: listarCadastros
       parameters:
         - name: busca
@@ -1204,7 +1204,7 @@ paths:
       tags:
         - Acesso
       summary: Corrige o cadastro e o situa como ativo ou inativo
-      description: 'Só admin. Nome, e-mail, unidade e squad; a matrícula não muda. ativa=false encerra todos os papéis; o administrador conectado não se inativa (403 PROPRIO_CADASTRO).'
+      description: 'Curador ou admin corrigem nome, e-mail, unidade e squad; a matrícula não muda. Mudar ativa é só do admin (403 para o curador): ativa=false encerra todos os papéis; o administrador conectado não se inativa (403 PROPRIO_CADASTRO).'
       operationId: corrigirCadastro
       parameters:
         - name: id
@@ -7692,6 +7692,7 @@ components:
         - blocosQueEscreve
         - podeConceder
         - podeConcederAdmin
+        - podeEditarCadastros
         - podeAdministrar
       type: object
       properties:
@@ -7727,6 +7728,9 @@ components:
         podeConcederAdmin:
           type: boolean
           description: Concede o papel de admin (só admin).
+        podeEditarCadastros:
+          type: boolean
+          description: Busca e corrige cadastros de pessoas na gestão de acessos (curador ou admin).
         podeAdministrar:
           type: boolean
           description: Administra a ferramenta (admin).

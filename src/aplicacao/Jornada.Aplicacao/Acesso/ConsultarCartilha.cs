@@ -32,6 +32,7 @@ public sealed class ConsultarCartilha(IPoliticasDeGovernanca politicas, IMetamod
         (Acao.Triar, "Triar a bandeja"),
         (Acao.Descontinuar, "Descontinuar ativo"),
         (Acao.Conceder, "Conceder papéis"),
+        (Acao.EditarCadastro, "Corrigir cadastro de pessoa"),
         (Acao.Administrar, "Administrar a ferramenta"),
     ];
 
